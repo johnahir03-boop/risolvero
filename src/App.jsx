@@ -1,6 +1,72 @@
 import { useState, useEffect, useRef } from "react";
 
-// ── SUPABASE ─────────────────────────────────────────────
+// ── NOTIFICATIONS ────────────────────────────────────────
+const NOTIF_KEY = "rslv_notif_time";
+
+async function registerSW() {
+  if ("serviceWorker" in navigator) {
+    try { await navigator.serviceWorker.register("/sw.js"); } catch {}
+  }
+}
+
+async function requestNotifPermission() {
+  if (!("Notification" in window)) return false;
+  if (Notification.permission === "granted") return true;
+  if (Notification.permission === "denied") return false;
+  const result = await Notification.requestPermission();
+  return result === "granted";
+}
+
+function scheduleNotifications() {
+  if (!("serviceWorker" in navigator) || Notification.permission !== "granted") return;
+  navigator.serviceWorker.ready.then(reg => {
+    if (!reg.active) return;
+    const notifs = load("rslv_notifs", { habits:true, streak:true, finance:true });
+    const reminderTime = load(NOTIF_KEY, "09:00");
+    const [hours, minutes] = reminderTime.split(":").map(Number);
+    const now = new Date();
+
+    // Daily habit reminder
+    if (notifs.habits) {
+      let next = new Date();
+      next.setHours(hours, minutes, 0, 0);
+      if (next <= now) next.setDate(next.getDate() + 1);
+      const delay = next - now;
+      const habits = load("rslv_habits", []);
+      const done = load("rslv_done", { date:"", checked:{} });
+      const todayDone = done.date === new Date().toISOString().slice(0,10);
+      const allComplete = habits.length > 0 && habits.every(h => done.checked?.[h.id]);
+      if (!todayDone || !allComplete) {
+        reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:"🌱 Risolvero", body:`${habits.length} habit${habits.length!==1?"s":""} waiting for you today. Keep your streak going!`, delay, tag:"daily-habit" });
+      }
+    }
+
+    // Streak reminder — 8pm if not opened
+    if (notifs.streak) {
+      const streak = load("rslv_streak", 0);
+      if (streak > 0) {
+        let streakReminder = new Date();
+        streakReminder.setHours(20, 0, 0, 0);
+        if (streakReminder <= now) streakReminder.setDate(streakReminder.getDate() + 1);
+        reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:`🔥 ${streak} day streak at risk!`, body:"Complete your habits today to keep your streak alive.", delay: streakReminder - now, tag:"streak" });
+      }
+    }
+
+    // Subscription reminders
+    if (notifs.finance) {
+      const subs = load("rslv_subs", []);
+      subs.filter(s => s.reminder).forEach(s => {
+        const renewDate = new Date(s.nextDate);
+        const twoDaysBefore = new Date(renewDate);
+        twoDaysBefore.setDate(twoDaysBefore.getDate() - 2);
+        twoDaysBefore.setHours(9, 0, 0, 0);
+        if (twoDaysBefore > now) {
+          reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:`💳 ${s.name} renews in 2 days`, body:`${s.name} will charge you soon. Check your Finance section.`, delay: twoDaysBefore - now, tag:`sub-${s.id}` });
+        }
+      });
+    }
+  });
+}
 const SUPABASE_URL = "https://cmeimhnmpnzxguwmdghs.supabase.co";
 const SUPABASE_KEY = "sb_publishable_vaMo5Vew20gPsY9JhTtOCQ_UEc9QiPA";
 
@@ -133,28 +199,34 @@ function AddHabitModal({ onAdd, onClose }) {
   return (
     <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:22 }}>
-          <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>New Habit</div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)" }}><Icons.Close /></button>
-        </div>
-        <div style={{ marginBottom:20 }}>
-          <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>Habit Name</div>
-          <input autoFocus value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="e.g. Morning walk"
-            style={{ width:"100%", padding:"14px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:15, fontFamily:"'Sora',sans-serif", fontWeight:500, outline:"none" }}/>
-        </div>
-        <div style={{ marginBottom:24 }}>
-          <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:10 }}>Pick an Icon</div>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-            {EMOJI_OPTIONS.map(e=>(
-              <button key={e} onClick={()=>setEmoji(e)} style={{ width:42, height:42, borderRadius:12, fontSize:20, background:emoji===e?"rgba(168,213,194,0.2)":"rgba(255,255,255,0.05)", border:emoji===e?"1.5px solid rgba(168,213,194,0.5)":"1px solid rgba(255,255,255,0.08)", cursor:"pointer", transition:"all 0.15s", display:"flex", alignItems:"center", justifyContent:"center" }}>{e}</button>
-            ))}
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", display:"flex", flexDirection:"column" }}>
+        {/* scrollable content */}
+        <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"24px 22px 8px", flex:1 }}>
+          <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:22 }}>
+            <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>New Habit</div>
+            <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)" }}><Icons.Close /></button>
+          </div>
+          <div style={{ marginBottom:20 }}>
+            <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>Habit Name</div>
+            <input autoFocus value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="e.g. Morning walk"
+              style={{ width:"100%", padding:"14px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:15, fontFamily:"'Sora',sans-serif", fontWeight:500, outline:"none" }}/>
+          </div>
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:10 }}>Pick an Icon</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+              {EMOJI_OPTIONS.map(e=>(
+                <button key={e} onClick={()=>setEmoji(e)} style={{ width:42, height:42, borderRadius:12, fontSize:20, background:emoji===e?"rgba(168,213,194,0.2)":"rgba(255,255,255,0.05)", border:emoji===e?"1.5px solid rgba(168,213,194,0.5)":"1px solid rgba(255,255,255,0.08)", cursor:"pointer", transition:"all 0.15s", display:"flex", alignItems:"center", justifyContent:"center" }}>{e}</button>
+              ))}
+            </div>
           </div>
         </div>
-        <button onClick={submit} disabled={!name.trim()} style={{ width:"100%", padding:"16px", background:name.trim()?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.08)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:name.trim()?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:name.trim()?"pointer":"not-allowed", transition:"all 0.2s" }}>
-          Add Habit
-        </button>
+        {/* fixed save button */}
+        <div style={{ padding:"12px 22px 44px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+          <button onClick={submit} disabled={!name.trim()} style={{ width:"100%", padding:"16px", background:name.trim()?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.08)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:name.trim()?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:name.trim()?"pointer":"not-allowed", transition:"all 0.2s" }}>
+            Add Habit
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -191,9 +263,10 @@ function HabitCard({ habit, done, pts, onToggle, onDelete, colorIdx, delay }) {
   );
 }
 
-function HomePage() {
+function HomePage({ onNavigate=()=>{} }) {
   const hr = new Date().getHours();
-  const greeting = hr<12?"Good morning":hr<17?"Good afternoon":"Good evening";
+  const greeting = hr<5?"Good night":hr<12?"Good morning":hr<17?"Good afternoon":hr<21?"Good evening":"Good night";
+  const displayName = load("rslv_display_name","");
   const [habits, setHabits] = useState(()=>load("rslv_habits",[]));
   const [done, setDone] = useState(()=>{ const s=load("rslv_done",{date:"",checked:{}}); return s.date===TODAY()?s.checked:{}; });
   const [streak, setStreak] = useState(()=>load("rslv_streak",0));
@@ -226,7 +299,7 @@ function HomePage() {
           <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:600, marginBottom:5 }}>
             {new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}
           </div>
-          <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px", lineHeight:1.1 }}>{greeting} 👋</div>
+          <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px", lineHeight:1.1 }}>{greeting}{displayName ? `, ${displayName}` : ""} 👋</div>
           <div style={{ fontSize:13, color:"rgba(255,255,255,0.3)", marginTop:5, fontFamily:"'Sora',sans-serif" }}>{msg}</div>
         </div>
         <div style={{ width:42, height:42, borderRadius:14, flexShrink:0, background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, fontWeight:800, color:"#1a1a2e", fontFamily:"'Sora',sans-serif", boxShadow:"0 4px 16px rgba(168,213,194,0.2)" }}>R</div>
@@ -272,6 +345,78 @@ function HomePage() {
       <div onClick={()=>setShowAdd(true)} style={{ padding:"15px 18px", borderRadius:20, border:"1px dashed rgba(255,255,255,0.1)", display:"flex", alignItems:"center", justifyContent:"center", gap:8, cursor:"pointer", color:"rgba(255,255,255,0.25)", fontSize:13, fontFamily:"'Sora',sans-serif", fontWeight:600, animation:"fadeUp 0.4s ease 0.3s both", marginBottom:14 }}>
         <Icons.Plus/> Add a habit
       </div>
+
+      {/* Quick Actions */}
+      {(() => {
+        const ALL_ACTIONS = [
+          { id:"learn",      emoji:"📖", label:"Learn 5 words",    tab:"learning",   color:"#D8D0F0" },
+          { id:"logfood",    emoji:"🍽️", label:"Log food",         tab:"fitness",    color:"#F5DDD0" },
+          { id:"water",      emoji:"💧", label:"Log water",         tab:"fitness",    color:"#C8DFF0" },
+          { id:"expense",    emoji:"💰", label:"Add expense",       tab:"finance",    color:"#C8E6DA" },
+          { id:"habit",      emoji:"✅", label:"Add habit",         tab:"home",       color:"#A8D5C2" },
+          { id:"workout",    emoji:"🏃", label:"Log workout",       tab:"fitness",    color:"#F5DDD0" },
+          { id:"walk",       emoji:"🚶", label:"Log walk",          tab:"fitness",    color:"#C8E6DA" },
+          { id:"finance",    emoji:"📊", label:"View finance",      tab:"finance",    color:"#C8E6DA" },
+          { id:"learning",   emoji:"🌍", label:"Learning session",  tab:"learning",   color:"#D8D0F0" },
+          { id:"challenges", emoji:"⚡", label:"Challenges",        tab:"community",  color:"#F0E8D0" },
+          { id:"community",  emoji:"🤝", label:"Community feed",    tab:"community",  color:"#C8DFF0" },
+          { id:"subscription",emoji:"📱",label:"Add subscription",  tab:"finance",    color:"#EDD0F0" },
+          { id:"profile",    emoji:"⚙️", label:"Settings",          tab:"profile",    color:"#F0D0D8" },
+          { id:"barcode",    emoji:"📷", label:"Scan barcode",      tab:"fitness",    color:"#F5DDD0" },
+        ];
+
+        const [activeActions, setActiveActions] = useState(()=>load("rslv_quick_actions",["learn","logfood","water","expense"]));
+        const [editMode, setEditMode] = useState(false);
+
+        const saveActions = (ids) => { setActiveActions(ids); save("rslv_quick_actions",ids); };
+        const toggle = (id) => {
+          if(activeActions.includes(id)) {
+            if(activeActions.length>1) saveActions(activeActions.filter(x=>x!==id));
+          } else {
+            if(activeActions.length<4) saveActions([...activeActions,id]);
+          }
+        };
+
+        const visible = ALL_ACTIONS.filter(a=>activeActions.includes(a.id));
+
+        return (
+          <div style={{ marginBottom:14, animation:"fadeUp 0.4s ease 0.32s both" }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+              <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Quick Actions</div>
+              <button onClick={()=>setEditMode(e=>!e)} style={{ background:editMode?"rgba(168,213,194,0.15)":"rgba(255,255,255,0.06)", border:editMode?"1px solid rgba(168,213,194,0.3)":"1px solid rgba(255,255,255,0.1)", borderRadius:10, padding:"5px 12px", cursor:"pointer", color:editMode?"#A8D5C2":"rgba(255,255,255,0.4)", fontSize:11, fontFamily:"'Sora',sans-serif", fontWeight:700 }}>
+                {editMode ? "Done" : "Edit"}
+              </button>
+            </div>
+
+            {editMode ? (
+              <div>
+                <div style={{ fontSize:12, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginBottom:10 }}>Pick up to 4 actions ({activeActions.length}/4 selected)</div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                  {ALL_ACTIONS.map(a=>{
+                    const selected = activeActions.includes(a.id);
+                    return (
+                      <div key={a.id} onClick={()=>toggle(a.id)} style={{ background:selected?`${a.color}20`:"rgba(255,255,255,0.04)", border:selected?`1.5px solid ${a.color}40`:"1px solid rgba(255,255,255,0.08)", borderRadius:14, padding:"11px 12px", display:"flex", alignItems:"center", gap:8, cursor:"pointer", transition:"all 0.15s" }}>
+                        <span style={{ fontSize:18 }}>{a.emoji}</span>
+                        <span style={{ fontSize:11, fontWeight:600, color:selected?a.color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", flex:1 }}>{a.label}</span>
+                        {selected && <div style={{ width:16, height:16, borderRadius:"50%", background:a.color, display:"flex", alignItems:"center", justifyContent:"center" }}><Icons.Check/></div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                {visible.map(a=>(
+                  <div key={a.id} onClick={()=>{ if(a.id==="habit") setShowAdd(true); else onNavigate(a.tab); }} style={{ background:`${a.color}15`, border:`1px solid ${a.color}25`, borderRadius:16, padding:"13px 14px", display:"flex", alignItems:"center", gap:10, cursor:"pointer", transition:"all 0.2s" }}>
+                    <span style={{ fontSize:20 }}>{a.emoji}</span>
+                    <span style={{ fontSize:12, fontWeight:700, color:a.color, fontFamily:"'Sora',sans-serif" }}>{a.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div style={{ padding:"14px 18px", borderRadius:20, background:"rgba(255,179,71,0.07)", border:"1px solid rgba(255,179,71,0.13)", display:"flex", alignItems:"center", gap:12, animation:"fadeUp 0.4s ease 0.35s both" }}>
         <div style={{ fontSize:22 }}>🔥</div>
@@ -472,7 +617,7 @@ function AddExpenseModal({ onAdd, onClose }) {
   return (
     <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"88vh", overflowY:"auto" }}>
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"88vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
         <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
 
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:22 }}>
@@ -592,7 +737,7 @@ function BorrowModal({ needyJar, allJars, onBorrow, onClose }) {
   return (
     <div style={{ position:"fixed", inset:0, zIndex:110, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", overflowY:"auto" }}>
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
         <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
           <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Borrow Money</div>
@@ -653,6 +798,70 @@ function SalaryModal({ current, onSave, onClose }) {
   );
 }
 
+function AddSubForm({ onAdd, currency }) {
+  const [name, setName] = useState("");
+  const [amount, setAmount] = useState("");
+  const [day, setDay] = useState("1");
+  const [emoji, setEmoji] = useState("📱");
+  const [reminder, setReminder] = useState(true);
+
+  const COMMON_SUBS = [
+    {name:"Netflix",emoji:"🎬",amount:"15.99"},{name:"Spotify",emoji:"🎵",amount:"9.99"},
+    {name:"Disney+",emoji:"✨",amount:"8.99"},{name:"Amazon Prime",emoji:"📦",amount:"4.99"},
+    {name:"YouTube Premium",emoji:"▶️",amount:"13.99"},{name:"Apple TV+",emoji:"🍎",amount:"8.99"},
+  ];
+
+  const nextDate = () => {
+    const today = new Date();
+    const d = parseInt(day)||1;
+    let next = new Date(today.getFullYear(), today.getMonth(), d);
+    if(next <= today) next = new Date(today.getFullYear(), today.getMonth()+1, d);
+    return next.toISOString().split("T")[0];
+  };
+
+  const submit = () => {
+    if(!name.trim()||!amount) return;
+    onAdd({ name:name.trim(), amount:parseFloat(amount), emoji, nextDate:nextDate(), reminder, jar:"play" });
+  };
+
+  return (
+    <div>
+      <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8, letterSpacing:"0.1em", textTransform:"uppercase" }}>Quick Pick</div>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:16 }}>
+        {COMMON_SUBS.map(s=>(
+          <div key={s.name} onClick={()=>{ setName(s.name); setAmount(s.amount); setEmoji(s.emoji); }} style={{ padding:"7px 12px", borderRadius:12, background:name===s.name?"rgba(168,213,194,0.15)":"rgba(255,255,255,0.05)", border:name===s.name?"1px solid rgba(168,213,194,0.3)":"1px solid rgba(255,255,255,0.08)", cursor:"pointer", display:"flex", alignItems:"center", gap:6 }}>
+            <span style={{ fontSize:14 }}>{s.emoji}</span>
+            <span style={{ fontSize:12, fontWeight:600, color:name===s.name?"#A8D5C2":"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif" }}>{s.name}</span>
+          </div>
+        ))}
+      </div>
+      {[
+        {label:"Name",val:name,set:setName,placeholder:"e.g. Netflix"},
+        {label:`Amount (${currency})`,val:amount,set:setAmount,placeholder:"9.99",type:"number"},
+        {label:"Renewal Day of Month",val:day,set:setDay,placeholder:"e.g. 15",type:"number"},
+      ].map(({label,val,set,placeholder,type="text"})=>(
+        <div key={label} style={{ marginBottom:14 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8, letterSpacing:"0.1em", textTransform:"uppercase" }}>{label}</div>
+          <input type={type} value={val} onChange={e=>set(e.target.value)} placeholder={placeholder}
+            style={{ width:"100%", padding:"13px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:15, fontFamily:"'Sora',sans-serif", fontWeight:600, outline:"none" }}/>
+        </div>
+      ))}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 16px", background:"rgba(255,255,255,0.04)", borderRadius:14, marginBottom:20 }}>
+        <div>
+          <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,255,255,0.8)", fontFamily:"'Sora',sans-serif" }}>🔔 Remind me before renewal</div>
+          <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>Get notified 2 days before charge</div>
+        </div>
+        <div onClick={()=>setReminder(r=>!r)} style={{ width:44, height:26, borderRadius:13, background:reminder?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.1)", position:"relative", cursor:"pointer", transition:"all 0.25s", flexShrink:0 }}>
+          <div style={{ position:"absolute", top:3, left:reminder?20:3, width:20, height:20, borderRadius:"50%", background:"#fff", transition:"all 0.25s", boxShadow:"0 2px 6px rgba(0,0,0,0.3)" }}/>
+        </div>
+      </div>
+      <button onClick={submit} disabled={!name.trim()||!amount} style={{ width:"100%", padding:"15px", background:name.trim()&&amount?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.08)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:name.trim()&&amount?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:name.trim()&&amount?"pointer":"not-allowed" }}>
+        Add Subscription
+      </button>
+    </div>
+  );
+}
+
 function FinancePage({ onModalChange=()=>{} }) {
   const [salary, setSalary] = useState(()=>load("rslv_salary", 0));
   const [expenses, setExpenses] = useState(()=>load("rslv_expenses", []));
@@ -662,6 +871,12 @@ function FinancePage({ onModalChange=()=>{} }) {
   const [selectedJar, setSelectedJar] = useState(null);
   const [borrowFromJar, setBorrowFromJar] = useState(null);
   const [returnBannerDismissed, setReturnBannerDismissed] = useState(false);
+  const [showJarInfo, setShowJarInfo] = useState(false);
+  const [subs, setSubs] = useState(()=>load("rslv_subs",[]));
+  const [showAddSub, setShowAddSub] = useState(false);
+  const currency = load("rslv_currency","€");
+
+  useEffect(()=>{ save("rslv_subs",subs); },[subs]);
 
   const openModal  = (fn) => { onModalChange(true);  fn(); };
   const closeModal = (fn) => { onModalChange(false); fn(); };
@@ -699,8 +914,13 @@ function FinancePage({ onModalChange=()=>{} }) {
     <div style={{ padding:"0 18px 32px" }}>
       {/* header */}
       <div style={{ marginBottom:22, animation:"fadeUp 0.4s ease both" }}>
-        <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:600, marginBottom:5 }}>YOUR MONEY</div>
-        <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px" }}>Finance</div>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div>
+            <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:600, marginBottom:5 }}>YOUR MONEY</div>
+            <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px" }}>Finance</div>
+          </div>
+          <button onClick={()=>{ onModalChange(true); setShowJarInfo(true); }} style={{ background:"rgba(168,213,194,0.1)", border:"1px solid rgba(168,213,194,0.2)", borderRadius:12, padding:"8px 14px", cursor:"pointer", color:"#A8D5C2", fontSize:12, fontFamily:"'Sora',sans-serif", fontWeight:700 }}>ℹ️ How it works</button>
+        </div>
       </div>
 
       {/* return loans banner */}
@@ -851,10 +1071,85 @@ function FinancePage({ onModalChange=()=>{} }) {
         </div>
       )}
 
+      {/* SUBSCRIPTIONS */}
+      <div style={{ marginTop:20 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+          <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Subscriptions</div>
+          <div onClick={()=>openModal(()=>setShowAddSub(true))} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:20, background:"rgba(168,213,194,0.12)", border:"1px solid rgba(168,213,194,0.25)", cursor:"pointer", color:"#A8D5C2", fontSize:12, fontWeight:700, fontFamily:"'Sora',sans-serif" }}>
+            <Icons.Plus/> Add
+          </div>
+        </div>
+        {subs.length===0 ? (
+          <div style={{ padding:"20px", textAlign:"center", background:"rgba(255,255,255,0.03)", borderRadius:18, border:"1px dashed rgba(255,255,255,0.07)" }}>
+            <div style={{ fontSize:12, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif" }}>No subscriptions yet. Add Netflix, Spotify, etc.</div>
+          </div>
+        ) : (
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {subs.map((s,i)=>{
+              const daysUntil = Math.ceil((new Date(s.nextDate)-new Date())/(1000*60*60*24));
+              const urgent = daysUntil<=2;
+              return (
+                <div key={s.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 15px", background: urgent?"rgba(255,179,71,0.08)":"rgba(255,255,255,0.04)", border: urgent?"1px solid rgba(255,179,71,0.2)":"1px solid rgba(255,255,255,0.07)", borderRadius:16 }}>
+                  <div style={{ fontSize:20 }}>{s.emoji||"📱"}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif" }}>{s.name}</div>
+                    <div style={{ fontSize:11, color: urgent?"#FFB347":"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>
+                      {urgent ? `⚠️ Due in ${daysUntil} day${daysUntil===1?"":"s"}` : `Next: ${new Date(s.nextDate).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}`}
+                    </div>
+                  </div>
+                  <div style={{ fontSize:14, fontWeight:800, color:"#F0D0D8", fontFamily:"'Sora',sans-serif" }}>{currency}{s.amount}</div>
+                  <button onClick={()=>setSubs(p=>p.filter(x=>x.id!==s.id))} style={{ background:"none", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.15)", padding:4 }}><Icons.Trash/></button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {showSalary && <SalaryModal current={salary} onSave={handleSetSalary} onClose={()=>closeModal(()=>setShowSalary(false))}/>}
       {showExpense && <AddExpenseModal onAdd={addExpense} onClose={()=>closeModal(()=>setShowExpense(false))}/>}
       {selectedJar && <JarInfoModal jar={selectedJar} allocated={salary*selectedJar.pct} spent={spentPerJar(selectedJar.key)} onBorrow={()=>{ setBorrowFromJar(selectedJar); setSelectedJar(null); }} onClose={()=>closeModal(()=>setSelectedJar(null))}/>}
       {borrowFromJar && <BorrowModal needyJar={borrowFromJar} allJars={JARS} onBorrow={borrowMoney} onClose={()=>setBorrowFromJar(null)}/>}
+      {showAddSub && (
+        <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
+          <div onClick={()=>closeModal(()=>setShowAddSub(false))} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
+          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", display:"flex", flexDirection:"column" }}>
+            <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"24px 22px 8px", flex:1 }}>
+              <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 20px" }}/>
+              <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:20 }}>Add Subscription</div>
+              <AddSubForm onAdd={(sub)=>{ setSubs(p=>[...p,{id:Date.now().toString(),...sub}]); closeModal(()=>setShowAddSub(false)); }} currency={currency}/>
+            </div>
+          </div>
+        </div>
+      )}
+      {showJarInfo && (
+        <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
+          <div onClick={()=>{ onModalChange(false); setShowJarInfo(false); }} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
+          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", display:"flex", flexDirection:"column" }}>
+            <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"24px 22px 8px", flex:1 }}>
+              <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
+              <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>The 6 Jar System 🪙</div>
+              <div style={{ fontSize:13, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", lineHeight:1.7, marginBottom:20 }}>
+                From T. Harv Eker's "Secrets of the Millionaire Mind". Split every salary into 6 jars — each with a purpose. This simple system changes how you think about money.
+              </div>
+              {JARS.map(jar=>(
+                <div key={jar.key} style={{ background:jar.color, borderRadius:18, padding:"16px", marginBottom:10 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                    <span style={{ fontSize:22 }}>{jar.emoji}</span>
+                    <div>
+                      <div style={{ fontSize:15, fontWeight:800, color:jar.text, fontFamily:"'Sora',sans-serif" }}>{jar.label} — {Math.round(jar.pct*100)}%</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize:12, color:jar.text, opacity:0.7, fontFamily:"'Sora',sans-serif", lineHeight:1.6 }}>{jar.desc}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ padding:"12px 22px 44px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+              <button onClick={()=>{ onModalChange(false); setShowJarInfo(false); }} style={{ width:"100%", padding:"15px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer" }}>Got it!</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1843,8 +2138,12 @@ function AuthScreen({ onLogin, onSignup, onClose, onModalChange=()=>{} }) {
   };
 
   return (
-    <div style={{ minHeight:"calc(100vh - 180px)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"0 24px" }}>
-      <div style={{ width:"100%", maxWidth:380 }}>
+    <div style={{ minHeight:"calc(100vh - 80px)", display:"flex", flexDirection:"column", padding:"0 24px", paddingTop:60 }}>
+      {/* back button */}
+      {onClose && (
+        <button onClick={onClose} style={{ position:"absolute", top:60, left:18, background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:12, width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:18 }}>‹</button>
+      )}
+      <div style={{ width:"100%", maxWidth:380, margin:"0 auto" }}>
         <div style={{ textAlign:"center", marginBottom:32 }}>
           <div style={{ fontSize:48, marginBottom:12 }}>🌱</div>
           <div style={{ fontSize:24, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>Join the Community</div>
@@ -1981,7 +2280,7 @@ function CreatePostModal({ user, token, onPost, onClose }) {
   return (
     <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", overflowY:"auto" }}>
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
         <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 20px" }}/>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
           <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Share Your Win 🏆</div>
@@ -2028,7 +2327,7 @@ function CreateChallengeModal({ user, token, onCreated, onClose }) {
   return (
     <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", overflowY:"auto" }}>
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
         <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 20px" }}/>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
           <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Create Challenge ⚡</div>
@@ -2783,20 +3082,70 @@ function ProfilePage({ onModalChange=()=>{} }) {
     </div>
   );
 
+  if(section==="help") return (
+    <div style={{ padding:"0 18px 32px" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
+        <button onClick={()=>setSection(null)} style={{ background:"rgba(255,255,255,0.06)", border:"none", borderRadius:10, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:18 }}>‹</button>
+        <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Help Center</div>
+      </div>
+      {[
+        { q:"How does the Growth Circle work?", a:"Your Growth Circle fills based on the habits you complete each day. Each habit is worth an equal share of 100 points. Complete all habits = 100. It resets every day — fresh start, no guilt." },
+        { q:"How does the Jar System work?", a:"When you add your salary, it automatically splits into 6 jars based on T. Harv Eker's system: 55% Necessities, 10% Savings, 10% Education, 10% Play, 10% Freedom, 5% Give. Each expense deducts from the right jar." },
+        { q:"How do I join a Challenge?", a:"Go to Community → Challenges tab. Tap any challenge and hit Join. It will appear on your Home dashboard and affect your Growth Circle while active." },
+        { q:"Why is my streak broken?", a:"Your streak only continues if you complete ALL your habits every day. Miss one day and it resets to 0. Tip: keep your habit list small and realistic." },
+        { q:"How do I add a subscription reminder?", a:"Go to Finance → Subscriptions section → tap Add. Add the name, amount and renewal day. Toggle on the reminder and you'll be notified 2 days before it renews." },
+        { q:"Can I change my currency?", a:"Yes. Go to Settings → Currency and pick from 15 currencies. The change applies everywhere in the app immediately." },
+      ].map(({q,a},i)=>(
+        <div key={i} style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:18, padding:"16px", marginBottom:10 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>{q}</div>
+          <div style={{ fontSize:13, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", lineHeight:1.6 }}>{a}</div>
+        </div>
+      ))}
+    </div>
+  );
+
+  if(section==="privacy") return (
+    <div style={{ padding:"0 18px 32px" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
+        <button onClick={()=>setSection(null)} style={{ background:"rgba(255,255,255,0.06)", border:"none", borderRadius:10, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:18 }}>‹</button>
+        <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Privacy Policy</div>
+      </div>
+      {[
+        { title:"Data We Collect", body:"Risolvero stores your habits, finance data, fitness logs and learning history locally on your device. Community posts and profile data are stored on our secure Supabase database." },
+        { title:"How We Use Your Data", body:"Your data is used only to power the app features you use. We never sell your data to third parties. We never share your personal information with advertisers." },
+        { title:"Community Data", body:"When you post in the community, your username and post content are visible to other users. You can delete your posts at any time." },
+        { title:"Local Storage", body:"All personal data (habits, finance, fitness, learning) is stored locally on your device using browser localStorage. Clearing app data in Settings removes everything." },
+        { title:"Third Party Services", body:"We use Supabase for community features and Open Food Facts for food database search. Both are privacy-respecting services." },
+        { title:"Contact", body:"For any privacy concerns, you can clear all your data at any time from Settings → Data → Clear All App Data." },
+      ].map(({title,body},i)=>(
+        <div key={i} style={{ marginBottom:16 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>{title}</div>
+          <div style={{ fontSize:13, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", lineHeight:1.7 }}>{body}</div>
+        </div>
+      ))}
+    </div>
+  );
+
   // ── MAIN SETTINGS SCREEN ──
   return (
-    <div style={{ padding:"0 0 32px" }}>
+    <div style={{ padding:"0 0 120px" }}>
+
+      {/* header */}
+      <div style={{ padding:"0 18px 20px", animation:"fadeUp 0.4s ease both" }}>
+        <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:600, marginBottom:5 }}>APP</div>
+        <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px" }}>Settings</div>
+      </div>
+
       {/* profile card */}
-      <div style={{ padding:"0 18px", marginBottom:24, animation:"fadeUp 0.4s ease both" }}>
+      <div style={{ padding:"0 18px", marginBottom:24 }}>
         <div style={{ display:"flex", alignItems:"center", gap:14, padding:"20px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:24 }}>
           <div onClick={()=>{ setDraftName(name); setDraftAvatar(avatar); onModalChange(true); setEditName(true); }}
-            style={{ width:60, height:60, borderRadius:18, background: avatar?"transparent":"linear-gradient(135deg,#A8D5C2,#C5B8E8)", overflow:"hidden", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, fontWeight:800, color:"#1a1d2e", fontFamily:"'Sora',sans-serif", cursor:"pointer", position:"relative" }}>
+            style={{ width:60, height:60, borderRadius:18, background: avatar?"transparent":"linear-gradient(135deg,#A8D5C2,#C5B8E8)", overflow:"hidden", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, fontWeight:800, color:"#1a1d2e", fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>
             {avatar ? <img src={avatar} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : (name?.[0]||"R")}
-            <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.3)", display:"flex", alignItems:"center", justifyContent:"center", opacity:0, transition:"opacity 0.2s" }} className="edit-overlay">✏️</div>
           </div>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:2 }}>{name||"Your Name"}</div>
-            <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif" }}>Tap avatar to edit profile</div>
+            <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif" }}>Tap to edit profile</div>
           </div>
           <button onClick={()=>{ setDraftName(name); setDraftAvatar(avatar); onModalChange(true); setEditName(true); }} style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, padding:"7px 12px", cursor:"pointer", color:"rgba(255,255,255,0.4)", fontSize:12, fontFamily:"'Sora',sans-serif", fontWeight:700 }}>Edit</button>
         </div>
@@ -2804,7 +3153,7 @@ function ProfilePage({ onModalChange=()=>{} }) {
 
       {/* PREFERENCES */}
       <div style={{ padding:"0 18px", marginBottom:8 }}>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>Preferences</div>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Preferences</div>
       </div>
       <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
         <Row icon="💰" label="Currency" value={currency} onPress={()=>setSection("currency")}/>
@@ -2814,26 +3163,32 @@ function ProfilePage({ onModalChange=()=>{} }) {
 
       {/* NOTIFICATIONS */}
       <div style={{ padding:"0 18px", marginBottom:8 }}>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>Notifications</div>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Notifications</div>
       </div>
       <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
         <Toggle icon="🔥" label="Daily Habit Reminder" value={notifs.habits} onToggle={()=>toggleNotif("habits")}/>
         <Toggle icon="⚡" label="Streak Alert" value={notifs.streak} onToggle={()=>toggleNotif("streak")}/>
         <Toggle icon="💰" label="Finance Reminders" value={notifs.finance} onToggle={()=>toggleNotif("finance")}/>
-      </div>
-
-      {/* DATA */}
-      <div style={{ padding:"0 18px", marginBottom:8 }}>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>Data</div>
-      </div>
-      <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
-        <Row icon="🔄" label="Reset Today's Data" onPress={()=>setShowReset(true)}/>
-        <Row icon="🗑" label="Clear All App Data" danger onPress={()=>setShowClear(true)}/>
+        <div style={{ display:"flex", alignItems:"center", gap:14, padding:"15px 18px", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+          <div style={{ fontSize:18, width:24, textAlign:"center" }}>⏰</div>
+          <div style={{ flex:1, fontSize:14, fontWeight:600, color:"rgba(255,255,255,0.8)", fontFamily:"'Sora',sans-serif" }}>Reminder Time</div>
+          <input type="time" defaultValue={load(NOTIF_KEY,"09:00")} onChange={e=>{ save(NOTIF_KEY,e.target.value); scheduleNotifications(); }}
+            style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, padding:"6px 12px", color:"#fff", fontSize:14, fontFamily:"'Sora',sans-serif", outline:"none", colorScheme:"dark" }}/>
+        </div>
+        <div onClick={async()=>{ const granted = await requestNotifPermission(); if(granted) scheduleNotifications(); }} style={{ display:"flex", alignItems:"center", gap:14, padding:"15px 18px", cursor:"pointer" }}>
+          <div style={{ fontSize:18, width:24, textAlign:"center" }}>🔔</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:14, fontWeight:600, color:"#A8D5C2", fontFamily:"'Sora',sans-serif" }}>Enable Notifications</div>
+            <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>
+              {typeof Notification !== "undefined" ? Notification.permission === "granted" ? "✅ Notifications enabled" : "Tap to allow notifications" : "Not supported on this browser"}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* COMMUNITY ACCOUNT */}
       <div style={{ padding:"0 18px", marginBottom:8 }}>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>Community Account</div>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Community Account</div>
       </div>
       <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
         {token ? (
@@ -2853,13 +3208,33 @@ function ProfilePage({ onModalChange=()=>{} }) {
         )}
       </div>
 
+      {/* DATA */}
+      <div style={{ padding:"0 18px", marginBottom:8 }}>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Data</div>
+      </div>
+      <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
+        <Row icon="🔄" label="Reset Today's Data" onPress={()=>setShowReset(true)}/>
+        <Row icon="🗑" label="Clear All App Data" danger onPress={()=>setShowClear(true)}/>
+      </div>
+
+      {/* SUPPORT */}
+      <div style={{ padding:"0 18px", marginBottom:8 }}>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Support</div>
+      </div>
+      <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
+        <Row icon="❓" label="Help Center" onPress={()=>setSection("help")}/>
+        <Row icon="🔒" label="Privacy Policy" onPress={()=>setSection("privacy")}/>
+        <Row icon="⭐" label="Rate Risolvero" onPress={()=>window.open("https://risolveroapp2.vercel.app","_blank")}/>
+      </div>
+
       {/* ABOUT */}
       <div style={{ padding:"0 18px", marginBottom:8 }}>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>About</div>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>About</div>
       </div>
       <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
         <Row icon="📱" label="Version" value="1.0.0"/>
         <Row icon="🌱" label="Risolvero" value="Built for growth"/>
+        <Row icon="👨‍💻" label="Made with" value="❤️"/>
       </div>
 
       {/* auth modal */}
@@ -2954,12 +3329,167 @@ function ProfilePage({ onModalChange=()=>{} }) {
   );
 }
 
+/* ─────────────────────────────────────────────
+   ONBOARDING
+───────────────────────────────────────────── */
+function OnboardingScreen({ onComplete }) {
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState("");
+  const [goals, setGoals] = useState([]);
+
+  const GOAL_OPTIONS = [
+    { id:"habits",   emoji:"✅", label:"Build habits",     desc:"Daily routines that stick" },
+    { id:"fitness",  emoji:"💪", label:"Get fit",           desc:"Track food, water & workouts" },
+    { id:"finance",  emoji:"💰", label:"Save money",        desc:"The jar system that works" },
+    { id:"learning", emoji:"📚", label:"Learn something",   desc:"5 words a day, every day" },
+  ];
+
+  const toggleGoal = (id) => setGoals(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
+
+  const SCREENS = [
+    // Screen 0 — Welcome
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100vh", padding:"0 28px", textAlign:"center" }}>
+      <div style={{ fontSize:72, marginBottom:24, animation:"cardIn 0.6s ease both" }}>🌱</div>
+      <div style={{ fontSize:32, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-1px", marginBottom:12, lineHeight:1.2, animation:"fadeUp 0.5s ease 0.1s both" }}>
+        Welcome to Risolvero
+      </div>
+      <div style={{ fontSize:16, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", lineHeight:1.7, marginBottom:48, animation:"fadeUp 0.5s ease 0.2s both" }}>
+        The app for people who want to be better — and actually become it.
+      </div>
+      <div style={{ width:"100%", animation:"fadeUp 0.5s ease 0.3s both" }}>
+        <button onClick={()=>setStep(1)} style={{ width:"100%", padding:"18px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:20, fontSize:16, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer", marginBottom:12, boxShadow:"0 8px 30px rgba(168,213,194,0.25)" }}>
+          Let's go →
+        </button>
+        <button onClick={()=>onComplete("")} style={{ width:"100%", padding:"14px", background:"none", border:"none", fontSize:13, fontFamily:"'Sora',sans-serif", color:"rgba(255,255,255,0.2)", cursor:"pointer" }}>
+          Skip intro
+        </button>
+      </div>
+    </div>,
+
+    // Screen 1 — What do you want to improve?
+    <div style={{ padding:"60px 24px 32px", minHeight:"100vh" }}>
+      <div style={{ fontSize:11, color:"rgba(255,255,255,0.3)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:12 }}>Step 1 of 3</div>
+      <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px", marginBottom:6, lineHeight:1.2 }}>What do you want to improve?</div>
+      <div style={{ fontSize:14, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:32 }}>Pick everything that matters to you</div>
+      <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:40 }}>
+        {GOAL_OPTIONS.map(g=>{
+          const sel = goals.includes(g.id);
+          return (
+            <div key={g.id} onClick={()=>toggleGoal(g.id)} style={{ display:"flex", alignItems:"center", gap:16, padding:"18px 20px", borderRadius:20, background:sel?"rgba(168,213,194,0.1)":"rgba(255,255,255,0.04)", border:sel?"1.5px solid rgba(168,213,194,0.35)":"1px solid rgba(255,255,255,0.08)", cursor:"pointer", transition:"all 0.2s" }}>
+              <div style={{ fontSize:32 }}>{g.emoji}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:16, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif" }}>{g.label}</div>
+                <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>{g.desc}</div>
+              </div>
+              <div style={{ width:24, height:24, borderRadius:"50%", background:sel?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.2s", flexShrink:0 }}>
+                {sel && <Icons.Check/>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <button onClick={()=>setStep(2)} disabled={goals.length===0} style={{ width:"100%", padding:"18px", background:goals.length>0?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.06)", border:"none", borderRadius:20, fontSize:16, fontWeight:800, fontFamily:"'Sora',sans-serif", color:goals.length>0?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:goals.length>0?"pointer":"not-allowed", transition:"all 0.2s" }}>
+        Continue →
+      </button>
+    </div>,
+
+    // Screen 2 — What's your name?
+    <div style={{ padding:"60px 24px 32px", minHeight:"100vh" }}>
+      <div style={{ fontSize:11, color:"rgba(255,255,255,0.3)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:12 }}>Step 2 of 3</div>
+      <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px", marginBottom:6 }}>What's your name?</div>
+      <div style={{ fontSize:14, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:40 }}>So the app feels personal</div>
+      <input
+        autoFocus
+        value={name}
+        onChange={e=>setName(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&name.trim()&&setStep(3)}
+        placeholder="Your first name"
+        style={{ width:"100%", padding:"18px 20px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:18, color:"#fff", fontSize:22, fontFamily:"'Sora',sans-serif", fontWeight:700, outline:"none", marginBottom:40, display:"block" }}
+      />
+      <div style={{ fontSize:13, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif", textAlign:"center", marginBottom:20 }}>
+        {name ? `Nice to meet you, ${name} 👋` : ""}
+      </div>
+      <button onClick={()=>setStep(3)} disabled={!name.trim()} style={{ width:"100%", padding:"18px", background:name.trim()?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.06)", border:"none", borderRadius:20, fontSize:16, fontWeight:800, fontFamily:"'Sora',sans-serif", color:name.trim()?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:name.trim()?"pointer":"not-allowed", transition:"all 0.2s" }}>
+        Continue →
+      </button>
+    </div>,
+
+    // Screen 3 — Ready!
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100vh", padding:"0 28px", textAlign:"center" }}>
+      <div style={{ fontSize:72, marginBottom:20, animation:"cardIn 0.5s ease both" }}>🚀</div>
+      <div style={{ fontSize:30, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-1px", marginBottom:10, animation:"fadeUp 0.5s ease 0.05s both" }}>
+        {name ? `You're ready, ${name}!` : "You're ready!"}
+      </div>
+      <div style={{ fontSize:15, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", lineHeight:1.7, marginBottom:16, animation:"fadeUp 0.5s ease 0.1s both" }}>
+        Your journey starts today.
+      </div>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, justifyContent:"center", marginBottom:40, animation:"fadeUp 0.5s ease 0.15s both" }}>
+        {goals.map(g=>{ const opt = GOAL_OPTIONS.find(o=>o.id===g); return opt ? (
+          <div key={g} style={{ padding:"8px 16px", borderRadius:20, background:"rgba(168,213,194,0.1)", border:"1px solid rgba(168,213,194,0.2)", fontSize:13, fontWeight:600, color:"#A8D5C2", fontFamily:"'Sora',sans-serif" }}>
+            {opt.emoji} {opt.label}
+          </div>
+        ) : null; })}
+      </div>
+      <button onClick={()=>onComplete(name)} style={{ width:"100%", padding:"18px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:20, fontSize:16, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer", boxShadow:"0 8px 30px rgba(168,213,194,0.25)", animation:"fadeUp 0.5s ease 0.2s both" }}>
+        Start growing 🌱
+      </button>
+    </div>
+  ];
+
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap');
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+        html,body{background:#12141E;height:100%;}
+        ::-webkit-scrollbar{display:none;}
+        @keyframes cardIn{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+      `}</style>
+      <div style={{ maxWidth:430, margin:"0 auto", background:"#12141E", minHeight:"100vh", position:"relative", overflow:"hidden" }}>
+        {/* progress dots */}
+        {step > 0 && (
+          <div style={{ position:"fixed", top:20, left:"50%", transform:"translateX(-50%)", display:"flex", gap:6, zIndex:10 }}>
+            {[1,2,3].map(i=>(
+              <div key={i} style={{ width: step>=i?24:8, height:8, borderRadius:8, background: step>=i?"#A8D5C2":"rgba(255,255,255,0.15)", transition:"all 0.3s" }}/>
+            ))}
+          </div>
+        )}
+        {/* back button */}
+        {step > 0 && (
+          <button onClick={()=>setStep(s=>s-1)} style={{ position:"fixed", top:14, left:18, background:"rgba(255,255,255,0.06)", border:"none", borderRadius:12, width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:18, zIndex:10 }}>‹</button>
+        )}
+        <div key={step} style={{ animation:"tabIn 0.3s ease both" }}>
+          {SCREENS[step]}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function Risolvero() {
   const [tab, setTab] = useState("home");
   const [navHidden, setNavHidden] = useState(false);
+  const [onboarded, setOnboarded] = useState(()=>!!localStorage.getItem("rslv_onboarded"));
+  const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+
+  useEffect(()=>{
+    registerSW();
+    if(onboarded) scheduleNotifications();
+  },[onboarded]);
+
+  const completeOnboarding = (name) => {
+    if(name) save("rslv_display_name", name);
+    localStorage.setItem("rslv_onboarded","1");
+    setOnboarded(true);
+    // ask for notification permission after onboarding
+    setTimeout(()=>setShowNotifPrompt(true), 800);
+  };
+
+  if(!onboarded) return <OnboardingScreen onComplete={completeOnboarding}/>;
 
   const pages = {
-    home:      <HomePage/>,
+    home:      <HomePage onNavigate={setTab}/>,
     fitness:   <FitnessPage onModalChange={setNavHidden}/>,
     learning:  <LearningPage/>,
     finance:   <FinancePage onModalChange={setNavHidden}/>,
@@ -2976,6 +3506,7 @@ export default function Risolvero() {
         .modal-open-nav{display:none !important;}
         @media (max-height: 500px){ .bottom-nav{ display:none !important; } }
         ::-webkit-scrollbar{display:none;}
+        *{-webkit-overflow-scrolling:touch;}
         input::placeholder{color:rgba(255,255,255,0.25);}
         input{color-scheme:dark;}
         @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
@@ -2984,7 +3515,7 @@ export default function Risolvero() {
         @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
       `}</style>
-      <div style={{ maxWidth:430, margin:"0 auto", minHeight:"100vh", background:"#12141E", position:"relative", overflow:"hidden", fontFamily:"'Sora',sans-serif" }}>
+      <div style={{ maxWidth:430, margin:"0 auto", minHeight:"100vh", background:"#12141E", position:"relative", overflowX:"hidden", overflowY:"auto", fontFamily:"'Sora',sans-serif" }}>
         <div style={{ position:"fixed", top:0, left:"50%", transform:"translateX(-50%)", width:430, height:"100vh", pointerEvents:"none", zIndex:0 }}>
           <div style={{ position:"absolute", top:-60, left:"20%", width:280, height:280, background:"radial-gradient(circle,rgba(168,213,194,0.06) 0%,transparent 65%)", filter:"blur(50px)" }}/>
           <div style={{ position:"absolute", top:100, right:"5%", width:200, height:200, background:"radial-gradient(circle,rgba(197,184,232,0.05) 0%,transparent 65%)", filter:"blur(40px)" }}/>
@@ -2998,6 +3529,26 @@ export default function Risolvero() {
         <div key={tab} style={{ position:"relative", zIndex:1, paddingBottom:110, animation:"tabIn 0.25s ease both" }}>
           {pages[tab]}
         </div>
+        {/* Notification permission prompt */}
+        {showNotifPrompt && Notification.permission === "default" && (
+          <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"flex-end", justifyContent:"center", padding:"0 0 40px" }}>
+            <div onClick={()=>setShowNotifPrompt(false)} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.5)" }}/>
+            <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:28, padding:"28px 24px", margin:"0 16px", border:"1px solid rgba(255,255,255,0.1)", animation:"sheetUp 0.3s ease both" }}>
+              <div style={{ fontSize:40, textAlign:"center", marginBottom:14 }}>🔔</div>
+              <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", textAlign:"center", marginBottom:8 }}>Stay on track</div>
+              <div style={{ fontSize:14, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", textAlign:"center", lineHeight:1.6, marginBottom:24 }}>
+                Get reminders for your habits, streak alerts and subscription renewals.
+              </div>
+              <button onClick={async()=>{ await requestNotifPermission(); scheduleNotifications(); setShowNotifPrompt(false); }} style={{ width:"100%", padding:"16px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer", marginBottom:10 }}>
+                Enable Notifications
+              </button>
+              <button onClick={()=>setShowNotifPrompt(false)} style={{ width:"100%", padding:"12px", background:"none", border:"none", fontSize:13, fontFamily:"'Sora',sans-serif", color:"rgba(255,255,255,0.25)", cursor:"pointer" }}>
+                Not now
+              </button>
+            </div>
+          </div>
+        )}
+
         {!navHidden && (
         <div className="bottom-nav" style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, padding:"0 16px 26px", zIndex:20, paddingBottom:"max(26px, env(safe-area-inset-bottom))" }}>
           <div style={{ background:"rgba(18,20,30,0.96)", backdropFilter:"blur(30px)", WebkitBackdropFilter:"blur(30px)", borderRadius:28, border:"1px solid rgba(255,255,255,0.07)", padding:"10px 4px", display:"flex", justifyContent:"space-around", boxShadow:"0 8px 40px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.05)" }}>
