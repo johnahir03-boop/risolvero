@@ -5,67 +5,71 @@ const NOTIF_KEY = "rslv_notif_time";
 
 async function registerSW() {
   if ("serviceWorker" in navigator) {
-    try { await navigator.serviceWorker.register("/sw.js"); } catch {}
+    try { await navigator.serviceWorker.register("/sw.js"); } catch(e) {}
   }
 }
 
 async function requestNotifPermission() {
-  if (!("Notification" in window)) return false;
-  if (Notification.permission === "granted") return true;
-  if (Notification.permission === "denied") return false;
-  const result = await Notification.requestPermission();
-  return result === "granted";
+  try {
+    if (!("Notification" in window)) return false;
+    if (Notification.permission === "granted") return true;
+    if (Notification.permission === "denied") return false;
+    const result = await Notification.requestPermission();
+    return result === "granted";
+  } catch(e) { return false; }
 }
 
 function scheduleNotifications() {
-  if (!("serviceWorker" in navigator) || Notification.permission !== "granted") return;
-  navigator.serviceWorker.ready.then(reg => {
-    if (!reg.active) return;
-    const notifs = load("rslv_notifs", { habits:true, streak:true, finance:true });
-    const reminderTime = load(NOTIF_KEY, "09:00");
-    const [hours, minutes] = reminderTime.split(":").map(Number);
-    const now = new Date();
+  try {
+    if (!("serviceWorker" in navigator)) return;
+    if (typeof Notification === "undefined") return;
+    if (Notification.permission !== "granted") return;
+    navigator.serviceWorker.ready.then(reg => {
+      if (!reg.active) return;
+      const notifs = load("rslv_notifs", { habits:true, streak:true, finance:true });
+      const reminderTime = load(NOTIF_KEY, "09:00");
+      const parts = reminderTime.split(":");
+      const hours = parseInt(parts[0]) || 9;
+      const minutes = parseInt(parts[1]) || 0;
+      const now = new Date();
 
-    // Daily habit reminder
-    if (notifs.habits) {
-      let next = new Date();
-      next.setHours(hours, minutes, 0, 0);
-      if (next <= now) next.setDate(next.getDate() + 1);
-      const delay = next - now;
-      const habits = load("rslv_habits", []);
-      const done = load("rslv_done", { date:"", checked:{} });
-      const todayDone = done.date === new Date().toISOString().slice(0,10);
-      const allComplete = habits.length > 0 && habits.every(h => done.checked?.[h.id]);
-      if (!todayDone || !allComplete) {
-        reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:"🌱 Risolvero", body:`${habits.length} habit${habits.length!==1?"s":""} waiting for you today. Keep your streak going!`, delay, tag:"daily-habit" });
-      }
-    }
-
-    // Streak reminder — 8pm if not opened
-    if (notifs.streak) {
-      const streak = load("rslv_streak", 0);
-      if (streak > 0) {
-        let streakReminder = new Date();
-        streakReminder.setHours(20, 0, 0, 0);
-        if (streakReminder <= now) streakReminder.setDate(streakReminder.getDate() + 1);
-        reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:`🔥 ${streak} day streak at risk!`, body:"Complete your habits today to keep your streak alive.", delay: streakReminder - now, tag:"streak" });
-      }
-    }
-
-    // Subscription reminders
-    if (notifs.finance) {
-      const subs = load("rslv_subs", []);
-      subs.filter(s => s.reminder).forEach(s => {
-        const renewDate = new Date(s.nextDate);
-        const twoDaysBefore = new Date(renewDate);
-        twoDaysBefore.setDate(twoDaysBefore.getDate() - 2);
-        twoDaysBefore.setHours(9, 0, 0, 0);
-        if (twoDaysBefore > now) {
-          reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:`💳 ${s.name} renews in 2 days`, body:`${s.name} will charge you soon. Check your Finance section.`, delay: twoDaysBefore - now, tag:`sub-${s.id}` });
+      if (notifs.habits) {
+        let next = new Date();
+        next.setHours(hours, minutes, 0, 0);
+        if (next <= now) next.setDate(next.getDate() + 1);
+        const delay = next - now;
+        const habits = load("rslv_habits", []);
+        if (habits.length > 0) {
+          reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:"🌱 Risolvero", body:`${habits.length} habit${habits.length!==1?"s":""} waiting today!`, delay, tag:"daily-habit" });
         }
-      });
-    }
-  });
+      }
+
+      if (notifs.streak) {
+        const streak = load("rslv_streak", 0);
+        if (streak > 0) {
+          let sr = new Date();
+          sr.setHours(20, 0, 0, 0);
+          if (sr <= now) sr.setDate(sr.getDate() + 1);
+          reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:`🔥 ${streak} day streak at risk!`, body:"Complete your habits to keep your streak.", delay: sr - now, tag:"streak" });
+        }
+      }
+
+      if (notifs.finance) {
+        const subs = load("rslv_subs", []);
+        subs.filter(s => s.reminder).forEach(s => {
+          try {
+            const renewDate = new Date(s.nextDate);
+            const twoDaysBefore = new Date(renewDate);
+            twoDaysBefore.setDate(twoDaysBefore.getDate() - 2);
+            twoDaysBefore.setHours(9, 0, 0, 0);
+            if (twoDaysBefore > now) {
+              reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:`💳 ${s.name} renews in 2 days`, body:`${s.name} will charge you soon.`, delay: twoDaysBefore - now, tag:`sub-${s.id}` });
+            }
+          } catch(e) {}
+        });
+      }
+    }).catch(e => {});
+  } catch(e) {}
 }
 const SUPABASE_URL = "https://cmeimhnmpnzxguwmdghs.supabase.co";
 const SUPABASE_KEY = "sb_publishable_vaMo5Vew20gPsY9JhTtOCQ_UEc9QiPA";
@@ -3534,7 +3538,7 @@ export default function Risolvero() {
           {pages[tab]}
         </div>
         {/* Notification permission prompt */}
-        {showNotifPrompt && Notification.permission === "default" && (
+        {showNotifPrompt && typeof Notification !== "undefined" && Notification.permission === "default" && (
           <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"flex-end", justifyContent:"center", padding:"0 0 40px" }}>
             <div onClick={()=>setShowNotifPrompt(false)} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.5)" }}/>
             <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:28, padding:"28px 24px", margin:"0 16px", border:"1px solid rgba(255,255,255,0.1)", animation:"sheetUp 0.3s ease both" }}>
