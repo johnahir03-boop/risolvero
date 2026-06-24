@@ -106,6 +106,67 @@ async function getUser(token) {
   return res.json();
 }
 
+// Authenticated DB call (uses the logged-in user's token so RLS policies pass)
+async function sbAuthed(path, token, options={}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "Prefer": options.prefer || "return=representation",
+      ...options.headers,
+    },
+    ...options,
+  });
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw e; }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+// Upload an image file to Supabase Storage 'media' bucket, return its public URL
+async function uploadImage(file, token, folder="uploads") {
+  const ext = (file.name?.split(".").pop() || "jpg").toLowerCase();
+  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/media/${path}`, {
+    method: "POST",
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": file.type || "image/jpeg",
+    },
+    body: file,
+  });
+  if (!res.ok) { const e = await res.text().catch(()=>"upload failed"); throw new Error(e); }
+  return `${SUPABASE_URL}/storage/v1/object/public/media/${path}`;
+}
+
+// Compress an image file before upload (keeps storage small, uploads fast)
+function compressImage(file, maxDim=1200, quality=0.82) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxDim) { height = height * maxDim / width; width = maxDim; }
+        else if (height > maxDim) { width = width * maxDim / height; height = maxDim; }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        canvas.toBlob(blob => {
+          if (!blob) return reject(new Error("compress failed"));
+          const out = new File([blob], file.name || "image.jpg", { type:"image/jpeg" });
+          resolve(out);
+        }, "image/jpeg", quality);
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 const TODAY = () => new Date().toISOString().slice(0, 10);
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -114,6 +175,14 @@ function load(key, fallback) {
 function save(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
 }
+
+// ── LIGHT MODE ──────────────────────────
+// Handled entirely via CSS in the <style> block (see #rslv-root.light rules).
+
+/* Light mode is handled entirely via CSS overrides in the <style> block —
+   far more reliable than walking the DOM at runtime. */
+
+
 
 const Icons = {
   Home: ({ active }) => (
@@ -130,6 +199,25 @@ const Icons = {
   Plus:  () => <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>,
   Trash: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>,
   Close: () => <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>,
+  // ── settings line icons (replace emoji) ──
+  Target: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>,
+  Wallet: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 012-2h12a2 2 0 012 2v1"/><path d="M3 7v10a2 2 0 002 2h13a1 1 0 001-1v-3"/><path d="M21 11v4h-4a2 2 0 010-4h4z"/></svg>,
+  Chart: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20V4M4 20h16"/><rect x="7" y="12" width="3" height="5" rx="0.5"/><rect x="12" y="8" width="3" height="9" rx="0.5"/><rect x="17" y="5" width="3" height="12" rx="0.5"/></svg>,
+  Sun: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"/></svg>,
+  Moon: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 14.5A8 8 0 119.5 4a6.5 6.5 0 0010.5 10.5z"/></svg>,
+  Flame: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3c1 3.5 4.5 5 4.5 9a4.5 4.5 0 01-9 0c0-1.5.7-2.7 1.5-3.5C9 10 9 11.5 10 12c.5-2 1-4 2-9z"/></svg>,
+  Bolt: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L4.5 13.5H11l-1 8.5L18.5 10.5H12l1-8.5z"/></svg>,
+  Bell: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9a6 6 0 1112 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 19a2 2 0 004 0"/></svg>,
+  Clock: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>,
+  Refresh: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11A8 8 0 105.6 6.4L4 8"/><path d="M4 4v4h4"/></svg>,
+  TrashLg: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"/></svg>,
+  Help: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 015 0c0 1.5-2.5 2-2.5 3.5"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg>,
+  Shield: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/></svg>,
+  Star: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9L6.7 19.5l1.1-6L3.4 9.3l6-.8L12 3z"/></svg>,
+  Phone: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>,
+  Leaf: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20A7 7 0 014 13c0-5 5-9 16-9 0 11-4 16-9 16z"/><path d="M9 16c2-4 5-6 8-7"/></svg>,
+  Logout: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M9 4H6a2 2 0 00-2 2v12a2 2 0 002 2h3"/><path d="M16 16l4-4-4-4M20 12H9"/></svg>,
+  Heart: () => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20s-7-4.5-9-9c-1.5-3.5 1-6.5 4-6.5 2 0 3.5 1.5 5 3.5 1.5-2 3-3.5 5-3.5 3 0 5.5 3 4 6.5-2 4.5-9 9-9 9z"/></svg>,
 };
 
 const PALETTE = [
@@ -147,7 +235,7 @@ function GrowthCircle({ score }) {
   const [disp, setDisp] = useState(0);
   const [prog, setProg] = useState(0);
   const prevRef = useRef(0);
-  const R = 72, C = 2 * Math.PI * R;
+  const R = 56, C = 2 * Math.PI * R;
 
   useEffect(() => {
     const from = prevRef.current;
@@ -168,23 +256,22 @@ function GrowthCircle({ score }) {
   const offset = C - (prog / 100) * C;
 
   return (
-    <div style={{ position:"relative", width:160, height:160, flexShrink:0 }}>
-      <div style={{ position:"absolute", inset:-10, borderRadius:"50%", background:"radial-gradient(circle,rgba(168,213,194,0.1) 0%,transparent 70%)", filter:"blur(12px)" }}/>
-      <svg width="160" height="160" style={{ transform:"rotate(-90deg)" }}>
-        <circle cx="80" cy="80" r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7"/>
-        <circle cx="80" cy="80" r={R} fill="none" stroke="url(#sg)" strokeWidth="7" strokeLinecap="round"
+    <div style={{ position:"relative", width:128, height:128, flexShrink:0 }}>
+      <svg width="128" height="128" style={{ transform:"rotate(-90deg)" }}>
+        <circle cx="64" cy="64" r={R} fill="none" stroke="rgba(139,127,181,0.16)" strokeWidth="8"/>
+        <circle cx="64" cy="64" r={R} fill="none" stroke="url(#sg)" strokeWidth="8" strokeLinecap="round"
           strokeDasharray={C} strokeDashoffset={offset}
           style={{ transition:"stroke-dashoffset 0.04s linear" }}/>
         <defs>
           <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#A8D5C2"/>
+            <stop offset="0%" stopColor="#A99BD8"/>
             <stop offset="100%" stopColor="#C5B8E8"/>
           </linearGradient>
         </defs>
       </svg>
-      <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:1 }}>
-        <div style={{ fontSize:42, fontWeight:800, lineHeight:1, fontFamily:"'Sora',sans-serif", color:"#fff", letterSpacing:"-2px" }}>{disp}</div>
-        <div style={{ fontSize:9, letterSpacing:"0.2em", color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", textTransform:"uppercase", fontWeight:600 }}>/100</div>
+      <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:0 }}>
+        <div style={{ fontSize:46, fontWeight:300, lineHeight:1, fontFamily:"'Sora',sans-serif", color:"#7B6FB0", letterSpacing:"-2px" }}>{disp}</div>
+        <div style={{ fontSize:9, letterSpacing:"0.2em", color:"#A99BD8", fontFamily:"'Sora',sans-serif", textTransform:"uppercase", fontWeight:600, marginTop:2 }}>/100</div>
       </div>
     </div>
   );
@@ -311,18 +398,18 @@ function HomePage({ onNavigate=()=>{} }) {
         <div style={{ width:42, height:42, borderRadius:14, flexShrink:0, background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, fontWeight:800, color:"#1a1a2e", fontFamily:"'Sora',sans-serif", boxShadow:"0 4px 16px rgba(168,213,194,0.2)" }}>R</div>
       </div>
 
-      <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:26, padding:"22px 20px", display:"flex", alignItems:"center", gap:18, marginBottom:18, animation:"fadeUp 0.4s ease 0.07s both" }}>
+      <div className="rslv-hero-card" style={{ background:"linear-gradient(150deg, #EDE9F8 0%, #F3F0FA 60%, #EFF4F1 100%)", border:"1px solid rgba(150,130,200,0.12)", borderRadius:28, padding:"26px 22px", display:"flex", alignItems:"center", gap:20, marginBottom:18, animation:"fadeUp 0.4s ease 0.07s both", boxShadow:"0 8px 30px rgba(150,130,200,0.12)" }}>
         <GrowthCircle score={score}/>
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:11, letterSpacing:"0.14em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:600, marginBottom:6 }}>Growth Score</div>
-          <div style={{ fontSize:13, color:"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif", marginBottom:12 }}>{habits.length===0?"Add your first habit below":`${doneCount} of ${habits.length} habits done`}</div>
+          <div style={{ fontSize:10.5, letterSpacing:"0.16em", color:"#8B7FB5", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:700, marginBottom:8 }}>Growth Score</div>
+          <div style={{ fontSize:13, color:"#6B6580", fontFamily:"'Sora',sans-serif", marginBottom:14, lineHeight:1.4 }}>{habits.length===0?"Add your first habit below":`${doneCount} of ${habits.length} habits done`}</div>
           {habits.length>0&&(
-            <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
-              {habits.map(h=>(
-                <div key={h.id} style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  <div style={{ fontSize:11 }}>{h.emoji}</div>
-                  <div style={{ flex:1, height:4, borderRadius:4, background:"rgba(255,255,255,0.07)", overflow:"hidden" }}>
-                    <div style={{ height:"100%", borderRadius:4, width:done[h.id]?"100%":"0%", background:"linear-gradient(90deg,#A8D5C2,#C5B8E8)", transition:"width 0.4s ease" }}/>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {habits.slice(0,4).map(h=>(
+                <div key={h.id} style={{ display:"flex", alignItems:"center", gap:9 }}>
+                  <div style={{ fontSize:12 }}>{h.emoji}</div>
+                  <div style={{ flex:1, height:5, borderRadius:5, background:"rgba(139,127,181,0.15)", overflow:"hidden" }}>
+                    <div style={{ height:"100%", borderRadius:5, width:done[h.id]?"100%":"0%", background:"linear-gradient(90deg,#A99BD8,#C5B8E8)", transition:"width 0.5s ease" }}/>
                   </div>
                 </div>
               ))}
@@ -341,14 +428,14 @@ function HomePage({ onNavigate=()=>{} }) {
           {habits.map((h,i)=><HabitCard key={h.id} habit={h} done={!!done[h.id]} pts={pts} onToggle={()=>toggle(h.id)} onDelete={()=>deleteHabit(h.id)} colorIdx={i} delay={0.14+i*0.05}/>)}
         </div>
       ):(
-        <div style={{ padding:"32px 20px", textAlign:"center", background:"rgba(255,255,255,0.03)", borderRadius:20, marginBottom:12, border:"1px dashed rgba(255,255,255,0.08)", animation:"fadeUp 0.4s ease 0.16s both" }}>
-          <div style={{ fontSize:32, marginBottom:10 }}>🌱</div>
-          <div style={{ fontSize:14, fontWeight:700, color:"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>No habits yet</div>
-          <div style={{ fontSize:12, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif", lineHeight:1.6 }}>Add your first habit and start growing today</div>
+        <div style={{ padding:"36px 24px", textAlign:"center", background:"linear-gradient(150deg, #EAF3EE 0%, #F0F5F2 100%)", borderRadius:24, marginBottom:12, border:"1px solid rgba(120,170,140,0.13)", animation:"fadeUp 0.4s ease 0.16s both", boxShadow:"0 6px 22px rgba(120,170,140,0.1)" }}>
+          <div style={{ width:56, height:56, borderRadius:18, background:"rgba(120,170,140,0.14)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px" }}><div style={{ fontSize:28 }}>🌱</div></div>
+          <div style={{ fontSize:15, fontWeight:700, color:"#3D5848", fontFamily:"'Sora',sans-serif", marginBottom:6, letterSpacing:"-0.01em" }}>Start your first habit</div>
+          <div style={{ fontSize:12.5, color:"#6B8576", fontFamily:"'Sora',sans-serif", lineHeight:1.6, maxWidth:240, margin:"0 auto" }}>Small steps, every day. Add one habit and watch your growth circle fill.</div>
         </div>
       )}
 
-      <div onClick={()=>setShowAdd(true)} style={{ padding:"15px 18px", borderRadius:20, border:"1px dashed rgba(255,255,255,0.1)", display:"flex", alignItems:"center", justifyContent:"center", gap:8, cursor:"pointer", color:"rgba(255,255,255,0.25)", fontSize:13, fontFamily:"'Sora',sans-serif", fontWeight:600, animation:"fadeUp 0.4s ease 0.3s both", marginBottom:14 }}>
+      <div onClick={()=>setShowAdd(true)} className="rslv-add-habit" style={{ padding:"16px 18px", borderRadius:18, background:"linear-gradient(135deg,#A99BD8,#C5B8E8)", display:"flex", alignItems:"center", justifyContent:"center", gap:8, cursor:"pointer", color:"#fff", fontSize:14, fontFamily:"'Sora',sans-serif", fontWeight:700, animation:"fadeUp 0.4s ease 0.3s both", marginBottom:14, boxShadow:"0 6px 20px rgba(169,155,216,0.3)", letterSpacing:"-0.01em" }}>
         <Icons.Plus/> Add a habit
       </div>
 
@@ -845,8 +932,8 @@ function AddSubForm({ onAdd, currency }) {
           <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,255,255,0.8)", fontFamily:"'Sora',sans-serif" }}>🔔 Remind me before renewal</div>
           <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>Get notified 2 days before charge</div>
         </div>
-        <div onClick={()=>setReminder(r=>!r)} style={{ width:44, height:26, borderRadius:13, background:reminder?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.1)", position:"relative", cursor:"pointer", transition:"all 0.25s", flexShrink:0 }}>
-          <div style={{ position:"absolute", top:3, left:reminder?20:3, width:20, height:20, borderRadius:"50%", background:"#fff", transition:"all 0.25s", boxShadow:"0 2px 6px rgba(0,0,0,0.3)" }}/>
+        <div onClick={()=>setReminder(r=>!r)} className={reminder?"rslv-toggle on":"rslv-toggle off"} style={{ width:46, height:28, borderRadius:14, background:reminder?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(120,120,130,0.25)", border:reminder?"1px solid rgba(168,213,194,0.5)":"1.5px solid rgba(120,120,130,0.45)", position:"relative", cursor:"pointer", transition:"all 0.25s", flexShrink:0, boxSizing:"border-box" }}>
+          <div style={{ position:"absolute", top:2.5, left:reminder?20:2.5, width:21, height:21, borderRadius:"50%", background:"#fff", border:"1px solid rgba(0,0,0,0.08)", transition:"all 0.25s", boxShadow:"0 1px 4px rgba(0,0,0,0.25)" }}/>
         </div>
       </div>
       <button onClick={submit} disabled={!name.trim()||!amount} style={{ width:"100%", padding:"15px", background:name.trim()&&amount?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.08)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:name.trim()&&amount?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:name.trim()&&amount?"pointer":"not-allowed" }}>
@@ -1921,7 +2008,16 @@ function CommunityPage({ onModalChange=()=>{} }) {
     try {
       const headers = { "apikey":SUPABASE_KEY, ...(token?{ "Authorization":`Bearer ${token}` }:{}) };
       const data = await sb(`posts?select=*,profiles(username,avatar_url,full_name)&order=created_at.desc&limit=30`, { headers });
-      setPosts(data||[]);
+      let list = data||[];
+      // hide posts from users I've blocked
+      if(token && user?.id){
+        try {
+          const blocked = await sb(`blocks?blocker_id=eq.${user.id}&select=blocked_id`, { headers });
+          const blockedIds = (blocked||[]).map(b=>b.blocked_id);
+          if(blockedIds.length) list = list.filter(p=>!blockedIds.includes(p.user_id));
+        } catch {}
+      }
+      setPosts(list);
     } catch {}
     setLoading(false);
   };
@@ -1939,29 +2035,44 @@ function CommunityPage({ onModalChange=()=>{} }) {
   };
 
   const login = async (email, password) => {
-    const data = await sbAuth("token?grant_type=password", { email, password });
-    if(data.access_token) {
-      localStorage.setItem("rslv_token", data.access_token);
-      setToken(data.access_token);
-      return true;
+    try {
+      const data = await sbAuth("token?grant_type=password", { email, password });
+      if(data.access_token) {
+        localStorage.setItem("rslv_token", data.access_token);
+        setToken(data.access_token);
+        return true;
+      }
+      if(data.error_description?.toLowerCase().includes("not confirmed") || data.msg?.toLowerCase().includes("not confirmed"))
+        return "Please confirm your email first, or ask the app owner to turn off email confirmation.";
+      return data.error_description || data.msg || data.error || "Wrong email or password.";
+    } catch(e) {
+      return "Connection problem. Check your internet and try again.";
     }
-    return data.error_description || "Login failed";
   };
 
   const signup = async (email, password, username, fullName) => {
-    const data = await sbAuth("signup", { email, password });
-    if(data.id || data.user?.id) {
-      const uid = data.id||data.user.id;
-      const tok = data.access_token||data.session?.access_token;
-      if(tok) {
+    try {
+      const data = await sbAuth("signup", { email, password });
+      const uid = data.id || data.user?.id;
+      const tok = data.access_token || data.session?.access_token;
+      // success WITH token = email confirmation is off, user is logged in
+      if(uid && tok) {
         localStorage.setItem("rslv_token", tok);
-        // create profile
-        await sb(`profiles`, { method:"POST", body:JSON.stringify({ id:uid, username, full_name:fullName }), headers:{ "apikey":SUPABASE_KEY, "Authorization":`Bearer ${tok}`, "Content-Type":"application/json", "Prefer":"return=representation" } });
+        try {
+          await sb(`profiles`, { method:"POST", body:JSON.stringify({ id:uid, username, full_name:fullName }), headers:{ "apikey":SUPABASE_KEY, "Authorization":`Bearer ${tok}`, "Content-Type":"application/json", "Prefer":"return=representation" } });
+        } catch {}
         setToken(tok);
         return true;
       }
+      // success but NO token = email confirmation is ON
+      if(uid && !tok)
+        return "Account created! Check your email to confirm, then sign in. (Or ask the app owner to disable email confirmation for instant login.)";
+      if(data.msg?.toLowerCase().includes("already") || data.error_description?.toLowerCase().includes("already"))
+        return "That email is already registered. Try signing in instead.";
+      return data.error_description || data.msg || data.error || "Could not create account.";
+    } catch(e) {
+      return "Connection problem. Check your internet and try again.";
     }
-    return data.error_description || "Signup failed";
   };
 
   const logout = () => {
@@ -1993,6 +2104,7 @@ function CommunityPage({ onModalChange=()=>{} }) {
 
   const [showMenu, setShowMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [feedFilter, setFeedFilter] = useState("foryou");
 
   const requireAuth = (fn) => {
     if(!token) { onModalChange(true); setShowAuth(true); return; }
@@ -2005,15 +2117,15 @@ function CommunityPage({ onModalChange=()=>{} }) {
     <div style={{ padding:"0 18px 32px" }}>
 
       {/* header — search + 3 dots */}
-      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:20, animation:"fadeUp 0.4s ease both" }}>
-        <div style={{ flex:1, display:"flex", alignItems:"center", gap:10, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, padding:"11px 14px" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:18, animation:"fadeUp 0.4s ease both" }}>
+        <div className="rslv-search-bar" style={{ flex:1, display:"flex", alignItems:"center", gap:8, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:11, padding:"8px 12px" }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
           <input value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Search..."
             style={{ flex:1, background:"none", border:"none", outline:"none", color:"rgba(255,255,255,0.7)", fontSize:13, fontFamily:"'Sora',sans-serif" }}/>
         </div>
         <div style={{ position:"relative" }}>
-          <button onClick={()=>setShowMenu(m=>!m)} style={{ width:42, height:42, borderRadius:12, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexDirection:"column", gap:3.5 }}>
-            {[0,1,2].map(i=><div key={i} style={{ width:3.5, height:3.5, borderRadius:"50%", background:"rgba(255,255,255,0.5)" }}/>)}
+          <button onClick={()=>setShowMenu(m=>!m)} className="rslv-menu-btn" style={{ width:36, height:36, borderRadius:11, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexDirection:"column", gap:3 }}>
+            {[0,1,2].map(i=><div key={i} className="rslv-menu-dot" style={{ width:3.5, height:3.5, borderRadius:"50%", background:"rgba(255,255,255,0.5)" }}/>)}
           </button>
           {showMenu && (
             <div onClick={()=>setShowMenu(false)} style={{ position:"fixed", inset:0, zIndex:49 }}/>
@@ -2042,6 +2154,18 @@ function CommunityPage({ onModalChange=()=>{} }) {
       {/* FEED */}
       {tab==="feed" && (
         <div>
+          {token && profile && (
+            <div onClick={()=>setTab("myprofile")} style={{ display:"flex", alignItems:"center", gap:13, padding:"4px 2px 16px", cursor:"pointer", animation:"fadeUp 0.4s ease both" }}>
+              <div style={{ width:52, height:52, borderRadius:16, background: profile?.avatar_url?"transparent":"linear-gradient(135deg,#A8D5C2,#C5B8E8)", overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:800, color:"#1a1d2e", fontFamily:"'Sora',sans-serif", flexShrink:0, border:"2px solid rgba(168,213,194,0.3)" }}>
+                {profile?.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : (profile?.full_name?.[0]?.toUpperCase()||profile?.username?.[0]?.toUpperCase()||"?")}
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:15.5, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:2 }}>{profile?.full_name||profile?.username||"You"}</div>
+                <div style={{ fontSize:12.5, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", lineHeight:1.4, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{profile?.bio||"Tap to set up your profile"}</div>
+              </div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+          )}
           {!token && (
             <div onClick={()=>{ onModalChange(true); setShowAuth(true); }} style={{ background:"linear-gradient(135deg,rgba(168,213,194,0.08),rgba(197,184,232,0.08))", border:"1px solid rgba(168,213,194,0.15)", borderRadius:18, padding:"14px 16px", marginBottom:14, display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}>
               <div style={{ flex:1 }}>
@@ -2052,25 +2176,84 @@ function CommunityPage({ onModalChange=()=>{} }) {
             </div>
           )}
           {token && (
-            <div onClick={()=>{ onModalChange(true); setShowPost(true); }} style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:18, padding:"13px 16px", marginBottom:14, display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}>
-              <div style={{ width:34, height:34, borderRadius:10, background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:"#1a1d2e", fontFamily:"'Sora',sans-serif", flexShrink:0 }}>
-                {profile?.username?.[0]?.toUpperCase()||"?"}
+            <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:20, padding:"14px 16px", marginBottom:14 }}>
+              <div onClick={()=>{ onModalChange(true); setShowPost(true); }} style={{ display:"flex", alignItems:"center", gap:12, cursor:"pointer", marginBottom:12 }}>
+                <div style={{ width:38, height:38, borderRadius:12, background: profile?.avatar_url?"transparent":"linear-gradient(135deg,#A8D5C2,#C5B8E8)", overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#1a1d2e", fontFamily:"'Sora',sans-serif", flexShrink:0 }}>
+                  {profile?.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : (profile?.username?.[0]?.toUpperCase()||"?")}
+                </div>
+                <div style={{ flex:1, fontSize:13.5, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif", lineHeight:1.4 }}>Share your win, ask for help, or start a challenge...</div>
               </div>
-              <div style={{ flex:1, fontSize:13, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif" }}>Share your win today...</div>
-              <div style={{ padding:"7px 14px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", borderRadius:10, fontSize:12, fontWeight:800, color:"#1a1d2e", fontFamily:"'Sora',sans-serif" }}>Post</div>
+              <div style={{ display:"flex", gap:8, borderTop:"1px solid rgba(255,255,255,0.06)", paddingTop:12 }}>
+                <button onClick={()=>{ onModalChange(true); setShowPost(true); }} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 0", borderRadius:12, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", color:"rgba(255,255,255,0.55)", fontSize:12.5, fontWeight:700, fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                  Photo
+                </button>
+                <button onClick={()=>requireAuth(()=>{ onModalChange(true); setShowCreateChallenge(true); })} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:6, padding:"9px 0", borderRadius:12, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", color:"rgba(255,255,255,0.55)", fontSize:12.5, fontWeight:700, fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M10 14.7V17a2 2 0 01-2 2"/><path d="M14 14.7V17a2 2 0 002 2"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg>
+                  Challenge
+                </button>
+              </div>
             </div>
           )}
+
+          {/* Community at a glance */}
+          <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:20, padding:"16px", marginBottom:14, animation:"fadeUp 0.4s ease 0.05s both" }}>
+            <div style={{ fontSize:13, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:12 }}>Community at a glance</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:8 }}>
+              {[
+                { icon:<Icons.Community/>, val:posts.length>0?`${posts.length}`:"—", label:"Posts", color:"#A8D5C2" },
+                { icon:<Icons.Bolt/>, val:challenges.length>0?`${challenges.length}`:"—", label:"Challenges", color:"#C5B8E8" },
+                { icon:<Icons.Flame/>, val:posts.reduce((a,p)=>a+(p.likes_count||0),0)||"—", label:"Likes", color:"#F5A623" },
+                { icon:<Icons.Star/>, val:joined.length||"—", label:"Joined", color:"#C8E6DA" },
+              ].map(({icon,val,label,color})=>(
+                <div key={label} style={{ background:"rgba(255,255,255,0.03)", borderRadius:14, padding:"12px 8px", textAlign:"center" }}>
+                  <div style={{ color, display:"flex", justifyContent:"center", marginBottom:6, opacity:0.9 }}>{icon}</div>
+                  <div style={{ fontSize:17, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", lineHeight:1 }}>{val}</div>
+                  <div style={{ fontSize:10, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif", marginTop:3 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Feed filter chips */}
+          <div style={{ display:"flex", gap:8, marginBottom:16, overflowX:"auto", paddingBottom:2, WebkitOverflowScrolling:"touch" }}>
+            {[
+              { id:"foryou", label:"For you", icon:"✦" },
+              { id:"following", label:"Following", icon:null },
+              { id:"trending", label:"Trending", icon:null },
+              { id:"new", label:"New", icon:null },
+            ].map(({id,label,icon})=>{
+              const active = feedFilter===id;
+              return (
+                <button key={id} onClick={()=>setFeedFilter(id)} style={{ flexShrink:0, display:"flex", alignItems:"center", gap:5, padding:"8px 16px", borderRadius:14, background:active?"rgba(168,213,194,0.12)":"rgba(255,255,255,0.04)", border:active?"1.5px solid rgba(168,213,194,0.4)":"1px solid rgba(255,255,255,0.07)", color:active?"#A8D5C2":"rgba(255,255,255,0.4)", fontSize:13, fontWeight:700, fontFamily:"'Sora',sans-serif", cursor:"pointer", transition:"all 0.2s" }}>
+                  {icon && <span style={{ fontSize:12 }}>{icon}</span>}{label}
+                </button>
+              );
+            })}
+          </div>
           {loading && <div style={{ textAlign:"center", padding:32, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif", fontSize:13 }}>Loading...</div>}
           {!loading && posts.length===0 && (
-            <div style={{ textAlign:"center", padding:"40px 24px", background:"rgba(255,255,255,0.03)", borderRadius:24, border:"1px dashed rgba(255,255,255,0.08)" }}>
+            <div style={{ textAlign:"center", padding:"48px 24px" }}>
               <div style={{ fontSize:16, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>No posts yet</div>
               <div style={{ fontSize:13, color:"rgba(255,255,255,0.15)", fontFamily:"'Sora',sans-serif" }}>Be the first to share your win</div>
             </div>
           )}
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-            {posts.filter(p=>!searchQuery||p.content.toLowerCase().includes(searchQuery.toLowerCase())).map((post,i)=>(
-              <PostCard key={post.id} post={post} user={user} token={token} onLike={likePost} onComment={()=>requireAuth(()=>{ onModalChange(true); setCommentPost(post); })} delay={i*0.05}/>
+            {(()=>{
+              let list = posts.filter(p=>!searchQuery||p.content.toLowerCase().includes(searchQuery.toLowerCase()));
+              if(feedFilter==="trending") list = [...list].sort((a,b)=>(b.likes_count||0)-(a.likes_count||0));
+              else if(feedFilter==="new") list = [...list].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+              else if(feedFilter==="following") list = list.filter(p=>followingIds.includes(p.user_id));
+              return list;
+            })().map((post,i)=>(
+              <PostCard key={post.id} post={post} user={user} token={token} onLike={likePost} onComment={()=>requireAuth(()=>{ onModalChange(true); setCommentPost(post); })} onHide={(postId, blockedUserId)=>{ setPosts(prev=>prev.filter(p=> p.id!==postId && (!blockedUserId || p.user_id!==blockedUserId) )); }} delay={i*0.05}/>
             ))}
+            {!loading && feedFilter==="following" && followingIds.length===0 && posts.length>0 && (
+              <div style={{ textAlign:"center", padding:"32px 24px" }}>
+                <div style={{ fontSize:14, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:4 }}>You're not following anyone yet</div>
+                <div style={{ fontSize:12, color:"rgba(255,255,255,0.15)", fontFamily:"'Sora',sans-serif" }}>Follow people to see their posts here</div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2123,11 +2306,17 @@ function AuthScreen({ onLogin, onSignup, onClose, onModalChange=()=>{} }) {
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
+    if(!email.trim() || !password.trim()) { setError("Please enter email and password."); return; }
+    if(mode==="signup" && (!username.trim() || !fullName.trim())) { setError("Please fill in all fields."); return; }
     setError(""); setLoading(true);
-    const result = mode==="login"
-      ? await onLogin(email, password)
-      : await onSignup(email, password, username, fullName);
-    if(result !== true) setError(result);
+    try {
+      const result = mode==="login"
+        ? await onLogin(email, password)
+        : await onSignup(email, password, username, fullName);
+      if(result !== true) setError(result);
+    } catch(e) {
+      setError("Something went wrong. Please try again.");
+    }
     setLoading(false);
   };
 
@@ -2172,9 +2361,11 @@ function AuthScreen({ onLogin, onSignup, onClose, onModalChange=()=>{} }) {
 }
 
 /* ── POST CARD ── */
-function PostCard({ post, user, token, onLike, onComment, delay }) {
+function PostCard({ post, user, token, onLike, onComment, onHide, delay }) {
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(post.likes_count||0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   const n = post.profiles;
   const timeAgo = (ts) => {
     const diff = (Date.now() - new Date(ts)) / 1000;
@@ -2185,32 +2376,106 @@ function PostCard({ post, user, token, onLike, onComment, delay }) {
   };
   const catColors = { fitness:"#F5DDD0", finance:"#C8E6DA", learning:"#D8D0F0", lifestyle:"#C8DFF0", default:"rgba(255,255,255,0.06)" };
   const bgColor = catColors[post.category]||catColors.default;
+  const isOwn = user && post.user_id === user.id;
+
+  const report = async () => {
+    if(!token){ alert("Sign in to report posts."); return; }
+    setBusy(true);
+    try {
+      await sbAuthed("reports", token, { method:"POST", body:JSON.stringify({ reporter_id:user.id, reported_post_id:post.id, reported_user_id:post.user_id, reason:"inappropriate" }) });
+      alert("Thanks. This post has been reported and will be reviewed.");
+      onHide?.(post.id);
+    } catch { alert("Could not report. Try again."); }
+    setBusy(false); setMenuOpen(false);
+  };
+
+  const block = async () => {
+    if(!token){ alert("Sign in to block users."); return; }
+    if(!confirm(`Block @${n?.username||"this user"}? You won't see their posts anymore.`)) return;
+    setBusy(true);
+    try {
+      await sbAuthed("blocks", token, { method:"POST", body:JSON.stringify({ blocker_id:user.id, blocked_id:post.user_id }) });
+      onHide?.(post.id, post.user_id);
+    } catch { alert("Could not block. Try again."); }
+    setBusy(false); setMenuOpen(false);
+  };
+
+  const deleteOwn = async () => {
+    if(!confirm("Delete this post?")) return;
+    setBusy(true);
+    try {
+      await sbAuthed(`posts?id=eq.${post.id}`, token, { method:"DELETE" });
+      onHide?.(post.id);
+    } catch { alert("Could not delete. Try again."); }
+    setBusy(false); setMenuOpen(false);
+  };
 
   return (
     <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:22, overflow:"hidden", animation:`fadeUp 0.4s ease ${delay}s both` }}>
-      {post.image_url && <img src={post.image_url} alt="" style={{ width:"100%", height:180, objectFit:"cover", display:"block" }}/>}
+      {post.image_url && <img src={post.image_url} alt="" style={{ width:"100%", maxHeight:300, objectFit:"cover", display:"block" }}/>}
       <div style={{ padding:"14px 16px" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
-          <div style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#1a1d2e", fontFamily:"'Sora',sans-serif", flexShrink:0 }}>
-            {n?.username?.[0]?.toUpperCase()||"?"}
+          <div style={{ width:38, height:38, borderRadius:12, background: n?.avatar_url?"transparent":"linear-gradient(135deg,#A8D5C2,#C5B8E8)", overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#1a1d2e", fontFamily:"'Sora',sans-serif", flexShrink:0 }}>
+            {n?.avatar_url ? <img src={n.avatar_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : (n?.username?.[0]?.toUpperCase()||"?")}
           </div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:13, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif" }}>{n?.full_name||n?.username||"User"}</div>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif" }}>@{n?.username} · {timeAgo(post.created_at)}</div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:13.5, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:1 }}>{n?.full_name||n?.username||"User"}</div>
+            <div style={{ fontSize:11, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif" }}>Posted a win · {timeAgo(post.created_at)}</div>
           </div>
           {post.category && (
             <div style={{ padding:"4px 10px", borderRadius:10, background:`${bgColor}30`, border:`1px solid ${bgColor}50`, fontSize:10, fontWeight:700, color:bgColor==="rgba(255,255,255,0.06)"?"rgba(255,255,255,0.4)":bgColor, fontFamily:"'Sora',sans-serif" }}>
               {post.category}
             </div>
           )}
+          {/* 3-dot menu */}
+          <div style={{ position:"relative" }}>
+            <button onClick={()=>setMenuOpen(m=>!m)} style={{ background:"none", border:"none", cursor:"pointer", padding:6, display:"flex", flexDirection:"column", gap:3, alignItems:"center" }}>
+              {[0,1,2].map(i=><div key={i} className="rslv-menu-dot" style={{ width:3.5, height:3.5, borderRadius:"50%", background:"rgba(255,255,255,0.4)" }}/>)}
+            </button>
+            {menuOpen && (
+              <>
+                <div onClick={()=>setMenuOpen(false)} style={{ position:"fixed", inset:0, zIndex:50 }}/>
+                <div style={{ position:"absolute", top:30, right:0, zIndex:51, background:"#1e2235", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, padding:6, minWidth:150, boxShadow:"0 8px 30px rgba(0,0,0,0.4)" }}>
+                  {isOwn ? (
+                    <button onClick={deleteOwn} disabled={busy} style={{ width:"100%", textAlign:"left", padding:"10px 12px", background:"none", border:"none", cursor:"pointer", color:"#ff6b6b", fontSize:13, fontFamily:"'Sora',sans-serif", fontWeight:600, borderRadius:8 }}>Delete post</button>
+                  ) : (
+                    <>
+                      <button onClick={report} disabled={busy} style={{ width:"100%", textAlign:"left", padding:"10px 12px", background:"none", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.8)", fontSize:13, fontFamily:"'Sora',sans-serif", fontWeight:600, borderRadius:8 }}>🚩 Report post</button>
+                      <button onClick={block} disabled={busy} style={{ width:"100%", textAlign:"left", padding:"10px 12px", background:"none", border:"none", cursor:"pointer", color:"#ff6b6b", fontSize:13, fontFamily:"'Sora',sans-serif", fontWeight:600, borderRadius:8 }}>🚫 Block user</button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-        <div style={{ fontSize:14, color:"rgba(255,255,255,0.85)", fontFamily:"'Sora',sans-serif", lineHeight:1.6, marginBottom:12 }}>{post.content}</div>
-        <div style={{ display:"flex", gap:16, alignItems:"center" }}>
-          <button onClick={()=>{ setLiked(l=>!l); setLikes(n=>liked?n-1:n+1); onLike(post.id, liked); }} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:liked?"#ff6b6b":"rgba(255,255,255,0.3)", fontSize:13, fontFamily:"'Sora',sans-serif", fontWeight:600 }}>
-            {liked?"❤️":"🤍"} {likes}
+        <div style={{ fontSize:14, color:"rgba(255,255,255,0.85)", fontFamily:"'Sora',sans-serif", lineHeight:1.6, marginBottom:12 }}>
+          {post.content.split(/(\s+)/).map((word,wi)=>(
+            word.startsWith("#") && word.length>1
+              ? <span key={wi} style={{ color:"#7Fd1a8", fontWeight:600 }}>{word}</span>
+              : word
+          ))}
+        </div>
+        {/* engagement summary bar */}
+        <div style={{ display:"flex", alignItems:"center", gap:14, padding:"10px 0", marginBottom:4, borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:13, color:"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif", fontWeight:600 }}>🔥 {likes}</div>
+          <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:13, color:"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif", fontWeight:600 }}>💬 {post.comments_count||0}</div>
+        </div>
+        {/* Like / Comment / Share row */}
+        <div style={{ display:"flex", alignItems:"center", borderTop:"1px solid rgba(255,255,255,0.06)", paddingTop:8 }}>
+          <button onClick={()=>{ setLiked(l=>!l); setLikes(x=>liked?x-1:x+1); onLike(post.id, liked); }} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7, background:"none", border:"none", cursor:"pointer", color:liked?"#ff6b6b":"rgba(255,255,255,0.45)", fontSize:13, fontFamily:"'Sora',sans-serif", fontWeight:700, padding:"8px 0" }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill={liked?"#ff6b6b":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 000-7.8z"/></svg>
+            Like
           </button>
-          <button onClick={onComment} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.3)", fontSize:13, fontFamily:"'Sora',sans-serif", fontWeight:600 }}>
-            💬 {post.comments_count||0}
+          <div style={{ width:1, height:20, background:"rgba(255,255,255,0.08)" }}/>
+          <button onClick={onComment} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7, background:"none", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.45)", fontSize:13, fontFamily:"'Sora',sans-serif", fontWeight:700, padding:"8px 0" }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.4 8.4 0 01-3.8-.9L3 21l1.9-5.7A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z"/></svg>
+            Comment
+          </button>
+          <div style={{ width:1, height:20, background:"rgba(255,255,255,0.08)" }}/>
+          <button onClick={()=>{ if(navigator.share){ navigator.share({ title:"Risolvero", text:post.content }).catch(()=>{}); } else { alert("Sharing not supported on this device."); } }} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7, background:"none", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.45)", fontSize:13, fontFamily:"'Sora',sans-serif", fontWeight:700, padding:"8px 0" }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>
+            Share
           </button>
         </div>
       </div>
@@ -2258,8 +2523,21 @@ function CreatePostModal({ user, token, onPost, onClose }) {
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("fitness");
   const [imageUrl, setImageUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const cats = ["fitness","finance","learning","lifestyle"];
+
+  const pickImage = async (e) => {
+    const file = e.target.files?.[0];
+    if(!file) return;
+    setUploading(true);
+    try {
+      const small = await compressImage(file, 1200, 0.82);
+      const url = await uploadImage(small, token, "posts");
+      setImageUrl(url);
+    } catch(err) { alert("Image upload failed. Try again."); }
+    setUploading(false);
+  };
 
   const submit = async () => {
     if(!content.trim()) return;
@@ -2282,16 +2560,28 @@ function CreatePostModal({ user, token, onPost, onClose }) {
         </div>
         <textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="What did you achieve today? Share it with the community..." rows={4}
           style={{ width:"100%", padding:"14px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:14, fontFamily:"'Sora',sans-serif", outline:"none", resize:"none", marginBottom:14, boxSizing:"border-box" }}/>
+
+        {/* photo upload */}
+        {imageUrl ? (
+          <div style={{ position:"relative", marginBottom:14, borderRadius:16, overflow:"hidden" }}>
+            <img src={imageUrl} alt="" style={{ width:"100%", maxHeight:240, objectFit:"cover", display:"block" }}/>
+            <button onClick={()=>setImageUrl("")} style={{ position:"absolute", top:8, right:8, width:30, height:30, borderRadius:"50%", background:"rgba(0,0,0,0.6)", border:"none", color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}><Icons.Close/></button>
+          </div>
+        ) : (
+          <label style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, width:"100%", padding:"14px", background:"rgba(255,255,255,0.04)", border:"1px dashed rgba(255,255,255,0.15)", borderRadius:14, cursor:"pointer", marginBottom:14, color:"rgba(255,255,255,0.5)", fontSize:13, fontFamily:"'Sora',sans-serif", fontWeight:600 }}>
+            <input type="file" accept="image/*" onChange={pickImage} style={{ display:"none" }}/>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            {uploading ? "Uploading photo..." : "Add a photo"}
+          </label>
+        )}
+
         <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8, letterSpacing:"0.1em", textTransform:"uppercase" }}>Category</div>
-        <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" }}>
+        <div style={{ display:"flex", gap:8, marginBottom:18, flexWrap:"wrap" }}>
           {cats.map(c=>(
             <button key={c} onClick={()=>setCategory(c)} style={{ padding:"7px 14px", borderRadius:12, background:category===c?"rgba(168,213,194,0.15)":"rgba(255,255,255,0.05)", border:category===c?"1px solid rgba(168,213,194,0.3)":"1px solid rgba(255,255,255,0.08)", color:category===c?"#A8D5C2":"rgba(255,255,255,0.4)", fontSize:12, fontWeight:700, fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>{c}</button>
           ))}
         </div>
-        <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8, letterSpacing:"0.1em", textTransform:"uppercase" }}>Photo URL (optional)</div>
-        <input value={imageUrl} onChange={e=>setImageUrl(e.target.value)} placeholder="https://... paste an image link"
-          style={{ width:"100%", padding:"12px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:13, fontFamily:"'Sora',sans-serif", outline:"none", marginBottom:18 }}/>
-        <button onClick={submit} disabled={!content.trim()||loading} style={{ width:"100%", padding:"15px", background:content.trim()?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.08)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:content.trim()?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:content.trim()?"pointer":"not-allowed" }}>
+        <button onClick={submit} disabled={!content.trim()||loading||uploading} style={{ width:"100%", padding:"15px", background:content.trim()&&!uploading?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.08)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:content.trim()&&!uploading?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:content.trim()&&!uploading?"pointer":"not-allowed" }}>
           {loading?"Posting...":"Post to Community"}
         </button>
       </div>
@@ -2930,6 +3220,9 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
   const [editName, setEditName]   = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftAvatar, setDraftAvatar] = useState("");
+  const [bio, setBio]             = useState(()=>load("rslv_bio",""));
+  const [draftBio, setDraftBio]   = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [section, setSection]     = useState(null);
   const [token, setToken]         = useState(()=>localStorage.getItem("rslv_token")||null);
   const [showAuth, setShowAuth]   = useState(false);
@@ -2956,13 +3249,42 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
     save("rslv_notifs",updated);
   };
 
-  const saveName = () => {
+  const saveName = async () => {
     setName(draftName);
     setAvatar(draftAvatar);
+    setBio(draftBio);
     save("rslv_display_name",draftName);
     save("rslv_avatar",draftAvatar);
+    save("rslv_bio",draftBio);
+    // sync to community profile if signed in
+    if(token){
+      try {
+        const u = await getUser(token);
+        if(u?.id){
+          await sbAuthed(`profiles?id=eq.${u.id}`, token, {
+            method:"PATCH",
+            body: JSON.stringify({ full_name:draftName, avatar_url:draftAvatar, bio:draftBio }),
+          });
+        }
+      } catch {}
+    }
     setEditName(false);
     onModalChange(false);
+  };
+
+  const pickAvatar = async (e) => {
+    const file = e.target.files?.[0];
+    if(!file) return;
+    if(!token){ alert("Sign in to Community first to upload a photo (Settings → Sign In to Community)."); return; }
+    setUploadingAvatar(true);
+    try {
+      const small = await compressImage(file, 600, 0.85);
+      const url = await uploadImage(small, token, "avatars");
+      setDraftAvatar(url);
+    } catch(err) {
+      alert("Upload failed. Please try again.");
+    }
+    setUploadingAvatar(false);
   };
 
   const resetToday = () => {
@@ -2981,20 +3303,20 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
   };
 
   const Row = ({icon, label, value, onPress, danger}) => (
-    <div onClick={onPress} style={{ display:"flex", alignItems:"center", gap:14, padding:"15px 18px", cursor:onPress?"pointer":"default", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
-      <div style={{ fontSize:18, width:24, textAlign:"center" }}>{icon}</div>
-      <div style={{ flex:1, fontSize:14, fontWeight:600, color:danger?"#ff6b6b":"rgba(255,255,255,0.8)", fontFamily:"'Sora',sans-serif" }}>{label}</div>
-      {value && <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif" }}>{value}</div>}
-      {onPress && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>}
+    <div onClick={onPress} style={{ display:"flex", alignItems:"center", gap:14, padding:"16px 18px", cursor:onPress?"pointer":"default", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ width:34, height:34, borderRadius:10, background:danger?"rgba(255,107,107,0.12)":"rgba(168,213,194,0.13)", display:"flex", alignItems:"center", justifyContent:"center", color:danger?"#ff6b6b":"#6fae93", flexShrink:0 }}>{icon}</div>
+      <div style={{ flex:1, fontSize:14.5, fontWeight:600, color:danger?"#ff6b6b":"rgba(255,255,255,0.85)", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.01em" }}>{label}</div>
+      {value && <div style={{ fontSize:13, fontWeight:500, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif" }}>{value}</div>}
+      {onPress && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>}
     </div>
   );
 
   const Toggle = ({label, icon, value, onToggle}) => (
-    <div style={{ display:"flex", alignItems:"center", gap:14, padding:"15px 18px", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
-      <div style={{ fontSize:18, width:24, textAlign:"center" }}>{icon}</div>
-      <div style={{ flex:1, fontSize:14, fontWeight:600, color:"rgba(255,255,255,0.8)", fontFamily:"'Sora',sans-serif" }}>{label}</div>
-      <div onClick={onToggle} style={{ width:44, height:26, borderRadius:13, background:value?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.1)", position:"relative", cursor:"pointer", transition:"all 0.25s", flexShrink:0 }}>
-        <div style={{ position:"absolute", top:3, left:value?20:3, width:20, height:20, borderRadius:"50%", background:"#fff", transition:"all 0.25s", boxShadow:"0 2px 6px rgba(0,0,0,0.3)" }}/>
+    <div style={{ display:"flex", alignItems:"center", gap:14, padding:"16px 18px", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ width:34, height:34, borderRadius:10, background:"rgba(168,213,194,0.13)", display:"flex", alignItems:"center", justifyContent:"center", color:"#6fae93", flexShrink:0 }}>{icon}</div>
+      <div style={{ flex:1, fontSize:14.5, fontWeight:600, color:"rgba(255,255,255,0.85)", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.01em" }}>{label}</div>
+      <div onClick={onToggle} className={value?"rslv-toggle on":"rslv-toggle off"} style={{ width:46, height:28, borderRadius:14, background:value?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(120,120,130,0.25)", border:value?"1px solid rgba(168,213,194,0.5)":"1.5px solid rgba(120,120,130,0.45)", position:"relative", cursor:"pointer", transition:"all 0.25s", flexShrink:0, boxSizing:"border-box" }}>
+        <div style={{ position:"absolute", top:2.5, left:value?20:2.5, width:21, height:21, borderRadius:"50%", background:"#fff", border:"1px solid rgba(0,0,0,0.08)", transition:"all 0.25s", boxShadow:"0 1px 4px rgba(0,0,0,0.25)" }}/>
       </div>
     </div>
   );
@@ -3133,15 +3455,15 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
       {/* profile card */}
       <div style={{ padding:"0 18px", marginBottom:24 }}>
         <div style={{ display:"flex", alignItems:"center", gap:14, padding:"20px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:24 }}>
-          <div onClick={()=>{ setDraftName(name); setDraftAvatar(avatar); onModalChange(true); setEditName(true); }}
+          <div onClick={()=>{ setDraftName(name); setDraftAvatar(avatar); setDraftBio(bio); onModalChange(true); setEditName(true); }}
             style={{ width:60, height:60, borderRadius:18, background: avatar?"transparent":"linear-gradient(135deg,#A8D5C2,#C5B8E8)", overflow:"hidden", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, fontWeight:800, color:"#1a1d2e", fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>
             {avatar ? <img src={avatar} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : (name?.[0]||"R")}
           </div>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:2 }}>{name||"Your Name"}</div>
-            <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif" }}>Tap to edit profile</div>
+            <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", lineHeight:1.4 }}>{bio||"Tap to edit profile"}</div>
           </div>
-          <button onClick={()=>{ setDraftName(name); setDraftAvatar(avatar); onModalChange(true); setEditName(true); }} style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, padding:"7px 12px", cursor:"pointer", color:"rgba(255,255,255,0.4)", fontSize:12, fontFamily:"'Sora',sans-serif", fontWeight:700 }}>Edit</button>
+          <button onClick={()=>{ setDraftName(name); setDraftAvatar(avatar); setDraftBio(bio); onModalChange(true); setEditName(true); }} style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, padding:"7px 12px", cursor:"pointer", color:"rgba(255,255,255,0.4)", fontSize:12, fontFamily:"'Sora',sans-serif", fontWeight:700 }}>Edit</button>
         </div>
       </div>
 
@@ -3150,10 +3472,10 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
         <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Preferences</div>
       </div>
       <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
-        <Row icon="💰" label="Currency" value={currency} onPress={()=>setSection("currency")}/>
-        <Row icon="🎯" label="Daily Goals" value={`${goals.calories} kcal`} onPress={()=>setSection("goals")}/>
-        <Row icon="📊" label="Growth History" onPress={()=>setSection("history")}/>
-        <Toggle icon={darkMode?"🌙":"☀️"} label={darkMode?"Dark Mode":"Light Mode"} value={darkMode} onToggle={()=>setDarkMode(d=>!d)}/>
+        <Row icon={<Icons.Wallet/>} label="Currency" value={currency} onPress={()=>setSection("currency")}/>
+        <Row icon={<Icons.Target/>} label="Daily Goals" value={`${goals.calories} kcal`} onPress={()=>setSection("goals")}/>
+        <Row icon={<Icons.Chart/>} label="Growth History" onPress={()=>setSection("history")}/>
+        <Toggle icon={darkMode?<Icons.Moon/>:<Icons.Sun/>} label={darkMode?"Dark Mode":"Light Mode"} value={darkMode} onToggle={()=>setDarkMode(d=>!d)}/>
       </div>
 
       {/* NOTIFICATIONS */}
@@ -3161,9 +3483,9 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
         <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Notifications</div>
       </div>
       <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
-        <Toggle icon="🔥" label="Daily Habit Reminder" value={notifs.habits} onToggle={()=>toggleNotif("habits")}/>
-        <Toggle icon="⚡" label="Streak Alert" value={notifs.streak} onToggle={()=>toggleNotif("streak")}/>
-        <Toggle icon="💰" label="Finance Reminders" value={notifs.finance} onToggle={()=>toggleNotif("finance")}/>
+        <Toggle icon={<Icons.Flame/>} label="Daily Habit Reminder" value={notifs.habits} onToggle={()=>toggleNotif("habits")}/>
+        <Toggle icon={<Icons.Bolt/>} label="Streak Alert" value={notifs.streak} onToggle={()=>toggleNotif("streak")}/>
+        <Toggle icon={<Icons.Wallet/>} label="Finance Reminders" value={notifs.finance} onToggle={()=>toggleNotif("finance")}/>
         <div style={{ display:"flex", alignItems:"center", gap:14, padding:"15px 18px", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
           <div style={{ fontSize:18, width:24, textAlign:"center" }}>⏰</div>
           <div style={{ flex:1, fontSize:14, fontWeight:600, color:"rgba(255,255,255,0.8)", fontFamily:"'Sora',sans-serif" }}>Reminder Time</div>
@@ -3187,18 +3509,18 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
       </div>
       <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
         {token ? (
-          <div onClick={()=>{ localStorage.removeItem("rslv_token"); setToken(null); }} style={{ display:"flex", alignItems:"center", gap:14, padding:"15px 18px", cursor:"pointer" }}>
-            <div style={{ fontSize:18, width:24, textAlign:"center" }}>🚪</div>
-            <div style={{ flex:1, fontSize:14, fontWeight:600, color:"#ff6b6b", fontFamily:"'Sora',sans-serif" }}>Sign Out of Community</div>
+          <div onClick={()=>{ localStorage.removeItem("rslv_token"); setToken(null); }} style={{ display:"flex", alignItems:"center", gap:14, padding:"16px 18px", cursor:"pointer" }}>
+            <div style={{ width:34, height:34, borderRadius:10, background:"rgba(255,107,107,0.12)", display:"flex", alignItems:"center", justifyContent:"center", color:"#ff6b6b", flexShrink:0 }}><Icons.Logout/></div>
+            <div style={{ flex:1, fontSize:14.5, fontWeight:600, color:"#ff6b6b", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.01em" }}>Sign Out of Community</div>
           </div>
         ) : (
-          <div onClick={()=>{ onModalChange(true); setShowAuth(true); }} style={{ display:"flex", alignItems:"center", gap:14, padding:"15px 18px", cursor:"pointer" }}>
-            <div style={{ fontSize:18, width:24, textAlign:"center" }}>🌱</div>
+          <div onClick={()=>{ onModalChange(true); setShowAuth(true); }} style={{ display:"flex", alignItems:"center", gap:14, padding:"16px 18px", cursor:"pointer" }}>
+            <div style={{ width:34, height:34, borderRadius:10, background:"rgba(168,213,194,0.13)", display:"flex", alignItems:"center", justifyContent:"center", color:"#6fae93", flexShrink:0 }}><Icons.Community/></div>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:14, fontWeight:600, color:"#A8D5C2", fontFamily:"'Sora',sans-serif" }}>Sign In to Community</div>
-              <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>Post wins, join challenges, follow others</div>
+              <div style={{ fontSize:14.5, fontWeight:600, color:"#6fae93", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.01em" }}>Sign In to Community</div>
+              <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>Post wins, join challenges, follow others</div>
             </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
           </div>
         )}
       </div>
@@ -3208,8 +3530,8 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
         <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Data</div>
       </div>
       <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
-        <Row icon="🔄" label="Reset Today's Data" onPress={()=>setShowReset(true)}/>
-        <Row icon="🗑" label="Clear All App Data" danger onPress={()=>setShowClear(true)}/>
+        <Row icon={<Icons.Refresh/>} label="Reset Today's Data" onPress={()=>setShowReset(true)}/>
+        <Row icon={<Icons.TrashLg/>} label="Clear All App Data" danger onPress={()=>setShowClear(true)}/>
       </div>
 
       {/* SUPPORT */}
@@ -3217,9 +3539,9 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
         <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Support</div>
       </div>
       <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
-        <Row icon="❓" label="Help Center" onPress={()=>setSection("help")}/>
-        <Row icon="🔒" label="Privacy Policy" onPress={()=>setSection("privacy")}/>
-        <Row icon="⭐" label="Rate Risolvero" onPress={()=>window.open("https://risolveroapp2.vercel.app","_blank")}/>
+        <Row icon={<Icons.Help/>} label="Help Center" onPress={()=>setSection("help")}/>
+        <Row icon={<Icons.Shield/>} label="Privacy Policy" onPress={()=>setSection("privacy")}/>
+        <Row icon={<Icons.Star/>} label="Rate Risolvero" onPress={()=>window.open("https://risolveroapp2.vercel.app","_blank")}/>
       </div>
 
       {/* ABOUT */}
@@ -3227,9 +3549,9 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
         <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>About</div>
       </div>
       <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
-        <Row icon="📱" label="Version" value="1.0.0"/>
-        <Row icon="🌱" label="Risolvero" value="Built for growth"/>
-        <Row icon="👨‍💻" label="Made with" value="❤️"/>
+        <Row icon={<Icons.Phone/>} label="Version" value="1.0.0"/>
+        <Row icon={<Icons.Leaf/>} label="Risolvero" value="Built for growth"/>
+        <Row icon={<Icons.Heart/>} label="Made with" value="Love"/>
       </div>
 
       {/* auth modal */}
@@ -3269,23 +3591,44 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
       {editName && (
         <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
           <div onClick={()=>{ setEditName(false); onModalChange(false); }} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)" }}>
-            <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:22 }}>
-              <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Edit Profile</div>
-              <button onClick={()=>{ setEditName(false); onModalChange(false); }} style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)" }}><Icons.Close/></button>
-            </div>
-            {[
-              {label:"Display Name", val:draftName, set:setDraftName, placeholder:"Your name"},
-              {label:"Avatar URL", val:draftAvatar, set:setDraftAvatar, placeholder:"https://... paste a photo link"},
-            ].map(({label,val,set,placeholder})=>(
-              <div key={label} style={{ marginBottom:14 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8, letterSpacing:"0.1em", textTransform:"uppercase" }}>{label}</div>
-                <input value={val} onChange={e=>set(e.target.value)} placeholder={placeholder}
+          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"88vh", display:"flex", flexDirection:"column" }}>
+            <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"24px 22px 8px", flex:1 }}>
+              <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
+                <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Edit Profile</div>
+                <button onClick={()=>{ setEditName(false); onModalChange(false); }} style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)" }}><Icons.Close/></button>
+              </div>
+
+              {/* avatar upload */}
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:24 }}>
+                <label style={{ cursor:"pointer", position:"relative" }}>
+                  <input type="file" accept="image/*" onChange={pickAvatar} style={{ display:"none" }}/>
+                  <div style={{ width:92, height:92, borderRadius:28, background: draftAvatar?"transparent":"linear-gradient(135deg,#A8D5C2,#C5B8E8)", overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center", fontSize:34, fontWeight:800, color:"#1a1d2e", fontFamily:"'Sora',sans-serif", border:"2px solid rgba(255,255,255,0.1)" }}>
+                    {uploadingAvatar ? <div style={{ fontSize:12, color:"#fff", fontWeight:600 }}>...</div> : (draftAvatar ? <img src={draftAvatar} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : (draftName?.[0]||"R"))}
+                  </div>
+                  <div style={{ position:"absolute", bottom:-2, right:-2, width:30, height:30, borderRadius:"50%", background:"#A8D5C2", display:"flex", alignItems:"center", justifyContent:"center", border:"3px solid #1a1d2e" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a1d2e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  </div>
+                </label>
+                <div style={{ fontSize:12, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif", marginTop:10 }}>{uploadingAvatar?"Uploading...":"Tap photo to change"}</div>
+              </div>
+
+              <div style={{ marginBottom:16 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8, letterSpacing:"0.1em", textTransform:"uppercase" }}>Display Name</div>
+                <input value={draftName} onChange={e=>setDraftName(e.target.value)} placeholder="Your name"
                   style={{ width:"100%", padding:"13px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:14, fontFamily:"'Sora',sans-serif", outline:"none" }}/>
               </div>
-            ))}
-            <button onClick={saveName} style={{ width:"100%", padding:"15px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer", marginTop:8 }}>Save</button>
+
+              <div style={{ marginBottom:16 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8, letterSpacing:"0.1em", textTransform:"uppercase" }}>Bio</div>
+                <textarea value={draftBio} onChange={e=>setDraftBio(e.target.value.slice(0,150))} placeholder="A short line about you..." rows={3}
+                  style={{ width:"100%", padding:"13px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:14, fontFamily:"'Sora',sans-serif", outline:"none", resize:"none", lineHeight:1.5 }}/>
+                <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:6, textAlign:"right" }}>{draftBio.length}/150</div>
+              </div>
+            </div>
+            <div style={{ padding:"12px 22px 44px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+              <button onClick={saveName} disabled={uploadingAvatar} style={{ width:"100%", padding:"15px", background:uploadingAvatar?"rgba(255,255,255,0.1)":"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:uploadingAvatar?"rgba(255,255,255,0.3)":"#1a1d2e", cursor:uploadingAvatar?"not-allowed":"pointer" }}>Save Profile</button>
+            </div>
           </div>
         </div>
       )}
@@ -3468,28 +3811,31 @@ export default function Risolvero() {
   const [navHidden, setNavHidden] = useState(false);
   const [onboarded, setOnboarded] = useState(()=>!!localStorage.getItem("rslv_onboarded"));
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+  const [darkMode, setDarkMode] = useState(()=>load("rslv_dark_mode",true));
 
   useEffect(()=>{
     registerSW();
     if(onboarded) scheduleNotifications();
   },[onboarded]);
 
+  useEffect(()=>{
+    save("rslv_dark_mode", darkMode);
+    document.body.style.background = darkMode ? "#12141E" : "#FFFFFF";
+    const rootEl = document.getElementById("rslv-root");
+    if(rootEl){
+      if(darkMode) rootEl.classList.remove("light");
+      else rootEl.classList.add("light");
+    }
+  },[darkMode, tab, onboarded, navHidden, showNotifPrompt]);
+
   const completeOnboarding = (name) => {
     if(name) save("rslv_display_name", name);
     localStorage.setItem("rslv_onboarded","1");
     setOnboarded(true);
-    // ask for notification permission after onboarding
     setTimeout(()=>setShowNotifPrompt(true), 800);
   };
 
   if(!onboarded) return <OnboardingScreen onComplete={completeOnboarding}/>;
-
-  const [darkMode, setDarkMode] = useState(()=>load("rslv_dark_mode",true));
-
-  useEffect(()=>{
-    save("rslv_dark_mode", darkMode);
-    document.body.style.background = darkMode ? "#12141E" : "#F5F5F0";
-  },[darkMode]);
 
   const pages = {
     home:      <HomePage onNavigate={setTab}/>,
@@ -3504,12 +3850,11 @@ export default function Risolvero() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-        html,body{background:${darkMode?"#12141E":"#F5F5F0"};overscroll-behavior:none;height:100%;}
-        html{height:-webkit-fill-available;}
+        html{background:${darkMode?"#12141E":"#FFFFFF"};-webkit-text-size-adjust:100%;}
+        body{background:${darkMode?"#12141E":"#FFFFFF"};min-height:100vh;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:none;}
         .modal-open-nav{display:none !important;}
         @media (max-height: 500px){ .bottom-nav{ display:none !important; } }
         ::-webkit-scrollbar{display:none;}
-        *{-webkit-overflow-scrolling:touch;}
         input::placeholder{color:${darkMode?"rgba(255,255,255,0.25)":"rgba(0,0,0,0.25)"};}
         input{color-scheme:${darkMode?"dark":"light"};}
         @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
@@ -3517,18 +3862,151 @@ export default function Risolvero() {
         @keyframes tabIn{from{opacity:0}to{opacity:1}}
         @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-        ${!darkMode ? `
-          /* Light mode overrides */
-          input { background: rgba(0,0,0,0.05) !important; border-color: rgba(0,0,0,0.1) !important; color: #1a1a2e !important; }
-          textarea { background: rgba(0,0,0,0.05) !important; border-color: rgba(0,0,0,0.1) !important; color: #1a1a2e !important; }
-        ` : ""}
+
+        /* ============================================
+           PREMIUM LIGHT MODE
+           Pure white page · cards separated by soft
+           shadow + padding · charcoal ink · vibrant accents
+           ============================================ */
+        #rslv-root.light { background:#FFFFFF !important; }
+
+        /* page-level dark backgrounds -> white */
+        #rslv-root.light [style*="background: rgb(18, 20, 30)"],
+        #rslv-root.light [style*="background:#12141E"],
+        #rslv-root.light [style*="background: #12141E"] { background:#FFFFFF !important; }
+
+        /* solid dark sheets/modals -> white */
+        #rslv-root.light [style*="background: rgb(26, 29, 46)"],
+        #rslv-root.light [style*="background:#1a1d2e"],
+        #rslv-root.light [style*="background: #1a1d2e"] { background:#FFFFFF !important; }
+
+        /* card fills -> white with soft shadow (separation via depth, not color) */
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.03)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.03)"],
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.04)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.04)"],
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.05)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.05)"],
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.06)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.06)"] {
+          background:#FFFFFF !important;
+          box-shadow:0 1px 3px rgba(27,27,31,0.05), 0 8px 24px rgba(27,27,31,0.06) !important;
+        }
+        /* stronger fills (buttons, chips) -> light warm grey */
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.08)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.08)"] { background:rgba(27,27,31,0.05) !important; }
+
+        /* borders -> soft warm hairline */
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.07)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.07)"],
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.1)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.1)"] { border-color:rgba(27,27,31,0.07) !important; }
+
+        /* white text -> charcoal, scaled by importance */
+        #rslv-root.light [style*="color: rgb(255, 255, 255)"],
+        #rslv-root.light [style*="color:#fff"],
+        #rslv-root.light [style*="color: #fff"],
+        #rslv-root.light [style*="color:#ffffff"] { color:#1B1B1F !important; }
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.85)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.85)"] { color:rgba(27,27,31,0.9) !important; }
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.8)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.8)"] { color:rgba(27,27,31,0.85) !important; }
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.7)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.7)"] { color:rgba(27,27,31,0.75) !important; }
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.6)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.6)"] { color:rgba(27,27,31,0.68) !important; }
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.5)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.5)"] { color:rgba(27,27,31,0.75) !important; }
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.4)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.4)"] { color:rgba(27,27,31,0.72) !important; }
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.35)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.35)"] { color:rgba(27,27,31,0.7) !important; }
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.3)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.3)"] { color:rgba(27,27,31,0.7) !important; }
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.25)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.25)"] { color:rgba(27,27,31,0.68) !important; }
+        #rslv-root.light [style*="rgba(255, 255, 255, 0.2)"],
+        #rslv-root.light [style*="rgba(255,255,255,0.2)"] { color:rgba(27,27,31,0.65) !important; }
+
+        /* progress-bar / circle tracks: white-on-dark -> visible warm grey */
+        #rslv-root.light circle[stroke="rgba(255,255,255,0.12)"] { stroke:rgba(27,27,31,0.1) !important; }
+        #rslv-root.light circle[stroke="rgba(255, 255, 255, 0.12)"] { stroke:rgba(27,27,31,0.1) !important; }
+
+        /* sticky header fade */
+        #rslv-root.light [style*="linear-gradient(180deg,#12141E"],
+        #rslv-root.light [style*="linear-gradient(180deg, #12141E"] { background:linear-gradient(180deg,#FFFFFF 70%,transparent 100%) !important; }
+
+        /* inputs */
+        #rslv-root.light input, #rslv-root.light textarea, #rslv-root.light select {
+          background:#FFFFFF !important;
+          border-color:rgba(27,27,31,0.12) !important;
+          color:#1B1B1F !important;
+        }
+        #rslv-root.light input::placeholder, #rslv-root.light textarea::placeholder { color:rgba(27,27,31,0.35) !important; }
+
+        /* bottom nav */
+        #rslv-root.light .bottom-nav > div { background:rgba(255,255,255,0.98) !important; box-shadow:0 -1px 24px rgba(27,27,31,0.1) !important; border-color:rgba(27,27,31,0.06) !important; }
+        /* inactive nav buttons -> readable dark grey (active stays green via inline) */
+        #rslv-root.light .bottom-nav button[style*="rgba(255, 255, 255, 0.2)"],
+        #rslv-root.light .bottom-nav button[style*="rgba(255,255,255,0.2)"] { color:rgba(27,27,31,0.55) !important; }
+        #rslv-root.light .bottom-nav button[style*="rgba(255, 255, 255, 0.2)"] svg,
+        #rslv-root.light .bottom-nav button[style*="rgba(255,255,255,0.2)"] svg { stroke:rgba(27,27,31,0.5) !important; }
+
+        /* toggles keep their own styling in light mode (don't convert to white card) */
+        #rslv-root.light .rslv-toggle.off { background:rgba(120,120,130,0.22) !important; border-color:rgba(120,120,130,0.5) !important; box-shadow:none !important; }
+        #rslv-root.light .rslv-toggle.on { box-shadow:none !important; }
+
+        /* hero pastel card + add-habit button keep their gradients in light mode */
+        #rslv-root.light .rslv-hero-card { box-shadow:0 8px 30px rgba(150,130,200,0.14) !important; }
+        #rslv-root.light .rslv-add-habit { box-shadow:0 6px 20px rgba(169,155,216,0.3) !important; }
+
+        /* ── readable accent TEXT in light mode ──
+           Pale pastel accents are built for dark bg; on white they wash out.
+           Deepen them to a saturated, comfortable-to-read version.
+           (Only affects text color, not backgrounds/borders/gradients.) */
+        #rslv-root.light [style*="color: rgb(168, 213, 194)"],
+        #rslv-root.light [style*="color:#A8D5C2"],
+        #rslv-root.light [style*="color: #A8D5C2"] { color:#3F8F6E !important; }   /* mint green */
+        #rslv-root.light [style*="color: rgb(200, 223, 240)"],
+        #rslv-root.light [style*="color:#C8DFF0"],
+        #rslv-root.light [style*="color: #C8DFF0"] { color:#3D7BB0 !important; }   /* sky blue */
+        #rslv-root.light [style*="color: rgb(216, 208, 240)"],
+        #rslv-root.light [style*="color:#D8D0F0"],
+        #rslv-root.light [style*="color: #D8D0F0"] { color:#7A6CB8 !important; }   /* lavender */
+        #rslv-root.light [style*="color: rgb(245, 221, 208)"],
+        #rslv-root.light [style*="color:#F5DDD0"],
+        #rslv-root.light [style*="color: #F5DDD0"] { color:#C06B45 !important; }   /* peach */
+        #rslv-root.light [style*="color: rgb(200, 230, 218)"],
+        #rslv-root.light [style*="color:#C8E6DA"],
+        #rslv-root.light [style*="color: #C8E6DA"] { color:#3F8F6E !important; }   /* soft green */
+        #rslv-root.light [style*="color: rgb(240, 232, 208)"],
+        #rslv-root.light [style*="color:#F0E8D0"],
+        #rslv-root.light [style*="color: #F0E8D0"] { color:#A8862F !important; }   /* gold */
+        #rslv-root.light [style*="color: rgb(237, 208, 240)"],
+        #rslv-root.light [style*="color:#EDD0F0"],
+        #rslv-root.light [style*="color: #EDD0F0"] { color:#A053B0 !important; }   /* pink-purple */
+        #rslv-root.light [style*="color: rgb(255, 179, 71)"],
+        #rslv-root.light [style*="color:#FFB347"],
+        #rslv-root.light [style*="color: #FFB347"] { color:#D88A1E !important; }   /* amber */
+
+        /* community search bar -> clean inset, not floating white card */
+        #rslv-root.light .rslv-search-bar { background:rgba(27,27,31,0.04) !important; border-color:rgba(27,27,31,0.08) !important; box-shadow:none !important; }
+        #rslv-root.light .rslv-search-bar svg { stroke:rgba(27,27,31,0.35) !important; }
+        /* community 3-dot button -> clean inset, not floating white card */
+        #rslv-root.light .rslv-menu-btn { background:rgba(27,27,31,0.04) !important; border-color:rgba(27,27,31,0.08) !important; box-shadow:none !important; }
+
+        /* community 3-dot menu dots -> visible dark in light mode */
+        #rslv-root.light .rslv-menu-dot { background:rgba(27,27,31,0.45) !important; }
+        /* dark dropdown menus -> white card in light mode */
+        #rslv-root.light [style*="background: rgb(30, 34, 53)"],
+        #rslv-root.light [style*="background:#1e2235"] { background:#FFFFFF !important; box-shadow:0 8px 32px rgba(27,27,31,0.15) !important; }
       `}</style>
-      <div style={{ maxWidth:430, margin:"0 auto", minHeight:"100vh", background:darkMode?"#12141E":"#F5F5F0", position:"relative", overflowX:"hidden", overflowY:"auto", fontFamily:"'Sora',sans-serif" }}>
+      <div id="rslv-root" className={darkMode?"":"light"} style={{ maxWidth:430, margin:"0 auto", minHeight:"100vh", background:darkMode?"#12141E":"#FFFFFF", position:"relative", overflowX:"hidden", fontFamily:"'Sora',sans-serif" }}>
         <div style={{ position:"fixed", top:0, left:"50%", transform:"translateX(-50%)", width:430, height:"100vh", pointerEvents:"none", zIndex:0 }}>
           <div style={{ position:"absolute", top:-60, left:"20%", width:280, height:280, background:darkMode?"radial-gradient(circle,rgba(168,213,194,0.06) 0%,transparent 65%)":"radial-gradient(circle,rgba(168,213,194,0.15) 0%,transparent 65%)", filter:"blur(50px)" }}/>
           <div style={{ position:"absolute", top:100, right:"5%", width:200, height:200, background:darkMode?"radial-gradient(circle,rgba(197,184,232,0.05) 0%,transparent 65%)":"radial-gradient(circle,rgba(197,184,232,0.1) 0%,transparent 65%)", filter:"blur(40px)" }}/>
         </div>
-        <div style={{ position:"sticky", top:0, zIndex:10, padding:"52px 18px 12px", background:darkMode?"linear-gradient(180deg,#12141E 60%,transparent 100%)":"linear-gradient(180deg,#F5F5F0 60%,transparent 100%)" }}>
+        <div style={{ position:"sticky", top:0, zIndex:10, padding:"52px 18px 12px", background:darkMode?"linear-gradient(180deg,#12141E 60%,transparent 100%)":"linear-gradient(180deg,#FFFFFF 70%,transparent 100%)" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
             <div style={{ fontSize:13, fontWeight:800, letterSpacing:"0.26em", color:darkMode?"rgba(255,255,255,0.85)":"rgba(0,0,0,0.7)", fontFamily:"'Sora',sans-serif" }}>RISOLVERO</div>
             <div style={{ fontSize:11, color:darkMode?"rgba(255,255,255,0.2)":"rgba(0,0,0,0.3)", fontFamily:"'Sora',sans-serif" }}>{new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"})}</div>
