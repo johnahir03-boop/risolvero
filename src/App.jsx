@@ -40,7 +40,7 @@ function scheduleNotifications() {
         const delay = next - now;
         const habits = load("rslv_habits", []);
         if (habits.length > 0) {
-          reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:"🌱 Risolvero", body:`${habits.length} habit${habits.length!==1?"s":""} waiting today!`, delay, tag:"daily-habit" });
+          reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:"Risolvero", body:`${habits.length} habit${habits.length!==1?"s":""} waiting today!`, delay, tag:"daily-habit" });
         }
       }
 
@@ -50,7 +50,7 @@ function scheduleNotifications() {
           let sr = new Date();
           sr.setHours(20, 0, 0, 0);
           if (sr <= now) sr.setDate(sr.getDate() + 1);
-          reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:`🔥 ${streak} day streak at risk!`, body:"Complete your habits to keep your streak.", delay: sr - now, tag:"streak" });
+          reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:`${streak} day streak at risk!`, body:"Complete your habits to keep your streak.", delay: sr - now, tag:"streak" });
         }
       }
 
@@ -63,7 +63,7 @@ function scheduleNotifications() {
             twoDaysBefore.setDate(twoDaysBefore.getDate() - 2);
             twoDaysBefore.setHours(9, 0, 0, 0);
             if (twoDaysBefore > now) {
-              reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:`💳 ${s.name} renews in 2 days`, body:`${s.name} will charge you soon.`, delay: twoDaysBefore - now, tag:`sub-${s.id}` });
+              reg.active.postMessage({ type:"SCHEDULE_NOTIFICATION", title:`${s.name} renews in 2 days`, body:`${s.name} will charge you soon.`, delay: twoDaysBefore - now, tag:`sub-${s.id}` });
             }
           } catch(e) {}
         });
@@ -231,283 +231,295 @@ const PALETTE = [
   { bg:"#EDD0F0", text:"#280e2e", sub:"#8a409a", check:"#7a2a8a" },
 ];
 
-function GrowthCircle({ score }) {
-  const [disp, setDisp] = useState(0);
-  const [prog, setProg] = useState(0);
-  const prevRef = useRef(0);
-  const R = 56, C = 2 * Math.PI * R;
-
-  useEffect(() => {
-    const from = prevRef.current;
-    prevRef.current = score;
-    let raf, t0;
-    const run = (ts) => {
-      if (!t0) t0 = ts;
-      const p = Math.min((ts - t0) / 800, 1);
-      const e = 1 - Math.pow(1 - p, 3);
-      setDisp(Math.round(from + e * (score - from)));
-      setProg(from + e * (score - from));
-      if (p < 1) raf = requestAnimationFrame(run);
-    };
-    raf = requestAnimationFrame(run);
-    return () => cancelAnimationFrame(raf);
-  }, [score]);
-
-  const offset = C - (prog / 100) * C;
-
+/* ═════════ THEME v3 — palette, icons, primitives ═════════ */
+const FONT = "'Poppins',sans-serif";
+const PAL = { or:"#FF6B2C", or2:"#FF8A3D", or3:"#FF5E1F", bl:"#3D8BFF", bl2:"#5AA2FF", bl3:"#2F80ED", gr:"#7ECB4F", gr2:"#8FD95F", gr3:"#5FB332", am:"#FFB324", am2:"#FFC24D", am3:"#F5A302", vi2:"#8E7BFF", vi3:"#6C4CF0", ro2:"#FF7FA6", ro3:"#F04C7F", ink:"#17181C", red:"#E5484D" };
+const GRAD = { or:"linear-gradient(140deg,"+PAL.or2+","+PAL.or3+")", bl:"linear-gradient(140deg,"+PAL.bl2+","+PAL.bl3+")", gr:"linear-gradient(140deg,"+PAL.gr2+","+PAL.gr3+")", am:"linear-gradient(140deg,"+PAL.am2+","+PAL.am3+")", vi:"linear-gradient(140deg,"+PAL.vi2+","+PAL.vi3+")", ro:"linear-gradient(140deg,"+PAL.ro2+","+PAL.ro3+")", ink:"linear-gradient(140deg,#23242B,#17181C)" };
+const THEME = (dark) => dark ? {
+  dark:true, canvas:"#141519", card:"#1E1F25", chip:"#262730", sheet:"#1E1F25", input:"#262730",
+  ink:"#FFFFFF", ink2:"#A0A3AE", ink3:"#6E7280",
+  line:"#2A2B33", line2:"#34353F", track:"#2A2B33", dashed:"#34353F",
+  overlay:"rgba(0,0,0,0.6)", shadow:"none",
+} : {
+  dark:false, canvas:"#F4F4F6", card:"#FFFFFF", chip:"#F1F1F4", sheet:"#FFFFFF", input:"#F1F1F4",
+  ink:"#17181C", ink2:"#6E7280", ink3:"#9A9DA6",
+  line:"#ECECF0", line2:"#E0E0E6", track:"#ECECF0", dashed:"#E0E0E6",
+  overlay:"rgba(23,24,28,0.45)", shadow:"0 1px 3px rgba(23,24,28,.04), 0 10px 26px rgba(23,24,28,.06)",
+};
+const ISVG = {
+  home:<><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/></>,
+  fit:<path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/>,
+  book:<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></>,
+  wallet:<><path d="M19 7V5H6a2 2 0 0 0 0 4h13a1 1 0 0 1 1 1v3"/><path d="M4 7v11a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1v-3"/><path d="M17 12.5a1.5 1.5 0 0 0 0 3H21v-3h-4z"/></>,
+  user:<><circle cx="12" cy="8" r="4"/><path d="M4.5 21c0-3.8 3.3-6.5 7.5-6.5s7.5 2.7 7.5 6.5"/></>,
+  flame:<><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3 2.5.5 5 2.2 5 5a5 5 0 1 1-10 0c0-1.5.5-2.5 1-3.5.3 1 .8 1.5 1.5 2z"/><path d="M12 2c1.5 2.5 3.7 4.6 5 7 1 1.9 1.5 3.3 1.5 5"/></>,
+  drop:<path d="M12 3s6 6.7 6 11a6 6 0 0 1-12 0c0-4.3 6-11 6-11z"/>,
+  fork:<><path d="M7 3v6a2.5 2.5 0 0 0 5 0V3M9.5 3v18"/><path d="M17 3c1.8 1.8 1.8 6.2 0 8v10"/></>,
+  cam:<><rect x="3" y="7" width="18" height="13" rx="3.5"/><circle cx="12" cy="13.2" r="3.4"/><path d="M8.5 7l1.4-2.6h4.2L15.5 7"/></>,
+  gear:<><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.2-1.6l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2.8-1.6L13.3 2h-2.6l-.4 2.9A7 7 0 0 0 7.5 6.5l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .5.1 1.1.2 1.6l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2.8 1.6l.4 2.9h2.6l.4-2.9a7 7 0 0 0 2.8-1.6l2.3 1 2-3.4-2-1.5c.1-.5.2-1.1.2-1.6z"/></>,
+  target:<><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></>,
+  chart:<path d="M4.5 20V12M12 20V4.5M19.5 20v-6"/>,
+  check:<path d="M4.5 12.5l5 5L20 6.5"/>,
+  plus:<path d="M12 5v14M5 12h14"/>,
+  minus:<path d="M5 12h14"/>,
+  sun:<><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5 5l1.6 1.6M17.4 17.4 19 19M19 5l-1.6 1.6M6.6 17.4 5 19"/></>,
+  moon:<path d="M20.5 13.5A8.5 8.5 0 0 1 10.5 3.5a8.5 8.5 0 1 0 10 10z"/>,
+  coins:<><circle cx="9" cy="9" r="6"/><path d="M14.2 6.2a6 6 0 1 1-8 8"/><path d="M9 6.5v5M6.8 9h4.4"/></>,
+  bell:<><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></>,
+  clock:<><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></>,
+  star:<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9L3.5 9.7l5.9-.8z"/>,
+  chat:<path d="M21 12a8 8 0 0 1-8 8H4l2-3.2A8 8 0 1 1 21 12z"/>,
+  globe:<><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.3 3.8 5.2 3.8 8.5s-1.3 6.2-3.8 8.5c-2.5-2.3-3.8-5.2-3.8-8.5S9.5 5.8 12 3.5z"/></>,
+  info:<><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 7.8v.4"/></>,
+  heart:<path d="M12 20s-7.5-4.6-9.3-9A5 5 0 0 1 12 7a5 5 0 0 1 9.3 4c-1.8 4.4-9.3 9-9.3 9z"/>,
+  chev:<path d="M9.5 6l6 6-6 6"/>,
+  back:<path d="M14.5 6l-6 6 6 6"/>,
+  sound:<><path d="M4 9.5v5h3.5L12 18V6L7.5 9.5H4z"/><path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.2 6.6a7.6 7.6 0 0 1 0 10.8"/></>,
+  puzzle:<><rect x="3.5" y="3.5" width="7.2" height="7.2" rx="2.2"/><rect x="13.3" y="3.5" width="7.2" height="7.2" rx="2.2"/><rect x="3.5" y="13.3" width="7.2" height="7.2" rx="2.2"/><rect x="13.3" y="13.3" width="7.2" height="7.2" rx="2.2"/></>,
+  trash:<><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/><path d="M10 11v5M14 11v5"/></>,
+  close:<path d="M6 6l12 12M18 6L6 18"/>,
+  pen:<><path d="M4 20l4-1L20 7l-3-3L5 16l-1 4z"/><path d="M14.5 6.5l3 3"/></>,
+  leaf:<><path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19c3-3 6-5 10-6"/></>,
+  run:<><circle cx="14.5" cy="4.5" r="1.8"/><path d="M9 20.5l2.2-4.5-2.5-2 3-4.5 3 2 3.3-1"/><path d="M6 13.5l2.7-4 4-1 2.5 3"/></>,
+  search:<><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></>,
+  logout:<><path d="M9 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H9"/><path d="M15 8l4 4-4 4M19 12H9"/></>,
+  refresh:<><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 3v4h-4"/></>,
+};
+const Ic = ({ n, s=22, sw=2, style }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={style}>{ISVG[n]||ISVG.target}</svg>
+);
+const tints = (T) => ({
+  or:{bg:"rgba(255,107,44,.13)",fg:PAL.or}, bl:{bg:"rgba(61,139,255,.13)",fg:T.dark?PAL.bl2:PAL.bl3},
+  gr:{bg:"rgba(126,203,79,.16)",fg:T.dark?PAL.gr2:"#569B2B"}, am:{bg:"rgba(255,179,36,.18)",fg:T.dark?PAL.am2:"#C7830A"},
+  vi:{bg:"rgba(124,92,255,.14)",fg:T.dark?PAL.vi2:PAL.vi3}, ro:{bg:"rgba(240,76,127,.13)",fg:T.dark?PAL.ro2:PAL.ro3},
+  ink:{bg:T.chip,fg:T.ink}, red:{bg:"rgba(229,72,77,.12)",fg:PAL.red},
+});
+const Chip = ({ n, c="or", T, size=38, is=19, style, onClick }) => { const t=tints(T)[c]||tints(T).or; return (
+  <div onClick={onClick} style={{ width:size, height:size, borderRadius:Math.round(size*0.37), background:t.bg, color:t.fg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, cursor:onClick?"pointer":undefined, ...style }}><Ic n={n} s={is}/></div>
+);};
+const Ring = ({ pct=0, size=126, stroke=9, T, knob=true, over=false, children }) => {
+  const R=55, C=2*Math.PI*R, p=Math.max(0,Math.min(100,pct));
   return (
-    <div style={{ position:"relative", width:128, height:128, flexShrink:0 }}>
-      <svg width="128" height="128" style={{ transform:"rotate(-90deg)" }}>
-        <circle cx="64" cy="64" r={R} fill="none" stroke="rgba(139,127,181,0.16)" strokeWidth="8"/>
-        <circle cx="64" cy="64" r={R} fill="none" stroke="url(#sg)" strokeWidth="8" strokeLinecap="round"
-          strokeDasharray={C} strokeDashoffset={offset}
-          style={{ transition:"stroke-dashoffset 0.04s linear" }}/>
-        <defs>
-          <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#A99BD8"/>
-            <stop offset="100%" stopColor="#C5B8E8"/>
-          </linearGradient>
-        </defs>
+    <div style={{ position:"relative", width:size, height:size, flexShrink:0 }}>
+      <svg width={size} height={size} viewBox="0 0 126 126" style={{ transform:"rotate(-90deg)" }}>
+        <circle cx="63" cy="63" r={R} fill="none" stroke={T.track} strokeWidth="4" strokeDasharray="1.5 7" strokeLinecap="round"/>
+        <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={PAL.or2}/><stop offset="1" stopColor={PAL.or3}/></linearGradient></defs>
+        <circle cx="63" cy="63" r={R} fill="none" stroke={over?PAL.red:"url(#ringGrad)"} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={(C*p/100)+" "+C}/>
+        {knob && p>0 && <g transform={"rotate("+(p*3.6)+" 63 63)"}><circle cx="63" cy="8" r="6.5" fill={T.dark?"#fff":PAL.ink}/><circle cx="63" cy="8" r="2.4" fill={T.dark?PAL.ink:"#fff"}/></g>}
       </svg>
-      <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:0 }}>
-        <div style={{ fontSize:46, fontWeight:300, lineHeight:1, fontFamily:"'Sora',sans-serif", color:"#7B6FB0", letterSpacing:"-2px" }}>{disp}</div>
-        <div style={{ fontSize:9, letterSpacing:"0.2em", color:"#A99BD8", fontFamily:"'Sora',sans-serif", textTransform:"uppercase", fontWeight:600, marginTop:2 }}>/100</div>
-      </div>
+      <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>{children}</div>
     </div>
   );
+};
+const Sheet = ({ T, onClose, children }) => (
+  <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
+    <div onClick={onClose} style={{ position:"absolute", inset:0, background:T.overlay, backdropFilter:"blur(3px)" }}/>
+    <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:T.sheet, borderRadius:"30px 30px 0 0", padding:"18px 20px 40px", animation:"sheetUp 0.3s ease both", maxHeight:"90vh", display:"flex", flexDirection:"column", boxShadow:T.dark?"none":"0 -8px 40px rgba(23,24,28,.12)" }}>
+      <div style={{ width:38, height:4, borderRadius:3, background:T.line2, margin:"0 auto 16px", flexShrink:0 }}/>
+      <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", minHeight:0 }}>{children}</div>
+    </div>
+  </div>
+);
+const SecHead = ({ T, children, right, mt=18 }) => (
+  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", margin:mt+"px 2px 10px" }}>
+    <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.13em", textTransform:"uppercase", color:T.ink3, fontFamily:FONT }}>{children}</div>
+    {right}
+  </div>
+);
+const CTA = ({ children, onClick, disabled, T, style }) => (
+  <button onClick={onClick} disabled={disabled} style={{ width:"100%", border:"none", background:disabled?T.chip:GRAD.or, color:disabled?T.ink3:"#fff", borderRadius:18, padding:"16px", fontSize:15, fontWeight:700, fontFamily:FONT, cursor:disabled?"not-allowed":"pointer", boxShadow:disabled?"none":"0 10px 24px rgba(255,94,31,.3)", ...style }}>{children}</button>
+);
+const Field = ({ T, label, children }) => (
+  <div style={{ marginBottom:13 }}>
+    <div style={{ fontSize:10.5, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:T.ink3, fontFamily:FONT, marginBottom:7 }}>{label}</div>
+    {children}
+  </div>
+);
+const inputStyle = (T, big) => ({ width:"100%", background:T.input, border:"none", borderRadius:16, padding: big?"13px 16px":"12px 14px", color:T.ink, fontSize: big?22:14.5, fontWeight: big?800:600, fontFamily:FONT, outline:"none" });
+const ICON_OPTIONS = ["sun","run","book","drop","fit","fork","coins","target","pen","moon","heart","leaf","flame","puzzle","chart","globe"];
+const EMOJI2ICON = {"🏃":"run","📖":"book","💧":"drop","💰":"coins","🧘":"heart","🥗":"fork","💪":"fit","🚴":"run","✍️":"pen","🎯":"target","🌅":"sun","🛌":"moon","🧠":"puzzle","🎨":"pen","🎸":"pen","📝":"pen","🚶":"run","🍎":"fork","☀️":"sun","🌿":"leaf"};
+const habitIcon = (h) => (h && (h.icon || EMOJI2ICON[h.emoji])) || "target";
+const HCOLORS = ["or","bl","gr","am","vi","ro"];
+const JARMETA = { necessities:{c:"bl",icon:"home",grad:GRAD.bl}, savings:{c:"gr",icon:"coins",grad:GRAD.gr}, education:{c:"am",icon:"book",grad:GRAD.am}, play:{c:"or",icon:"star",grad:GRAD.or}, freedom:{c:"ink",icon:"chart",grad:GRAD.ink}, give:{c:"ro",icon:"heart",grad:GRAD.ro} };
+const MEALMETA = { breakfast:{icon:"sun",c:"am",grad:GRAD.am}, lunch:{icon:"fork",c:"or",grad:GRAD.or}, dinner:{icon:"moon",c:"bl",grad:GRAD.bl}, snacks:{icon:"heart",c:"gr",grad:GRAD.gr} };
+const speak = (text, langCode) => { try { const u=new SpeechSynthesisUtterance(text); const M={es:"es-ES",fr:"fr-FR",it:"it-IT",de:"de-DE",pt:"pt-BR",ar:"ar-SA",ja:"ja-JP",zh:"zh-CN",hi:"hi-IN",ru:"ru-RU"}; u.lang=M[langCode]||"en-US"; u.rate=0.85; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch(e){} };
+/* ═════════ end theme v3 ═════════ */
+
+
+function Tick({ color, size=14 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 12.5l5 5L20 6.5"/></svg>;
 }
 
-const EMOJI_OPTIONS = ["🏃","📖","💧","💰","🧘","🥗","💪","🚴","✍️","🎯","🌅","🛌","🧠","🎨","🎸","📝","🚶","🍎","☀️","🌿"];
-
-function AddHabitModal({ onAdd, onClose }) {
-  const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState("🎯");
-  const submit = () => {
-    if (!name.trim()) return;
-    onAdd({ name: name.trim(), emoji });
-    onClose();
-  };
+function AddHabitModal({ onAdd, onClose, T }) {
+  const [name,setName]=useState("");
+  const [icon,setIcon]=useState("target");
+  const submit=()=>{ if(!name.trim())return; onAdd({name:name.trim(),icon}); onClose(); };
   return (
-    <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", display:"flex", flexDirection:"column" }}>
-        {/* scrollable content */}
-        <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"24px 22px 8px", flex:1 }}>
-          <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:22 }}>
-            <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>New Habit</div>
-            <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)" }}><Icons.Close /></button>
-          </div>
-          <div style={{ marginBottom:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>Habit Name</div>
-            <input autoFocus value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="e.g. Morning walk"
-              style={{ width:"100%", padding:"14px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:15, fontFamily:"'Sora',sans-serif", fontWeight:500, outline:"none" }}/>
-          </div>
-          <div style={{ marginBottom:16 }}>
-            <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:10 }}>Pick an Icon</div>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-              {EMOJI_OPTIONS.map(e=>(
-                <button key={e} onClick={()=>setEmoji(e)} style={{ width:42, height:42, borderRadius:12, fontSize:20, background:emoji===e?"rgba(168,213,194,0.2)":"rgba(255,255,255,0.05)", border:emoji===e?"1.5px solid rgba(168,213,194,0.5)":"1px solid rgba(255,255,255,0.08)", cursor:"pointer", transition:"all 0.15s", display:"flex", alignItems:"center", justifyContent:"center" }}>{e}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-        {/* fixed save button */}
-        <div style={{ padding:"12px 22px 44px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
-          <button onClick={submit} disabled={!name.trim()} style={{ width:"100%", padding:"16px", background:name.trim()?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.08)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:name.trim()?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:name.trim()?"pointer":"not-allowed", transition:"all 0.2s" }}>
-            Add Habit
-          </button>
-        </div>
+    <Sheet T={T} onClose={onClose}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+        <div style={{ fontSize:22, fontWeight:800, color:T.ink, fontFamily:FONT, letterSpacing:"-0.01em" }}>New habit</div>
+        <Chip n="close" c="ink" T={T} size={36} is={16} onClick={onClose}/>
       </div>
-    </div>
+      <Field T={T} label="Name">
+        <input autoFocus value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="e.g. Morning walk" style={inputStyle(T,true)}/>
+      </Field>
+      <Field T={T} label="Icon">
+        <div style={{ display:"flex", flexWrap:"wrap", gap:9 }}>
+          {ICON_OPTIONS.map(ic=>(
+            <div key={ic} onClick={()=>setIcon(ic)} style={{ borderRadius:16, outline:icon===ic?("2px solid "+PAL.or):"none", outlineOffset:2 }}>
+              <Chip n={ic} c={icon===ic?"or":"ink"} T={T} size={44} is={20}/>
+            </div>
+          ))}
+        </div>
+      </Field>
+      <div style={{ height:6 }}/>
+      <CTA T={T} disabled={!name.trim()} onClick={submit}>Add habit</CTA>
+    </Sheet>
   );
 }
 
-function HabitCard({ habit, done, pts, onToggle, onDelete, colorIdx, delay }) {
-  const [holding, setHolding] = useState(false);
-  const holdTimer = useRef(null);
-  const c = PALETTE[colorIdx % PALETTE.length];
-  const startHold = () => { holdTimer.current = setTimeout(() => setHolding(true), 600); };
-  const endHold   = () => { clearTimeout(holdTimer.current); setHolding(false); };
+function HabitCard({ habit, idx, done, pts, onToggle, onDelete, delay, T }) {
+  const [holding,setHolding]=useState(false);
+  const holdTimer=useRef(null);
+  const startHold=()=>{ holdTimer.current=setTimeout(()=>setHolding(true),600); };
+  const endHold=()=>{ clearTimeout(holdTimer.current); };
+  const c=HCOLORS[idx%HCOLORS.length];
+  const doneFg={or:PAL.or3,bl:PAL.bl3,gr:PAL.gr3,am:PAL.am3,vi:PAL.vi3,ro:PAL.ro3}[c];
   return (
     <div style={{ position:"relative" }}>
       <div onClick={()=>!holding&&onToggle()} onMouseDown={startHold} onMouseUp={endHold} onMouseLeave={endHold} onTouchStart={startHold} onTouchEnd={endHold}
-        style={{ background:done?c.bg:"rgba(255,255,255,0.05)", border:done?"none":"1px solid rgba(255,255,255,0.08)", borderRadius:20, padding:"16px 15px", cursor:"pointer", transition:"all 0.25s ease", animation:`cardIn 0.4s ease ${delay}s both`, display:"flex", flexDirection:"column", justifyContent:"space-between", minHeight:110, position:"relative", overflow:"hidden", transform:holding?"scale(0.96)":"scale(1)", boxShadow:done?`0 4px 20px ${c.bg}30`:"none" }}>
-        {done&&<div style={{ position:"absolute", top:-20, right:-20, width:80, height:80, borderRadius:"50%", background:`${c.check}15` }}/>}
+        style={{ background:done?GRAD[c]:T.card, border:done?"none":("1px solid "+T.line), borderRadius:20, padding:"13px", minHeight:104, display:"flex", flexDirection:"column", justifyContent:"space-between", cursor:"pointer", animation:"cardIn 0.4s ease "+delay+"s both", boxShadow:done?"none":T.shadow, transition:"transform .15s" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-          <div style={{ fontSize:22 }}>{habit.emoji}</div>
-          <div style={{ width:24, height:24, borderRadius:"50%", background:done?c.check:"rgba(255,255,255,0.1)", border:done?"none":"1.5px solid rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.2s", flexShrink:0, boxShadow:done?`0 2px 8px ${c.check}50`:"none" }}>
-            {done&&<Icons.Check/>}
-          </div>
+          {done
+            ? <div style={{ width:38, height:38, borderRadius:14, background:"rgba(255,255,255,.22)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n={habitIcon(habit)} s={19}/></div>
+            : <Chip n={habitIcon(habit)} c={c} T={T}/>}
+          <div style={{ width:24, height:24, borderRadius:"50%", background:done?"#fff":"transparent", border:done?"none":("1.6px solid "+T.line2), display:"flex", alignItems:"center", justifyContent:"center" }}>{done&&<Tick color={doneFg} size={13}/>}</div>
         </div>
         <div>
-          <div style={{ fontSize:13, fontWeight:700, color:done?c.text:"rgba(255,255,255,0.8)", fontFamily:"'Sora',sans-serif", lineHeight:1.25, marginBottom:3 }}>{habit.name}</div>
-          <div style={{ fontSize:11, fontWeight:500, color:done?c.sub:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif" }}>+{pts} pts</div>
+          <div style={{ fontSize:13.5, fontWeight:700, lineHeight:1.15, letterSpacing:"-0.01em", color:done?"#fff":T.ink, fontFamily:FONT, marginTop:8 }}>{habit.name}</div>
+          <div style={{ fontSize:10.5, fontWeight:600, color:done?"rgba(255,255,255,.78)":T.ink3, fontFamily:FONT, marginTop:3 }}>+{pts} pts</div>
         </div>
       </div>
       {holding&&(
-        <button onClick={e=>{e.stopPropagation();onDelete();setHolding(false);}} style={{ position:"absolute", inset:0, borderRadius:20, background:"rgba(220,80,80,0.9)", border:"none", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6, color:"#fff", animation:"fadeIn 0.15s ease both" }}>
-          <Icons.Trash/><span style={{ fontSize:11, fontWeight:700, fontFamily:"'Sora',sans-serif" }}>Remove</span>
+        <button onClick={e=>{e.stopPropagation();onDelete();setHolding(false);}} onMouseLeave={()=>setHolding(false)} style={{ position:"absolute", inset:0, borderRadius:20, background:PAL.red, border:"none", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6, color:"#fff", animation:"fadeIn 0.15s ease both" }}>
+          <Ic n="trash" s={20}/><span style={{ fontSize:12, fontWeight:700, fontFamily:FONT }}>Remove</span>
         </button>
       )}
     </div>
   );
 }
 
-function HomePage({ onNavigate=()=>{} }) {
-  const hr = new Date().getHours();
-  const greeting = hr<5?"Good night":hr<12?"Good morning":hr<17?"Good afternoon":hr<21?"Good evening":"Good night";
-  const displayName = load("rslv_display_name","");
-  const [habits, setHabits] = useState(()=>load("rslv_habits",[]));
-  const [done, setDone] = useState(()=>{ const s=load("rslv_done",{date:"",checked:{}}); return s.date===TODAY()?s.checked:{}; });
-  const [streak, setStreak] = useState(()=>load("rslv_streak",0));
-  const [showAdd, setShowAdd] = useState(false);
-  const [activeActions, setActiveActions] = useState(()=>load("rslv_quick_actions",["learn","logfood","water","expense"]));
-  const [editMode, setEditMode] = useState(false);
-
+function HomePage({ onNavigate=()=>{}, darkMode=true }) {
+  const T=THEME(darkMode);
+  const hr=new Date().getHours();
+  const greeting=hr<5?"Good night":hr<12?"Good morning":hr<17?"Good afternoon":hr<21?"Good evening":"Good night";
+  const displayName=load("rslv_display_name","");
+  const [habits,setHabits]=useState(()=>load("rslv_habits",[]));
+  const [done,setDone]=useState(()=>{ const s=load("rslv_done",{date:"",checked:{}}); return s.date===TODAY()?s.checked:{}; });
+  const [streak,setStreak]=useState(()=>load("rslv_streak",0));
+  const [showAdd,setShowAdd]=useState(false);
+  const [activeActions,setActiveActions]=useState(()=>load("rslv_quick_actions",["learn","logfood","water","expense"]));
+  const [editMode,setEditMode]=useState(false);
   useEffect(()=>{ save("rslv_habits",habits); },[habits]);
   useEffect(()=>{ save("rslv_done",{date:TODAY(),checked:done}); },[done]);
-
-  const pts = habits.length>0 ? Math.floor(100/habits.length) : 0;
-  const doneCount = habits.filter(h=>done[h.id]).length;
-  const score = habits.length===0 ? 0 : doneCount===habits.length ? 100 : doneCount*pts;
-
-  const addHabit = ({name,emoji})=>{ setHabits(p=>[...p,{id:Date.now().toString(),name,emoji}]); };
-  const deleteHabit = id=>{ setHabits(p=>p.filter(h=>h.id!==id)); setDone(p=>{const n={...p};delete n[id];return n;}); };
-  const toggle = id=>{
-    setDone(p=>{
-      const next={...p,[id]:!p[id]};
-      const allDone=habits.length>0&&habits.every(h=>next[h.id]);
-      if(allDone){ save("rslv_last_complete_date",TODAY()); setStreak(s=>{const ns=s+1;save("rslv_streak",ns);return ns;}); }
-      return next;
-    });
-  };
-
-  const msg = score===0?"What will you achieve today?":score<40?"You've started. Keep going.":score<70?"More than halfway. Finish strong.":score<100?"Almost there. One more habit.":"Perfect day. You showed up. 🔥";
-
+  const pts=habits.length>0?Math.floor(100/habits.length):0;
+  const doneCount=habits.filter(h=>done[h.id]).length;
+  const score=habits.length===0?0:doneCount===habits.length?100:doneCount*pts;
+  const addHabit=({name,icon})=>{ setHabits(p=>[...p,{id:Date.now().toString(),name,icon}]); };
+  const deleteHabit=id=>{ setHabits(p=>p.filter(h=>h.id!==id)); setDone(p=>{const n={...p};delete n[id];return n;}); };
+  const toggle=id=>{ setDone(p=>{ const next={...p,[id]:!p[id]}; const allDone=habits.length>0&&habits.every(h=>next[h.id]); if(allDone){ save("rslv_last_complete_date",TODAY()); setStreak(s=>{const ns=s+1;save("rslv_streak",ns);return ns;}); } return next; }); };
+  const leftCount=habits.length-doneCount;
+  const subline=habits.length===0?"A fresh day. Add your first habit.":doneCount===0?"A fresh day. Pick your first habit.":doneCount===habits.length?"Perfect day. You showed up.":doneCount+" of "+habits.length+" habits done. Keep going.";
+  const hint=habits.length===0?"Your growth starts with one habit.":doneCount===habits.length?"Every habit done. Strong work.":"Finish "+leftCount+" more habit"+(leftCount===1?"":"s")+" to reach 100.";
+  const ALL_ACTIONS=[
+    {id:"learn",icon:"book",c:"gr",label:"Learn words",tab:"learning"},
+    {id:"logfood",icon:"fork",c:"am",label:"Log food",tab:"fitness"},
+    {id:"water",icon:"drop",c:"bl",label:"Log water",tab:"fitness"},
+    {id:"expense",icon:"coins",c:"am",label:"Add expense",tab:"finance"},
+    {id:"habit",icon:"target",c:"or",label:"Add habit",tab:"home"},
+    {id:"workout",icon:"fit",c:"gr",label:"Log workout",tab:"fitness"},
+    {id:"finance",icon:"chart",c:"gr",label:"View finance",tab:"finance"},
+    {id:"subscription",icon:"clock",c:"vi",label:"Subscriptions",tab:"finance"},
+    {id:"profile",icon:"gear",c:"ink",label:"Settings",tab:"profile"},
+    {id:"barcode",icon:"cam",c:"or",label:"Scan barcode",tab:"fitness"},
+  ];
+  const saveActions=ids=>{ setActiveActions(ids); save("rslv_quick_actions",ids); };
+  const toggleAction=id=>{ if(activeActions.includes(id)){ if(activeActions.length>1) saveActions(activeActions.filter(x=>x!==id)); } else { if(activeActions.length<4) saveActions([...activeActions,id]); } };
+  const visibleActions=ALL_ACTIONS.filter(a=>activeActions.includes(a.id));
   return (
-    <div style={{ padding:"0 18px 32px" }}>
-      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:22, animation:"fadeUp 0.4s ease both" }}>
+    <div style={{ padding:"0 18px 32px", fontFamily:FONT }}>
+      <div style={{ display:"inline-block", fontSize:10.5, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:T.ink3, background:T.card, border:"1px solid "+T.line, borderRadius:999, padding:"7px 14px", marginBottom:14, boxShadow:T.shadow }}>{new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}</div>
+      <div style={{ fontSize:30, fontWeight:800, letterSpacing:"-0.02em", lineHeight:1.08, color:T.ink }}>{greeting},<br/><span style={{ color:PAL.or }}>{displayName||"friend"}</span></div>
+      <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, marginTop:6 }}>{subline}</div>
+
+      <div style={{ background:T.card, borderRadius:26, padding:"18px 20px", margin:"18px 0 4px", display:"flex", alignItems:"center", gap:16, border:"1px solid "+T.line, boxShadow:T.shadow, animation:"fadeUp .4s ease both" }}>
+        <Ring pct={score} size={118} T={T}>
+          <div style={{ fontSize:32, fontWeight:800, letterSpacing:"-0.03em", lineHeight:1, color:T.ink, fontFamily:FONT }}>{score}</div>
+          <div style={{ fontSize:10, fontWeight:600, color:T.ink3, marginTop:3, fontFamily:FONT }}>of 100</div>
+        </Ring>
         <div>
-          <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:600, marginBottom:5 }}>
-            {new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}
-          </div>
-          <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px", lineHeight:1.1 }}>{greeting}{displayName ? `, ${displayName}` : ""} 👋</div>
-          <div style={{ fontSize:13, color:"rgba(255,255,255,0.3)", marginTop:5, fontFamily:"'Sora',sans-serif" }}>{msg}</div>
-        </div>
-        <div style={{ width:42, height:42, borderRadius:14, flexShrink:0, background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, fontWeight:800, color:"#1a1a2e", fontFamily:"'Sora',sans-serif", boxShadow:"0 4px 16px rgba(168,213,194,0.2)" }}>R</div>
-      </div>
-
-      <div className="rslv-hero-card" style={{ background:"linear-gradient(150deg, #EDE9F8 0%, #F3F0FA 60%, #EFF4F1 100%)", border:"1px solid rgba(150,130,200,0.12)", borderRadius:28, padding:"26px 22px", display:"flex", alignItems:"center", gap:20, marginBottom:18, animation:"fadeUp 0.4s ease 0.07s both", boxShadow:"0 8px 30px rgba(150,130,200,0.12)" }}>
-        <GrowthCircle score={score}/>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:10.5, letterSpacing:"0.16em", color:"#8B7FB5", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:700, marginBottom:8 }}>Growth Score</div>
-          <div style={{ fontSize:13, color:"#6B6580", fontFamily:"'Sora',sans-serif", marginBottom:14, lineHeight:1.4 }}>{habits.length===0?"Add your first habit below":`${doneCount} of ${habits.length} habits done`}</div>
-          {habits.length>0&&(
-            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {habits.slice(0,4).map(h=>(
-                <div key={h.id} style={{ display:"flex", alignItems:"center", gap:9 }}>
-                  <div style={{ fontSize:12 }}>{h.emoji}</div>
-                  <div style={{ flex:1, height:5, borderRadius:5, background:"rgba(139,127,181,0.15)", overflow:"hidden" }}>
-                    <div style={{ height:"100%", borderRadius:5, width:done[h.id]?"100%":"0%", background:"linear-gradient(90deg,#A99BD8,#C5B8E8)", transition:"width 0.5s ease" }}/>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div style={{ fontSize:10.5, fontWeight:700, letterSpacing:"0.13em", textTransform:"uppercase", color:T.ink3, marginBottom:6 }}>Growth score</div>
+          <div style={{ fontSize:15, fontWeight:700, color:T.ink }}>{score===100?"Perfect day":score>=60?"Strong day so far":score>0?"Getting going":"Fresh start"}</div>
+          <div style={{ fontSize:11.5, color:T.ink2, fontWeight:500, marginTop:4, lineHeight:1.5 }}>{hint}</div>
         </div>
       </div>
 
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12, animation:"fadeUp 0.4s ease 0.12s both" }}>
-        <div style={{ fontSize:11, letterSpacing:"0.14em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:700 }}>Today's Habits</div>
-        {habits.length>0&&<div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif" }}>{doneCount}/{habits.length} done</div>}
-      </div>
-
-      {habits.length>0?(
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
-          {habits.map((h,i)=><HabitCard key={h.id} habit={h} done={!!done[h.id]} pts={pts} onToggle={()=>toggle(h.id)} onDelete={()=>deleteHabit(h.id)} colorIdx={i} delay={0.14+i*0.05}/>)}
+      <SecHead T={T} right={
+        <div onClick={()=>setShowAdd(true)} style={{ width:30, height:30, borderRadius:"50%", background:darkMode?"#fff":PAL.ink, color:darkMode?PAL.ink:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><Ic n="plus" s={14} sw={2.6}/></div>
+      }>Today's habits</SecHead>
+      {habits.length===0?(
+        <div onClick={()=>setShowAdd(true)} style={{ padding:"34px 22px", textAlign:"center", background:T.card, borderRadius:24, border:"1px dashed "+T.dashed, cursor:"pointer" }}>
+          <div style={{ fontSize:17, fontWeight:800, color:T.ink, marginBottom:6 }}>Add your first habit</div>
+          <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, lineHeight:1.6 }}>Small steps, every day. Tap to begin.</div>
         </div>
       ):(
-        <div style={{ padding:"36px 24px", textAlign:"center", background:"linear-gradient(150deg, #EAF3EE 0%, #F0F5F2 100%)", borderRadius:24, marginBottom:12, border:"1px solid rgba(120,170,140,0.13)", animation:"fadeUp 0.4s ease 0.16s both", boxShadow:"0 6px 22px rgba(120,170,140,0.1)" }}>
-          <div style={{ width:56, height:56, borderRadius:18, background:"rgba(120,170,140,0.14)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px" }}><div style={{ fontSize:28 }}>🌱</div></div>
-          <div style={{ fontSize:15, fontWeight:700, color:"#3D5848", fontFamily:"'Sora',sans-serif", marginBottom:6, letterSpacing:"-0.01em" }}>Start your first habit</div>
-          <div style={{ fontSize:12.5, color:"#6B8576", fontFamily:"'Sora',sans-serif", lineHeight:1.6, maxWidth:240, margin:"0 auto" }}>Small steps, every day. Add one habit and watch your growth circle fill.</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          {habits.map((h,i)=><HabitCard key={h.id} habit={h} idx={i} done={!!done[h.id]} pts={pts} onToggle={()=>toggle(h.id)} onDelete={()=>deleteHabit(h.id)} delay={0.05+i*0.04} T={T}/>)}
         </div>
       )}
 
-      <div onClick={()=>setShowAdd(true)} className="rslv-add-habit" style={{ padding:"16px 18px", borderRadius:18, background:"linear-gradient(135deg,#A99BD8,#C5B8E8)", display:"flex", alignItems:"center", justifyContent:"center", gap:8, cursor:"pointer", color:"#fff", fontSize:14, fontFamily:"'Sora',sans-serif", fontWeight:700, animation:"fadeUp 0.4s ease 0.3s both", marginBottom:14, boxShadow:"0 6px 20px rgba(169,155,216,0.3)", letterSpacing:"-0.01em" }}>
-        <Icons.Plus/> Add a habit
-      </div>
-
-      {/* Quick Actions */}
-      {/* Quick Actions */}
-      {(()=>{
-        const ALL_ACTIONS = [
-          { id:"learn",      emoji:"📖", label:"Learn 5 words",   tab:"learning",  color:"#D8D0F0" },
-          { id:"logfood",    emoji:"🍽️", label:"Log food",        tab:"fitness",   color:"#F5DDD0" },
-          { id:"water",      emoji:"💧", label:"Log water",        tab:"fitness",   color:"#C8DFF0" },
-          { id:"expense",    emoji:"💰", label:"Add expense",      tab:"finance",   color:"#C8E6DA" },
-          { id:"habit",      emoji:"✅", label:"Add habit",        tab:"home",      color:"#A8D5C2" },
-          { id:"workout",    emoji:"🏃", label:"Log workout",      tab:"fitness",   color:"#F5DDD0" },
-          { id:"walk",       emoji:"🚶", label:"Log walk",         tab:"fitness",   color:"#C8E6DA" },
-          { id:"finance",    emoji:"📊", label:"View finance",     tab:"finance",   color:"#C8E6DA" },
-          { id:"learning",   emoji:"🌍", label:"Learning session", tab:"learning",  color:"#D8D0F0" },
-          { id:"challenges", emoji:"⚡", label:"Challenges",       tab:"community", color:"#F0E8D0" },
-          { id:"community",  emoji:"🤝", label:"Community feed",   tab:"community", color:"#C8DFF0" },
-          { id:"subscription",emoji:"📱",label:"Add subscription", tab:"finance",   color:"#EDD0F0" },
-          { id:"profile",    emoji:"⚙️", label:"Settings",         tab:"profile",   color:"#F0D0D8" },
-          { id:"barcode",    emoji:"📷", label:"Scan barcode",     tab:"fitness",   color:"#F5DDD0" },
-        ];
-        const saveActions = (ids) => { setActiveActions(ids); save("rslv_quick_actions",ids); };
-        const toggleAction = (id) => {
-          if(activeActions.includes(id)) { if(activeActions.length>1) saveActions(activeActions.filter(x=>x!==id)); }
-          else { if(activeActions.length<4) saveActions([...activeActions,id]); }
-        };
-        const visible = ALL_ACTIONS.filter(a=>activeActions.includes(a.id));
-        return (
-          <div style={{ marginBottom:14, animation:"fadeUp 0.4s ease 0.32s both" }}>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-              <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Quick Actions</div>
-              <button onClick={()=>setEditMode(e=>!e)} style={{ background:editMode?"rgba(168,213,194,0.15)":"rgba(255,255,255,0.06)", border:editMode?"1px solid rgba(168,213,194,0.3)":"1px solid rgba(255,255,255,0.1)", borderRadius:10, padding:"5px 12px", cursor:"pointer", color:editMode?"#A8D5C2":"rgba(255,255,255,0.4)", fontSize:11, fontFamily:"'Sora',sans-serif", fontWeight:700 }}>
-                {editMode?"Done":"Edit"}
-              </button>
-            </div>
-            {editMode ? (
-              <div>
-                <div style={{ fontSize:12, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginBottom:10 }}>Pick up to 4 actions ({activeActions.length}/4 selected)</div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-                  {ALL_ACTIONS.map(a=>{ const selected=activeActions.includes(a.id); return (
-                    <div key={a.id} onClick={()=>toggleAction(a.id)} style={{ background:selected?`${a.color}20`:"rgba(255,255,255,0.04)", border:selected?`1.5px solid ${a.color}40`:"1px solid rgba(255,255,255,0.08)", borderRadius:14, padding:"11px 12px", display:"flex", alignItems:"center", gap:8, cursor:"pointer", transition:"all 0.15s" }}>
-                      <span style={{ fontSize:18 }}>{a.emoji}</span>
-                      <span style={{ fontSize:11, fontWeight:600, color:selected?a.color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", flex:1 }}>{a.label}</span>
-                      {selected && <div style={{ width:16, height:16, borderRadius:"50%", background:a.color, display:"flex", alignItems:"center", justifyContent:"center" }}><Icons.Check/></div>}
-                    </div>
-                  );})}
-                </div>
-              </div>
-            ) : (
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-                {visible.map(a=>(
-                  <div key={a.id} onClick={()=>{ if(a.id==="habit") setShowAdd(true); else onNavigate(a.tab); }} style={{ background:`${a.color}15`, border:`1px solid ${a.color}25`, borderRadius:16, padding:"13px 14px", display:"flex", alignItems:"center", gap:10, cursor:"pointer", transition:"all 0.2s" }}>
-                    <span style={{ fontSize:20 }}>{a.emoji}</span>
-                    <span style={{ fontSize:12, fontWeight:700, color:a.color, fontFamily:"'Sora',sans-serif" }}>{a.label}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      <div style={{ padding:"14px 18px", borderRadius:20, background:"rgba(255,179,71,0.07)", border:"1px solid rgba(255,179,71,0.13)", display:"flex", alignItems:"center", gap:12, animation:"fadeUp 0.4s ease 0.35s both" }}>
-        <div style={{ fontSize:22 }}>🔥</div>
-        <div>
-          <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,210,140,0.8)", fontFamily:"'Sora',sans-serif" }}>{streak} day streak</div>
-          <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif", marginTop:1 }}>{streak===0?"Complete all habits to start your streak":"Keep it going. Don't break the chain."}</div>
+      <SecHead T={T} right={
+        <div onClick={()=>setEditMode(e=>!e)} style={{ display:"flex", alignItems:"center", gap:6, background:editMode?GRAD.or:(darkMode?"#fff":PAL.ink), color:editMode?"#fff":(darkMode?PAL.ink:"#fff"), borderRadius:999, padding:"7px 13px 7px 9px", cursor:"pointer" }}>
+          <Ic n={editMode?"check":"plus"} s={13} sw={2.6}/><span style={{ fontSize:11.5, fontWeight:700, fontFamily:FONT }}>{editMode?"Done":"Add"}</span>
         </div>
+      }>Quick actions</SecHead>
+      {editMode?(
+        <div>
+          <div style={{ fontSize:12, color:T.ink3, fontFamily:FONT, fontWeight:500, marginBottom:10 }}>Pick up to 4 ({activeActions.length}/4)</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            {ALL_ACTIONS.map(a=>{ const sel=activeActions.includes(a.id); return (
+              <div key={a.id} onClick={()=>toggleAction(a.id)} style={{ background:T.card, border:sel?("1.6px solid "+PAL.or):("1px solid "+T.line), borderRadius:16, padding:"10px 11px", display:"flex", alignItems:"center", gap:9, cursor:"pointer", boxShadow:T.shadow }}>
+                <Chip n={a.icon} c={sel?"or":a.c} T={T} size={30} is={15}/>
+                <span style={{ fontSize:12, fontWeight:700, color:T.ink, fontFamily:FONT, flex:1 }}>{a.label}</span>
+                {sel&&<div style={{ width:16, height:16, borderRadius:"50%", background:PAL.or, display:"flex", alignItems:"center", justifyContent:"center" }}><Tick color="#fff" size={9}/></div>}
+              </div>
+            );})}
+          </div>
+        </div>
+      ):(
+        <div style={{ display:"flex", flexWrap:"wrap", gap:9 }}>
+          {visibleActions.map(a=>(
+            <div key={a.id} onClick={()=>{ if(a.id==="habit") setShowAdd(true); else onNavigate(a.tab); }} style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 15px 8px 8px", borderRadius:999, background:T.card, border:"1px solid "+T.line, cursor:"pointer", boxShadow:T.shadow }}>
+              <Chip n={a.icon} c={a.c} T={T} size={30} is={15} style={{ borderRadius:"50%" }}/>
+              <span style={{ fontSize:12.5, fontWeight:600, color:T.ink, fontFamily:FONT, whiteSpace:"nowrap" }}>{a.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ background:darkMode?T.card:PAL.ink, border:darkMode?("1px solid "+T.line):"none", borderRadius:26, padding:"20px", marginTop:18, display:"flex", justifyContent:"space-between", alignItems:"center", animation:"fadeUp .4s ease .1s both" }}>
+        <div>
+          <div style={{ fontSize:10.5, fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", color:"rgba(255,255,255,.45)", fontFamily:FONT }}>Current streak</div>
+          <div style={{ display:"flex", alignItems:"baseline", gap:8, marginTop:6 }}>
+            <div style={{ fontSize:52, fontWeight:800, color:"#fff", letterSpacing:"-0.03em", lineHeight:1, fontFamily:FONT }}>{streak}</div>
+            <div style={{ fontSize:14, fontWeight:600, color:PAL.or2, fontFamily:FONT }}>days</div>
+          </div>
+          <div style={{ fontSize:11.5, color:"rgba(255,255,255,.45)", fontWeight:500, marginTop:6, fontFamily:FONT }}>{streak===0?"Finish all habits to start it.":"Don't break the chain."}</div>
+        </div>
+        <div style={{ width:52, height:52, borderRadius:"50%", background:GRAD.or, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", flexShrink:0 }}><Ic n="flame" s={22}/></div>
       </div>
 
-      {showAdd&&<AddHabitModal onAdd={addHabit} onClose={()=>setShowAdd(false)}/>}
+      {showAdd&&<AddHabitModal onAdd={addHabit} onClose={()=>setShowAdd(false)} T={T}/>}
     </div>
   );
 }
@@ -609,500 +621,335 @@ const EXPENSE_CATS = [
   { label:"Help a Friend",      jar:"give", emoji:"🤝",  tags:["friend","amico","help","aiuto","support","prestito","lend"] },
 ];
 
-function JarInfoModal({ jar, allocated, spent, onBorrow, onClose }) {
-  const remaining = allocated - spent;
-  const pct = Math.min(100, (spent/allocated)*100);
-  const depleted = remaining < 0;
+function JarInfoModal({ jar, totalIn, totalSpent, balance, monthIn, monthSpent, onBorrow, onClose, T }) {
+  const M=JARMETA[jar.key]||JARMETA.play;
+  const depleted=balance<0;
+  const drain=totalIn>0?Math.min(100,(totalSpent/totalIn)*100):0;
+  const monthLeft=monthIn-monthSpent;
+  const Box=({l,v,warn})=>(
+    <div style={{ flex:1, background:"rgba(255,255,255,.16)", borderRadius:14, padding:"10px 12px" }}>
+      <div style={{ fontSize:9.5, color:"rgba(255,255,255,.75)", fontFamily:FONT, fontWeight:600, marginBottom:2 }}>{l}</div>
+      <div style={{ fontSize:16, fontWeight:800, color:warn?"#FFD3D3":"#fff", fontFamily:FONT }}>{v}</div>
+    </div>);
   return (
-    <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 48px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
-        {/* jar header */}
-        <div style={{ background:jar.color, borderRadius:20, padding:"18px 18px 16px", marginBottom:20 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:12 }}>
-            <div style={{ fontSize:32 }}>{jar.emoji}</div>
-            <div>
-              <div style={{ fontSize:20, fontWeight:800, color:jar.text, fontFamily:"'Sora',sans-serif" }}>{jar.label}</div>
-              <div style={{ fontSize:12, color:jar.text, opacity:0.5, fontFamily:"'Sora',sans-serif" }}>{Math.round(jar.pct*100)}% of your salary</div>
-            </div>
-          </div>
-          {/* amounts */}
-          <div style={{ display:"flex", gap:10, marginBottom:10 }}>
-            <div style={{ flex:1, background:`${jar.text}10`, borderRadius:12, padding:"10px 12px" }}>
-              <div style={{ fontSize:10, color:jar.text, opacity:0.5, fontFamily:"'Sora',sans-serif", marginBottom:2 }}>Allocated</div>
-              <div style={{ fontSize:16, fontWeight:800, color:jar.text, fontFamily:"'Sora',sans-serif" }}>€{allocated.toFixed(0)}</div>
-            </div>
-            <div style={{ flex:1, background:`${jar.text}10`, borderRadius:12, padding:"10px 12px" }}>
-              <div style={{ fontSize:10, color:jar.text, opacity:0.5, fontFamily:"'Sora',sans-serif", marginBottom:2 }}>Spent</div>
-              <div style={{ fontSize:16, fontWeight:800, color:jar.text, fontFamily:"'Sora',sans-serif" }}>€{spent.toFixed(0)}</div>
-            </div>
-            <div style={{ flex:1, background:`${jar.text}10`, borderRadius:12, padding:"10px 12px" }}>
-              <div style={{ fontSize:10, color:jar.text, opacity:0.5, fontFamily:"'Sora',sans-serif", marginBottom:2 }}>Left</div>
-              <div style={{ fontSize:16, fontWeight:800, color:depleted?"#c0392b":jar.text, fontFamily:"'Sora',sans-serif" }}>€{Math.max(0,remaining).toFixed(0)}</div>
-            </div>
-          </div>
-          {/* drain bar */}
-          <div style={{ height:6, borderRadius:6, background:`${jar.text}20`, overflow:"hidden" }}>
-            <div style={{ height:"100%", borderRadius:6, width:`${pct}%`, background:depleted?"#c0392b":`${jar.text}60`, transition:"width 0.4s ease" }}/>
+    <Sheet T={T} onClose={onClose}>
+      <div style={{ background:M.grad, borderRadius:22, padding:"18px", marginBottom:14, border:T.dark&&jar.key==="freedom"?("1px solid "+T.line2):"none" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+          <div style={{ width:44, height:44, borderRadius:16, background:"rgba(255,255,255,.22)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n={M.icon} s={21}/></div>
+          <div>
+            <div style={{ fontSize:19, fontWeight:800, color:"#fff", fontFamily:FONT }}>{jar.label}</div>
+            <div style={{ fontSize:11.5, color:"rgba(255,255,255,.8)", fontFamily:FONT, fontWeight:500 }}>Gets {Math.round(jar.pct*100)}% of every salary</div>
           </div>
         </div>
-        {/* explanation */}
-        <div style={{ marginBottom:16 }}>
-          <div style={{ fontSize:14, color:"rgba(255,255,255,0.75)", fontFamily:"'Sora',sans-serif", lineHeight:1.7, marginBottom:14 }}>{jar.desc}</div>
-          <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"13px 15px" }}>
-            <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.1em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>Examples</div>
-            <div style={{ fontSize:13, color:"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif", lineHeight:1.6 }}>{jar.examples}</div>
-          </div>
+        <div style={{ display:"flex", gap:9, marginBottom:10 }}>
+          <Box l="Total in" v={"€"+totalIn.toFixed(0)}/>
+          <Box l="Spent" v={"€"+totalSpent.toFixed(0)}/>
+          <Box l="Balance" v={"€"+balance.toFixed(0)} warn={depleted}/>
         </div>
-        <div style={{ display:"flex", gap:10 }}>
-          <button onClick={()=>{ onBorrow(); }} style={{ flex:1, padding:"14px", background:"rgba(240,208,216,0.15)", border:"1px solid rgba(240,208,216,0.25)", borderRadius:16, fontSize:13, fontWeight:700, fontFamily:"'Sora',sans-serif", color:"#F0D0D8", cursor:"pointer" }}>
-            💸 Borrow Money
-          </button>
-          <button onClick={onClose} style={{ flex:1, padding:"14px", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, fontSize:13, fontWeight:700, fontFamily:"'Sora',sans-serif", color:"rgba(255,255,255,0.5)", cursor:"pointer" }}>
-            Got it
-          </button>
+        <div style={{ height:6, borderRadius:6, background:"rgba(255,255,255,.25)", overflow:"hidden" }}>
+          <div style={{ height:"100%", width:drain+"%", background:"#fff", borderRadius:6, transition:"width .4s" }}/>
         </div>
       </div>
-    </div>
-  );
-}
-
-function AddExpenseModal({ onAdd, onClose }) {
-  const [amount, setAmount] = useState("");
-  const [search, setSearch] = useState("");
-  const [cat, setCat] = useState(null);
-  const [note, setNote] = useState("");
-  const [step, setStep] = useState("category"); // "category" | "amount"
-
-  const results = search.trim().length === 0 ? [] : EXPENSE_CATS.filter(c =>
-    c.label.toLowerCase().includes(search.toLowerCase()) ||
-    c.tags.some(t => t.includes(search.toLowerCase()))
-  ).slice(0, 6);
-
-  const selectCat = (c) => { setCat(c); setStep("amount"); };
-
-  const selectJarManually = (jarKey) => {
-    const jar = JARS.find(j => j.key === jarKey);
-    setCat({ label: search.trim() || jar.label, jar: jarKey, emoji: jar.emoji });
-    setStep("amount");
-  };
-
-  const submit = () => {
-    const n = parseFloat(amount);
-    if (!n || n <= 0 || !cat) return;
-    onAdd({ amount: n, cat: cat.label, jar: cat.jar, emoji: cat.emoji, note: note.trim(), date: TODAY() });
-    onClose();
-  };
-
-  return (
-    <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"88vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
-        <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
-
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:22 }}>
-          <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>
-            {step === "category" ? "What did you spend on?" : `Add ${cat?.emoji} ${cat?.label}`}
-          </div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)" }}><Icons.Close/></button>
-        </div>
-
-        {step === "category" && (
-          <>
-            {/* search input */}
-            <input
-              autoFocus
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search — Netflix, rent, groceries..."
-              style={{ width:"100%", padding:"14px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:15, fontFamily:"'Sora',sans-serif", fontWeight:500, outline:"none", marginBottom:14 }}
-            />
-
-            {/* search results */}
-            {results.length > 0 && (
-              <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:18 }}>
-                {results.map(c => (
-                  <div key={c.label} onClick={() => selectCat(c)} style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 15px", borderRadius:14, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", cursor:"pointer", transition:"all 0.15s" }}>
-                    <span style={{ fontSize:20 }}>{c.emoji}</span>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:14, fontWeight:600, color:"rgba(255,255,255,0.9)", fontFamily:"'Sora',sans-serif" }}>{c.label}</div>
-                      <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif" }}>→ {JARS.find(j=>j.key===c.jar)?.emoji} {JARS.find(j=>j.key===c.jar)?.label} jar</div>
-                    </div>
-                    <div style={{ fontSize:18, color:"rgba(255,255,255,0.15)" }}>›</div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* no results — show manual jar picker */}
-            {search.trim().length > 0 && results.length === 0 && (
-              <div style={{ marginBottom:18 }}>
-                <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:12, textAlign:"center" }}>
-                  Not found — pick a jar manually
-                </div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-                  {JARS.map(jar => (
-                    <div key={jar.key} onClick={() => selectJarManually(jar.key)} style={{ background:jar.color, borderRadius:16, padding:"13px 14px", cursor:"pointer", transition:"all 0.15s" }}>
-                      <div style={{ fontSize:20, marginBottom:4 }}>{jar.emoji}</div>
-                      <div style={{ fontSize:12, fontWeight:700, color:jar.text, fontFamily:"'Sora',sans-serif" }}>{jar.label}</div>
-                      <div style={{ fontSize:10, color:jar.text, opacity:0.5, fontFamily:"'Sora',sans-serif" }}>{Math.round(jar.pct*100)}%</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* default: show jar cards when no search */}
-            {search.trim().length === 0 && (
-              <div>
-                <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:10 }}>Or pick a jar directly</div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-                  {JARS.map(jar => (
-                    <div key={jar.key} onClick={() => selectJarManually(jar.key)} style={{ background:jar.color, borderRadius:16, padding:"13px 14px", cursor:"pointer", transition:"all 0.15s" }}>
-                      <div style={{ fontSize:20, marginBottom:4 }}>{jar.emoji}</div>
-                      <div style={{ fontSize:12, fontWeight:700, color:jar.text, fontFamily:"'Sora',sans-serif" }}>{jar.label}</div>
-                      <div style={{ fontSize:10, color:jar.text, opacity:0.5, fontFamily:"'Sora',sans-serif" }}>{Math.round(jar.pct*100)}%</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {step === "amount" && (
-          <>
-            {/* selected category pill */}
-            <div onClick={() => setStep("category")} style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"8px 14px", borderRadius:20, background:"rgba(168,213,194,0.1)", border:"1px solid rgba(168,213,194,0.2)", cursor:"pointer", marginBottom:20 }}>
-              <span style={{ fontSize:16 }}>{cat?.emoji}</span>
-              <span style={{ fontSize:13, fontWeight:600, color:"#A8D5C2", fontFamily:"'Sora',sans-serif" }}>{cat?.label}</span>
-              <span style={{ fontSize:11, color:"rgba(168,213,194,0.5)", fontFamily:"'Sora',sans-serif" }}>· {JARS.find(j=>j.key===cat?.jar)?.label}</span>
-              <span style={{ fontSize:11, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif" }}>change</span>
-            </div>
-
-            {/* amount */}
-            <div style={{ marginBottom:16 }}>
-              <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>Amount (€)</div>
-              <input autoFocus type="number" value={amount} onChange={e=>setAmount(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="0.00"
-                style={{ width:"100%", padding:"14px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:26, fontFamily:"'Sora',sans-serif", fontWeight:800, outline:"none" }}/>
-            </div>
-
-            {/* note */}
-            <div style={{ marginBottom:22 }}>
-              <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>Note (optional)</div>
-              <input value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Lidl groceries"
-                style={{ width:"100%", padding:"13px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:14, fontFamily:"'Sora',sans-serif", outline:"none" }}/>
-            </div>
-
-            <button onClick={submit} disabled={!amount||parseFloat(amount)<=0} style={{ width:"100%", padding:"16px", background:amount&&parseFloat(amount)>0?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.08)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:amount&&parseFloat(amount)>0?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:amount&&parseFloat(amount)>0?"pointer":"not-allowed", transition:"all 0.2s" }}>
-              Add Expense
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function BorrowModal({ needyJar, allJars, onBorrow, onClose }) {
-  const [fromJar, setFromJar] = useState(null);
-  const [amount, setAmount] = useState("");
-  const otherJars = allJars.filter(j=>j.key !== needyJar.key);
-  const submit = () => {
-    const n = parseFloat(amount);
-    if (!n||n<=0||!fromJar) return;
-    onBorrow({ fromJar: fromJar.key, toJar: needyJar.key, amount: n });
-    onClose();
-  };
-  return (
-    <div style={{ position:"fixed", inset:0, zIndex:110, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
-        <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-          <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Borrow Money</div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)" }}><Icons.Close/></button>
-        </div>
-        <div style={{ fontSize:13, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:20 }}>
-          Moving money into {needyJar.emoji} {needyJar.label}. Remember to return it next salary.
-        </div>
-        {/* pick source jar */}
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:10 }}>Take from which jar?</div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:18 }}>
-          {otherJars.map(jar=>(
-            <div key={jar.key} onClick={()=>setFromJar(jar)} style={{ background:jar.color, borderRadius:16, padding:"13px 14px", cursor:"pointer", border: fromJar?.key===jar.key?"3px solid rgba(0,0,0,0.3)":"3px solid transparent", transition:"all 0.15s", opacity: fromJar && fromJar.key!==jar.key ? 0.6 : 1 }}>
-              <div style={{ fontSize:20, marginBottom:4 }}>{jar.emoji}</div>
-              <div style={{ fontSize:12, fontWeight:700, color:jar.text, fontFamily:"'Sora',sans-serif" }}>{jar.label}</div>
+      <div style={{ background:T.card, border:"1px solid "+T.line, borderRadius:18, padding:"13px 15px", marginBottom:14, boxShadow:T.shadow }}>
+        <div style={{ fontSize:10.5, fontWeight:700, letterSpacing:"0.12em", color:T.ink3, textTransform:"uppercase", fontFamily:FONT, marginBottom:8 }}>This month</div>
+        <div style={{ display:"flex" }}>
+          {[["+€"+monthIn.toFixed(0),"came in",tints(T).gr.fg],["−€"+monthSpent.toFixed(0),"spent",tints(T).ro.fg],["€"+monthLeft.toFixed(0),"left",T.ink]].map((x,i)=>(
+            <div key={i} style={{ flex:1, textAlign:"center" }}>
+              <div style={{ fontSize:15, fontWeight:800, color:x[2], fontFamily:FONT }}>{x[0]}</div>
+              <div style={{ fontSize:10, color:T.ink3, fontFamily:FONT, fontWeight:500 }}>{x[1]}</div>
             </div>
           ))}
         </div>
-        {/* amount */}
-        <div style={{ marginBottom:22 }}>
-          <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>Amount (€)</div>
-          <input autoFocus type="number" value={amount} onChange={e=>setAmount(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="0.00"
-            style={{ width:"100%", padding:"14px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:22, fontFamily:"'Sora',sans-serif", fontWeight:800, outline:"none" }}/>
-        </div>
-        <button onClick={submit} disabled={!fromJar||!amount||parseFloat(amount)<=0} style={{ width:"100%", padding:"16px", background:fromJar&&amount&&parseFloat(amount)>0?"linear-gradient(135deg,#F5DDD0,#F0D0D8)":"rgba(255,255,255,0.08)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:fromJar&&amount&&parseFloat(amount)>0?"#2e1a10":"rgba(255,255,255,0.2)", cursor:fromJar&&amount&&parseFloat(amount)>0?"pointer":"not-allowed", transition:"all 0.2s" }}>
-          Borrow Money
-        </button>
       </div>
-    </div>
+      <div style={{ fontSize:13.5, color:T.ink2, fontFamily:FONT, fontWeight:500, lineHeight:1.7, marginBottom:12 }}>{jar.desc}</div>
+      <div style={{ background:T.chip, borderRadius:16, padding:"12px 14px", marginBottom:16 }}>
+        <div style={{ fontSize:10.5, fontWeight:700, letterSpacing:"0.12em", color:T.ink3, textTransform:"uppercase", fontFamily:FONT, marginBottom:5 }}>Examples</div>
+        <div style={{ fontSize:12.5, color:T.ink2, fontFamily:FONT, fontWeight:500, lineHeight:1.6 }}>{jar.examples}</div>
+      </div>
+      <div style={{ display:"flex", gap:10 }}>
+        <button onClick={onBorrow} style={{ flex:1, padding:"14px", background:tints(T).ro.bg, border:"none", borderRadius:16, fontSize:13.5, fontWeight:700, fontFamily:FONT, color:tints(T).ro.fg, cursor:"pointer" }}>Borrow money</button>
+        <button onClick={onClose} style={{ flex:1, padding:"14px", background:T.chip, border:"none", borderRadius:16, fontSize:13.5, fontWeight:700, fontFamily:FONT, color:T.ink2, cursor:"pointer" }}>Got it</button>
+      </div>
+    </Sheet>
   );
 }
 
-function SalaryModal({ current, onSave, onClose }) {
-  const [val, setVal] = useState(current > 0 ? String(current) : "");
-  const submit = () => { const n = parseFloat(val); if (!n||n<=0) return; onSave(n); onClose(); };
+function SalaryModal({ editing, onSave, onDelete, onClose, T }) {
+  const [val,setVal]=useState(editing?String(editing.amount):"");
+  const [date,setDate]=useState(editing?editing.date:TODAY());
+  const ok=val&&parseFloat(val)>0&&date;
+  const submit=()=>{ if(!ok)return; onSave({ id:editing?editing.id:null, amount:parseFloat(val), date }); onClose(); };
   return (
-    <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:22 }}>
-          <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Monthly Salary</div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)" }}><Icons.Close/></button>
-        </div>
-        <div style={{ marginBottom:22 }}>
-          <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>Enter your monthly salary (€)</div>
-          <input autoFocus type="number" value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="e.g. 2500"
-            style={{ width:"100%", padding:"14px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:22, fontFamily:"'Sora',sans-serif", fontWeight:800, outline:"none" }}/>
-          <div style={{ fontSize:12, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif", marginTop:8, lineHeight:1.6 }}>
-            App will automatically split this into your 6 jars based on T. Harv Eker's system.
-          </div>
-        </div>
-        <button onClick={submit} disabled={!val||parseFloat(val)<=0} style={{ width:"100%", padding:"16px", background:val&&parseFloat(val)>0?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.08)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:val&&parseFloat(val)>0?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:val&&parseFloat(val)>0?"pointer":"not-allowed", transition:"all 0.2s" }}>
-          Save Salary
-        </button>
+    <Sheet T={T} onClose={onClose}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT }}>{editing?"Edit Salary":"Add Salary"}</div>
+        <Chip n="close" c="ink" T={T} size={36} is={16} onClick={onClose}/>
       </div>
-    </div>
+      <Field T={T} label="Amount (€)">
+        <input autoFocus type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder="e.g. 2000" style={inputStyle(T,true)}/>
+      </Field>
+      <Field T={T} label="Date received">
+        <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{ ...inputStyle(T), colorScheme:T.dark?"dark":"light" }}/>
+      </Field>
+      <div style={{ fontSize:11.5, color:T.ink3, fontFamily:FONT, fontWeight:500, marginBottom:14, lineHeight:1.6 }}>Added on top of your jars — each jar grows by its share. Nothing resets.</div>
+      <CTA T={T} disabled={!ok} onClick={submit}>{editing?"Save Changes":"Add Salary"}</CTA>
+      {editing&&(
+        <button onClick={()=>{ onDelete(editing.id); onClose(); }} style={{ width:"100%", padding:"13px", marginTop:10, background:tints(T).red.bg, border:"none", borderRadius:16, fontSize:13.5, fontWeight:700, fontFamily:FONT, color:PAL.red, cursor:"pointer" }}>Delete this entry</button>
+      )}
+    </Sheet>
   );
 }
 
-function AddSubForm({ onAdd, currency }) {
-  const [name, setName] = useState("");
-  const [amount, setAmount] = useState("");
-  const [day, setDay] = useState("1");
-  const [emoji, setEmoji] = useState("📱");
-  const [reminder, setReminder] = useState(true);
+function AddExpenseModal({ onAdd, onClose, T }) {
+  const [val,setVal]=useState("");
+  const [q,setQ]=useState("");
+  const [sel,setSel]=useState(null);
+  const [jar,setJar]=useState(null);
+  const [note,setNote]=useState("");
+  const ql=q.trim().toLowerCase();
+  const cats = ql ? EXPENSE_CATS.filter(c=>c.label.toLowerCase().includes(ql)||c.tags.some(t=>t.includes(ql))).slice(0,10) : EXPENSE_CATS.slice(0,10);
+  const pick=(c)=>{ setSel(c); setJar(c.jar); };
+  const ok=val&&parseFloat(val)>0&&sel;
+  const submit=()=>{ if(!ok)return; onAdd({ amount:parseFloat(val), cat:sel.label, emoji:sel.emoji, jar:jar||sel.jar, note:note.trim(), date:TODAY() }); onClose(); };
+  return (
+    <Sheet T={T} onClose={onClose}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT }}>Add Expense</div>
+        <Chip n="close" c="ink" T={T} size={36} is={16} onClick={onClose}/>
+      </div>
+      <Field T={T} label="Amount (€)">
+        <input autoFocus type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder="e.g. 24.50" style={inputStyle(T,true)}/>
+      </Field>
+      <Field T={T} label="Category">
+        <div style={{ display:"flex", alignItems:"center", gap:8, background:T.input, borderRadius:14, padding:"10px 12px", marginBottom:10 }}>
+          <Ic n="search" s={16} style={{ color:T.ink3 }}/>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search: rent, groceries, netflix..." style={{ flex:1, background:"none", border:"none", outline:"none", color:T.ink, fontSize:13.5, fontWeight:600, fontFamily:FONT }}/>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+          {cats.map(c=>{ const M=JARMETA[c.jar]; const on=sel&&sel.label===c.label; return (
+            <div key={c.label} onClick={()=>pick(c)} style={{ display:"flex", alignItems:"center", gap:8, background:T.card, border:on?("1.6px solid "+PAL.or):("1px solid "+T.line), borderRadius:14, padding:"9px 10px", cursor:"pointer", boxShadow:T.shadow }}>
+              <Chip n={M.icon} c={M.c} T={T} size={28} is={14}/>
+              <div style={{ minWidth:0 }}>
+                <div style={{ fontSize:11.5, fontWeight:700, color:T.ink, fontFamily:FONT, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.label}</div>
+                <div style={{ fontSize:9, color:T.ink3, fontFamily:FONT, fontWeight:600 }}>{JARS.find(j=>j.key===c.jar).label}</div>
+              </div>
+            </div>
+          );})}
+        </div>
+      </Field>
+      <Field T={T} label="From jar">
+        <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
+          {JARS.map(j=>{ const on=(jar||(sel&&sel.jar))===j.key; const M=JARMETA[j.key]; return (
+            <div key={j.key} onClick={()=>setJar(j.key)} style={{ display:"flex", alignItems:"center", gap:6, borderRadius:999, padding:"7px 12px", background:on?tints(T)[M.c==="ink"?"or":M.c].bg:T.chip, outline:on?("1.6px solid "+tints(T)[M.c==="ink"?"or":M.c].fg):"none", cursor:"pointer" }}>
+              <span style={{ width:9, height:9, borderRadius:"50%", background:M.c==="ink"?T.ink:PAL[M.c] }}/>
+              <span style={{ fontSize:11, fontWeight:700, color:T.ink, fontFamily:FONT }}>{j.label}</span>
+            </div>
+          );})}
+        </div>
+      </Field>
+      <Field T={T} label="Note (optional)">
+        <input value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. weekly shop" style={inputStyle(T)}/>
+      </Field>
+      <CTA T={T} disabled={!ok} onClick={submit}>Add Expense</CTA>
+    </Sheet>
+  );
+}
 
-  const COMMON_SUBS = [
-    {name:"Netflix",emoji:"🎬",amount:"15.99"},{name:"Spotify",emoji:"🎵",amount:"9.99"},
-    {name:"Disney+",emoji:"✨",amount:"8.99"},{name:"Amazon Prime",emoji:"📦",amount:"4.99"},
-    {name:"YouTube Premium",emoji:"▶️",amount:"13.99"},{name:"Apple TV+",emoji:"🍎",amount:"8.99"},
-  ];
+function BorrowModal({ needyJar, allJars, onBorrow, onClose, T }) {
+  const [from,setFrom]=useState(null);
+  const [val,setVal]=useState("");
+  const others=allJars.filter(j=>j.key!==needyJar.key);
+  const ok=from&&val&&parseFloat(val)>0;
+  const submit=()=>{ if(!ok)return; onBorrow({ fromJar:from, toJar:needyJar.key, amount:parseFloat(val) }); onClose(); };
+  return (
+    <Sheet T={T} onClose={onClose}>
+      <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT, marginBottom:4 }}>Borrow for {needyJar.label}</div>
+      <div style={{ fontSize:12, color:T.ink3, fontFamily:FONT, fontWeight:500, marginBottom:16 }}>Take money from another jar. Return it when you can.</div>
+      <Field T={T} label="Take from">
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+          {others.map(j=>{ const M=JARMETA[j.key]; const on=from===j.key; return (
+            <div key={j.key} onClick={()=>setFrom(j.key)} style={{ display:"flex", alignItems:"center", gap:8, background:T.card, border:on?("1.6px solid "+PAL.or):("1px solid "+T.line), borderRadius:14, padding:"10px", cursor:"pointer", boxShadow:T.shadow }}>
+              <Chip n={M.icon} c={M.c==="ink"?"or":M.c} T={T} size={28} is={14}/>
+              <span style={{ fontSize:12, fontWeight:700, color:T.ink, fontFamily:FONT }}>{j.label}</span>
+            </div>
+          );})}
+        </div>
+      </Field>
+      <Field T={T} label="Amount (€)">
+        <input type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder="e.g. 50" style={inputStyle(T,true)}/>
+      </Field>
+      <CTA T={T} disabled={!ok} onClick={submit}>Borrow</CTA>
+    </Sheet>
+  );
+}
 
-  const nextDate = () => {
-    const today = new Date();
-    const d = parseInt(day)||1;
-    let next = new Date(today.getFullYear(), today.getMonth(), d);
-    if(next <= today) next = new Date(today.getFullYear(), today.getMonth()+1, d);
-    return next.toISOString().split("T")[0];
-  };
-
-  const submit = () => {
-    if(!name.trim()||!amount) return;
-    onAdd({ name:name.trim(), amount:parseFloat(amount), emoji, nextDate:nextDate(), reminder, jar:"play" });
-  };
-
+function AddSubForm({ onAdd, currency, T }) {
+  const [name,setName]=useState("");
+  const [val,setVal]=useState("");
+  const [date,setDate]=useState("");
+  const ok=name.trim()&&val&&parseFloat(val)>0&&date;
   return (
     <div>
-      <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8, letterSpacing:"0.1em", textTransform:"uppercase" }}>Quick Pick</div>
-      <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:16 }}>
-        {COMMON_SUBS.map(s=>(
-          <div key={s.name} onClick={()=>{ setName(s.name); setAmount(s.amount); setEmoji(s.emoji); }} style={{ padding:"7px 12px", borderRadius:12, background:name===s.name?"rgba(168,213,194,0.15)":"rgba(255,255,255,0.05)", border:name===s.name?"1px solid rgba(168,213,194,0.3)":"1px solid rgba(255,255,255,0.08)", cursor:"pointer", display:"flex", alignItems:"center", gap:6 }}>
-            <span style={{ fontSize:14 }}>{s.emoji}</span>
-            <span style={{ fontSize:12, fontWeight:600, color:name===s.name?"#A8D5C2":"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif" }}>{s.name}</span>
-          </div>
-        ))}
-      </div>
-      {[
-        {label:"Name",val:name,set:setName,placeholder:"e.g. Netflix"},
-        {label:`Amount (${currency})`,val:amount,set:setAmount,placeholder:"9.99",type:"number"},
-        {label:"Renewal Day of Month",val:day,set:setDay,placeholder:"e.g. 15",type:"number"},
-      ].map(({label,val,set,placeholder,type="text"})=>(
-        <div key={label} style={{ marginBottom:14 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8, letterSpacing:"0.1em", textTransform:"uppercase" }}>{label}</div>
-          <input type={type} value={val} onChange={e=>set(e.target.value)} placeholder={placeholder}
-            style={{ width:"100%", padding:"13px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:15, fontFamily:"'Sora',sans-serif", fontWeight:600, outline:"none" }}/>
-        </div>
-      ))}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 16px", background:"rgba(255,255,255,0.04)", borderRadius:14, marginBottom:20 }}>
-        <div>
-          <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,255,255,0.8)", fontFamily:"'Sora',sans-serif" }}>🔔 Remind me before renewal</div>
-          <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>Get notified 2 days before charge</div>
-        </div>
-        <div onClick={()=>setReminder(r=>!r)} className={reminder?"rslv-toggle on":"rslv-toggle off"} style={{ width:46, height:28, borderRadius:14, background:reminder?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(120,120,130,0.25)", border:reminder?"1px solid rgba(168,213,194,0.5)":"1.5px solid rgba(120,120,130,0.45)", position:"relative", cursor:"pointer", transition:"all 0.25s", flexShrink:0, boxSizing:"border-box" }}>
-          <div style={{ position:"absolute", top:2.5, left:reminder?20:2.5, width:21, height:21, borderRadius:"50%", background:"#fff", border:"1px solid rgba(0,0,0,0.08)", transition:"all 0.25s", boxShadow:"0 1px 4px rgba(0,0,0,0.25)" }}/>
-        </div>
-      </div>
-      <button onClick={submit} disabled={!name.trim()||!amount} style={{ width:"100%", padding:"15px", background:name.trim()&&amount?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.08)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:name.trim()&&amount?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:name.trim()&&amount?"pointer":"not-allowed" }}>
-        Add Subscription
-      </button>
+      <Field T={T} label="Name">
+        <input autoFocus value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Netflix" style={inputStyle(T)}/>
+      </Field>
+      <Field T={T} label={"Amount ("+currency+"/month)"}>
+        <input type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder="e.g. 12.99" style={inputStyle(T,true)}/>
+      </Field>
+      <Field T={T} label="Next payment date">
+        <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{ ...inputStyle(T), colorScheme:T.dark?"dark":"light" }}/>
+      </Field>
+      <CTA T={T} disabled={!ok} onClick={()=>{ if(!ok)return; onAdd({ name:name.trim(), amount:parseFloat(val), nextDate:date }); }}>Add Subscription</CTA>
     </div>
   );
 }
 
-function FinancePage({ onModalChange=()=>{} }) {
-  const [salary, setSalary] = useState(()=>load("rslv_salary", 0));
+function FinancePage({ onModalChange=()=>{}, darkMode=true }) {
+  const T=THEME(darkMode);
+  const [deposits, setDeposits] = useState(()=>{
+    let d = load("rslv_deposits", null);
+    if (!d) {
+      const oldSalary = load("rslv_salary", 0);
+      d = oldSalary > 0 ? [{ id:"seed", amount:oldSalary, date:TODAY() }] : [];
+    }
+    return d;
+  });
   const [expenses, setExpenses] = useState(()=>load("rslv_expenses", []));
   const [loans, setLoans] = useState(()=>load("rslv_loans", []));
-  const [showSalary, setShowSalary] = useState(false);
+  const [subs, setSubs] = useState(()=>load("rslv_subs",[]));
+  const [showAddSalary, setShowAddSalary] = useState(false);
+  const [editDep, setEditDep] = useState(null);
   const [showExpense, setShowExpense] = useState(false);
   const [selectedJar, setSelectedJar] = useState(null);
   const [borrowFromJar, setBorrowFromJar] = useState(null);
   const [returnBannerDismissed, setReturnBannerDismissed] = useState(false);
   const [showJarInfo, setShowJarInfo] = useState(false);
-  const [subs, setSubs] = useState(()=>load("rslv_subs",[]));
   const [showAddSub, setShowAddSub] = useState(false);
   const currency = load("rslv_currency","€");
-
-  useEffect(()=>{ save("rslv_subs",subs); },[subs]);
-
   const openModal  = (fn) => { onModalChange(true);  fn(); };
   const closeModal = (fn) => { onModalChange(false); fn(); };
-
-  useEffect(()=>{ save("rslv_salary", salary); }, [salary]);
+  useEffect(()=>{ save("rslv_deposits", deposits); save("rslv_salary", deposits.reduce((a,d)=>a+d.amount,0)); }, [deposits]);
   useEffect(()=>{ save("rslv_expenses", expenses); }, [expenses]);
   useEffect(()=>{ save("rslv_loans", loans); }, [loans]);
-
+  useEffect(()=>{ save("rslv_subs",subs); },[subs]);
   const addExpense = (exp) => setExpenses(p=>[{ id:Date.now().toString(), ...exp }, ...p]);
   const deleteExpense = (id) => setExpenses(p=>p.filter(e=>e.id!==id));
-
-  const spentPerJar = (jarKey) => expenses.filter(e=>e.jar===jarKey).reduce((a,e)=>a+e.amount, 0);
-  const totalSpent = expenses.reduce((a,e)=>a+e.amount, 0);
-  const totalSaved = salary > 0 ? Math.max(0, salary - totalSpent) : 0;
-
-  const lentFromJar   = (jarKey) => loans.filter(l=>l.from===jarKey && !l.returned).reduce((a,l)=>a+l.amount,0);
-  const borrowedByJar = (jarKey) => loans.filter(l=>l.to===jarKey && !l.returned).reduce((a,l)=>a+l.amount,0);
-  const activeLoans   = loans.filter(l=>!l.returned);
-  const showReturnBanner = activeLoans.length > 0 && !returnBannerDismissed;
-
-  const borrowMoney = ({fromJar, toJar, amount}) => {
-    setLoans(p=>[...p, { id:Date.now().toString(), from:fromJar, to:toJar, amount, date:TODAY(), returned:false }]);
-  };
-
-  const returnLoan = (loanId) => {
-    setLoans(p=>p.map(l=>l.id===loanId ? {...l, returned:true, returnedDate:TODAY()} : l));
-  };
-
-  const handleSetSalary = (newSalary) => {
-    setSalary(newSalary);
+  const saveDeposit = ({id, amount, date}) => {
+    if (id) setDeposits(p=>p.map(d=>d.id===id ? {...d, amount, date} : d));
+    else setDeposits(p=>[{ id:Date.now().toString(), amount, date }, ...p]);
     setReturnBannerDismissed(false);
   };
-
+  const deleteDeposit = (id) => setDeposits(p=>p.filter(d=>d.id!==id));
+  const monthKey = (s) => (s || "").slice(0,7);
+  const NOW_MONTH = monthKey(TODAY());
+  const pctOf = (k) => JARS.find(j=>j.key===k).pct;
+  const totalDeposited = deposits.reduce((a,d)=>a+d.amount, 0);
+  const monthDeposits  = deposits.filter(d=>monthKey(d.date)===NOW_MONTH);
+  const monthIncome    = monthDeposits.reduce((a,d)=>a+d.amount, 0);
+  const jarIn        = (k) => totalDeposited * pctOf(k);
+  const jarSpent     = (k) => expenses.filter(e=>e.jar===k).reduce((a,e)=>a+e.amount, 0);
+  const jarMonthIn   = (k) => monthIncome * pctOf(k);
+  const jarMonthSpent= (k) => expenses.filter(e=>e.jar===k && monthKey(e.date)===NOW_MONTH).reduce((a,e)=>a+e.amount, 0);
+  const lentFromJar  = (k) => loans.filter(l=>l.from===k && !l.returned).reduce((a,l)=>a+l.amount,0);
+  const borrowedByJar= (k) => loans.filter(l=>l.to===k && !l.returned).reduce((a,l)=>a+l.amount,0);
+  const jarBalance   = (k) => jarIn(k) - jarSpent(k) - lentFromJar(k) + borrowedByJar(k);
+  const totalBalance = JARS.reduce((a,j)=>a+jarBalance(j.key), 0);
+  const activeLoans   = loans.filter(l=>!l.returned);
+  const showReturnBanner = activeLoans.length > 0 && !returnBannerDismissed;
+  const borrowMoney = ({fromJar, toJar, amount}) => setLoans(p=>[...p, { id:Date.now().toString(), from:fromJar, to:toJar, amount, date:TODAY(), returned:false }]);
+  const returnLoan  = (loanId) => setLoans(p=>p.map(l=>l.id===loanId ? {...l, returned:true, returnedDate:TODAY()} : l));
+  const fmtDate = (s) => { try { return new Date(s).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}); } catch { return s; } };
+  const tt=tints(T);
   return (
-    <div style={{ padding:"0 18px 32px" }}>
-      {/* header */}
-      <div style={{ marginBottom:22, animation:"fadeUp 0.4s ease both" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <div>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:600, marginBottom:5 }}>YOUR MONEY</div>
-            <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px" }}>Finance</div>
-          </div>
-          <button onClick={()=>{ onModalChange(true); setShowJarInfo(true); }} style={{ background:"rgba(168,213,194,0.1)", border:"1px solid rgba(168,213,194,0.2)", borderRadius:12, padding:"8px 14px", cursor:"pointer", color:"#A8D5C2", fontSize:12, fontFamily:"'Sora',sans-serif", fontWeight:700 }}>ℹ️ How it works</button>
+    <div style={{ padding:"0 18px 32px", fontFamily:FONT }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, animation:"fadeUp .4s ease both" }}>
+        <div>
+          <div style={{ fontSize:26, fontWeight:800, color:T.ink, letterSpacing:"-0.02em" }}>Finance</div>
+          <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, marginTop:2 }}>Your money, 6 jars</div>
         </div>
+        <div onClick={()=>openModal(()=>setShowJarInfo(true))} style={{ width:44, height:44, borderRadius:"50%", background:T.card, border:"1px solid "+T.line, display:"flex", alignItems:"center", justifyContent:"center", color:T.ink2, cursor:"pointer", boxShadow:T.shadow }}><Ic n="info" s={20}/></div>
       </div>
 
-      {/* return loans banner */}
       {showReturnBanner && (
-        <div style={{ background:"rgba(240,208,216,0.1)", border:"1px solid rgba(240,208,216,0.25)", borderRadius:18, padding:"14px 16px", marginBottom:14, animation:"fadeUp 0.3s ease both" }}>
+        <div style={{ background:T.card, border:"1px solid "+T.line, borderRadius:18, padding:"13px 15px", marginBottom:12, boxShadow:T.shadow }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-            <div style={{ fontSize:13, fontWeight:700, color:"#F0D0D8", fontFamily:"'Sora',sans-serif" }}>
-              💸 Return borrowed money
-            </div>
-            <button onClick={()=>setReturnBannerDismissed(true)} style={{ background:"none", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.2)", fontSize:18, lineHeight:1 }}>×</button>
+            <div style={{ fontSize:13, fontWeight:700, color:tt.ro.fg }}>Return borrowed money</div>
+            <div onClick={()=>setReturnBannerDismissed(true)} style={{ color:T.ink3, cursor:"pointer" }}><Ic n="close" s={16}/></div>
           </div>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             {activeLoans.map(loan=>{
-              const fromJar = JARS.find(j=>j.key===loan.from);
-              const toJar   = JARS.find(j=>j.key===loan.to);
+              const fromJar=JARS.find(j=>j.key===loan.from), toJar=JARS.find(j=>j.key===loan.to);
               return (
-                <div key={loan.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", background:"rgba(255,255,255,0.04)", borderRadius:12 }}>
-                  <span style={{ fontSize:14 }}>{toJar?.emoji}</span>
-                  <div style={{ flex:1, fontSize:12, color:"rgba(255,255,255,0.6)", fontFamily:"'Sora',sans-serif" }}>
-                    {toJar?.label} borrowed <strong style={{ color:"#fff" }}>€{loan.amount}</strong> from {fromJar?.label}
-                  </div>
-                  <button onClick={()=>returnLoan(loan.id)} style={{ padding:"6px 12px", borderRadius:10, background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", fontSize:11, fontWeight:700, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer" }}>
-                    Return
-                  </button>
+                <div key={loan.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 11px", background:T.chip, borderRadius:12 }}>
+                  <Chip n={JARMETA[loan.to].icon} c={JARMETA[loan.to].c==="ink"?"or":JARMETA[loan.to].c} T={T} size={28} is={14}/>
+                  <div style={{ flex:1, fontSize:11.5, color:T.ink2, fontWeight:500 }}>{toJar&&toJar.label} borrowed <b style={{ color:T.ink }}>€{loan.amount}</b> from {fromJar&&fromJar.label}</div>
+                  <button onClick={()=>returnLoan(loan.id)} style={{ padding:"7px 13px", borderRadius:999, background:GRAD.gr, border:"none", fontSize:11, fontWeight:700, fontFamily:FONT, color:"#fff", cursor:"pointer" }}>Return</button>
                 </div>
               );
             })}
           </div>
-          {activeLoans.length === 0 && (
-            <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", textAlign:"center" }}>All returned ✓</div>
-          )}
         </div>
       )}
 
-      {/* salary card */}
-      <div onClick={()=>openModal(()=>setShowSalary(true))} style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:22, padding:"18px 20px", marginBottom:14, cursor:"pointer", animation:"fadeUp 0.4s ease 0.05s both", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+      <div style={{ background:T.card, border:"1px solid "+T.line, borderRadius:24, padding:"16px 18px", marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow:T.shadow, animation:"fadeUp .4s ease .05s both" }}>
         <div>
-          <div style={{ fontSize:11, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:600, marginBottom:4 }}>Monthly Salary</div>
-          <div style={{ fontSize:28, fontWeight:800, color: salary>0?"#fff":"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", letterSpacing:"-1px" }}>
-            {salary>0 ? `€${salary.toLocaleString()}` : "Tap to set"}
-          </div>
-          {salary>0 && <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:3 }}>€{(salary-totalSpent).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} remaining</div>}
+          <div style={{ fontSize:10.5, letterSpacing:"0.12em", color:T.ink3, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>This month's income</div>
+          <div style={{ fontSize:25, fontWeight:800, color:monthIncome>0?T.ink:T.ink3, letterSpacing:"-0.02em" }}>€{monthIncome.toLocaleString()}</div>
+          <div style={{ fontSize:10.5, color:T.ink3, fontWeight:500, marginTop:3 }}>{deposits.length>0 ? deposits.length+" deposit"+(deposits.length>1?"s":"")+" · €"+totalDeposited.toLocaleString()+" all time" : "No salary added yet"}</div>
         </div>
-        <div style={{ fontSize:28 }}>💰</div>
+        <div onClick={()=>openModal(()=>setShowAddSalary(true))} style={{ display:"flex", alignItems:"center", gap:6, padding:"11px 16px", borderRadius:16, background:GRAD.or, color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", boxShadow:"0 8px 18px rgba(255,94,31,.3)", flexShrink:0 }}>
+          <Ic n="plus" s={15} sw={2.6}/> Add
+        </div>
       </div>
 
-      {/* jars */}
-      {(salary > 0 || expenses.length > 0) && (
+      <div onClick={()=>openModal(()=>setShowExpense(true))} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, background:darkMode?"#fff":PAL.ink, color:darkMode?PAL.ink:"#fff", borderRadius:18, padding:"14px", fontSize:13.5, fontWeight:700, cursor:"pointer", marginBottom:16 }}>
+        <Ic n="plus" s={16} sw={2.4}/> Add expense
+      </div>
+
+      {(totalDeposited > 0 || expenses.length > 0) && (
         <>
-          <div style={{ fontSize:11, letterSpacing:"0.14em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:700, marginBottom:12, animation:"fadeUp 0.4s ease 0.1s both" }}>Your 6 Jars</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:18 }}>
+          <SecHead T={T} mt={0}>Your 6 jars</SecHead>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
             {JARS.map((jar,i)=>{
-              const allocated = salary * jar.pct;
-              const spent = spentPerJar(jar.key);
-              const lent = lentFromJar(jar.key);
-              const borrowed = borrowedByJar(jar.key);
-              const remaining = allocated - spent - lent + borrowed;
-              const pct = allocated > 0 ? Math.min(100, ((spent+lent)/allocated)*100) : spent > 0 ? 100 : 0;
-              const depleted = remaining < 0;
-              // loan detail labels
-              const lentLoans = loans.filter(l=>l.from===jar.key&&!l.returned);
-              const borrowedLoans = loans.filter(l=>l.to===jar.key&&!l.returned);
+              const M=JARMETA[jar.key];
+              const balance=jarBalance(jar.key), mIn=jarMonthIn(jar.key), mSpent=jarMonthSpent(jar.key);
+              const depleted=balance<0;
+              const mDrain=mIn>0?Math.min(100,(mSpent/mIn)*100):(mSpent>0?100:0);
+              const lentLoans=loans.filter(l=>l.from===jar.key&&!l.returned);
+              const borrowedLoans=loans.filter(l=>l.to===jar.key&&!l.returned);
               return (
-                <div key={jar.key} onClick={()=>setSelectedJar(jar)} style={{ background:jar.color, borderRadius:20, padding:"15px 14px", animation:`cardIn 0.4s ease ${0.12+i*0.05}s both`, position:"relative", overflow:"hidden", cursor:"pointer" }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
-                    <div style={{ fontSize:20 }}>{jar.emoji}</div>
-                    <div style={{ fontSize:10, fontWeight:700, color:jar.text, opacity:0.5, fontFamily:"'Sora',sans-serif" }}>{Math.round(jar.pct*100)}%</div>
+                <div key={jar.key} onClick={()=>openModal(()=>setSelectedJar(jar))} style={{ background:M.grad, border:T.dark&&jar.key==="freedom"?("1px solid "+T.line2):"none", borderRadius:22, padding:"14px", cursor:"pointer", animation:"cardIn .4s ease "+(0.08+i*0.05)+"s both", display:"flex", flexDirection:"column", justifyContent:"space-between", minHeight:150 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                    <div style={{ width:34, height:34, borderRadius:13, background:"rgba(255,255,255,.22)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n={M.icon} s={17}/></div>
+                    <div style={{ fontSize:10, fontWeight:800, color:"#fff", background:"rgba(255,255,255,.22)", borderRadius:999, padding:"4px 9px" }}>{Math.round(jar.pct*100)}%</div>
                   </div>
-                  <div style={{ fontSize:12, fontWeight:700, color:jar.text, fontFamily:"'Sora',sans-serif", marginBottom:2 }}>{jar.label}</div>
-                  <div style={{ fontSize:16, fontWeight:800, color:depleted?"#c0392b":jar.text, fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px" }}>
-                    {depleted ? `-€${Math.abs(remaining).toFixed(0)}` : `€${remaining.toFixed(0)}`}
-                  </div>
-                  <div style={{ fontSize:10, color:jar.text, opacity:0.4, fontFamily:"'Sora',sans-serif", marginBottom:8 }}>of €{allocated.toFixed(0)}</div>
-                  <div style={{ height:4, borderRadius:4, background:`${jar.text}20`, overflow:"hidden" }}>
-                    <div style={{ height:"100%", borderRadius:4, width:`${pct}%`, background:depleted?"#c0392b":`${jar.text}60`, transition:"width 0.4s ease" }}/>
-                  </div>
-                  {depleted && (
-                    <div onClick={e=>{ e.stopPropagation(); setBorrowFromJar(jar); }} style={{ marginTop:8, padding:"5px 10px", borderRadius:10, background:"rgba(192,57,43,0.2)", border:"1px solid rgba(192,57,43,0.4)", display:"inline-flex", alignItems:"center", gap:4, cursor:"pointer" }}>
-                      <span style={{ fontSize:10 }}>💸</span>
-                      <span style={{ fontSize:10, fontWeight:700, color:"#c0392b", fontFamily:"'Sora',sans-serif" }}>Borrow?</span>
+                  <div>
+                    <div style={{ fontSize:12.5, fontWeight:700, color:"rgba(255,255,255,.95)", marginBottom:1 }}>{jar.label}</div>
+                    <div style={{ fontSize:8.5, color:"rgba(255,255,255,.75)", textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700 }}>Total saved</div>
+                    <div style={{ fontSize:20, fontWeight:800, color:depleted?"#FFD3D3":"#fff", letterSpacing:"-0.02em", marginBottom:7 }}>{depleted?"-€"+Math.abs(balance).toFixed(0):"€"+balance.toFixed(0)}</div>
+                    <div style={{ background:"rgba(255,255,255,.16)", borderRadius:11, padding:"6px 9px" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <span style={{ fontSize:10.5, fontWeight:800, color:"#fff" }}>+€{mIn.toFixed(0)}</span>
+                        <span style={{ fontSize:10.5, fontWeight:700, color:"rgba(255,255,255,.85)" }}>−€{mSpent.toFixed(0)}</span>
+                      </div>
+                      <div style={{ height:3, borderRadius:3, background:"rgba(255,255,255,.28)", overflow:"hidden", marginTop:4 }}>
+                        <div style={{ height:"100%", width:mDrain+"%", background:"#fff", borderRadius:3, transition:"width .4s" }}/>
+                      </div>
                     </div>
-                  )}
-                  {/* loan pills */}
-                  {lentLoans.map(loan=>{
-                    const toJar = JARS.find(j=>j.key===loan.to);
-                    return (
-                      <div key={loan.id} style={{ marginTop:6, padding:"4px 8px", borderRadius:8, background:"rgba(200,50,50,0.15)", display:"inline-flex", alignItems:"center", gap:4 }}>
-                        <span style={{ fontSize:10 }}>📤</span>
-                        <span style={{ fontSize:10, fontWeight:700, color:"#c0392b", fontFamily:"'Sora',sans-serif" }}>-€{loan.amount} → {toJar?.label}</span>
+                    {depleted&&(
+                      <div onClick={e=>{ e.stopPropagation(); onModalChange(true); setBorrowFromJar(jar); }} style={{ marginTop:7, padding:"5px 10px", borderRadius:999, background:"rgba(255,255,255,.92)", display:"inline-flex", alignItems:"center", gap:5, cursor:"pointer" }}>
+                        <span style={{ fontSize:10, fontWeight:800, color:PAL.red }}>Borrow?</span>
                       </div>
-                    );
-                  })}
-                  {borrowedLoans.map(loan=>{
-                    const fromJar = JARS.find(j=>j.key===loan.from);
-                    return (
-                      <div key={loan.id} style={{ marginTop:6, padding:"4px 8px", borderRadius:8, background:"rgba(50,150,50,0.15)", display:"inline-flex", alignItems:"center", gap:4 }}>
-                        <span style={{ fontSize:10 }}>📥</span>
-                        <span style={{ fontSize:10, fontWeight:700, color:"#27ae60", fontFamily:"'Sora',sans-serif" }}>+€{loan.amount} from {fromJar?.label}</span>
-                      </div>
-                    );
-                  })}
+                    )}
+                    {lentLoans.map(loan=>{ const toJar=JARS.find(j=>j.key===loan.to); return (
+                      <div key={loan.id} style={{ marginTop:6, padding:"4px 9px", borderRadius:999, background:"rgba(0,0,0,.18)", display:"inline-flex", gap:4 }}>
+                        <span style={{ fontSize:9.5, fontWeight:700, color:"#fff" }}>−€{loan.amount} → {toJar&&toJar.label}</span>
+                      </div>); })}
+                    {borrowedLoans.map(loan=>{ const fromJar=JARS.find(j=>j.key===loan.from); return (
+                      <div key={loan.id} style={{ marginTop:6, padding:"4px 9px", borderRadius:999, background:"rgba(255,255,255,.22)", display:"inline-flex", gap:4 }}>
+                        <span style={{ fontSize:9.5, fontWeight:700, color:"#fff" }}>+€{loan.amount} from {fromJar&&fromJar.label}</span>
+                      </div>); })}
+                  </div>
                 </div>
               );
             })}
@@ -1110,126 +957,110 @@ function FinancePage({ onModalChange=()=>{} }) {
         </>
       )}
 
-      {/* total saved */}
-      {salary > 0 && (
-        <div style={{ padding:"16px 18px", borderRadius:18, background:"rgba(168,213,194,0.08)", border:"1px solid rgba(168,213,194,0.15)", display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18, animation:"fadeUp 0.4s ease 0.25s both" }}>
-          <div>
-            <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(168,213,194,0.5)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:4 }}>Total Saved This Month</div>
-            <div style={{ fontSize:24, fontWeight:800, color:"#A8D5C2", fontFamily:"'Sora',sans-serif", letterSpacing:"-1px" }}>€{totalSaved.toFixed(2)}</div>
+      {totalDeposited > 0 && (
+        <div style={{ background:GRAD.gr, borderRadius:22, padding:"15px 18px", display:"flex", alignItems:"center", gap:12, marginBottom:16, animation:"fadeUp .4s ease .2s both" }}>
+          <div style={{ width:38, height:38, borderRadius:14, background:"rgba(255,255,255,.22)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n="chart" s={18}/></div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:10.5, fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(255,255,255,.8)" }}>Total saved · all jars</div>
+            <div style={{ fontSize:21, fontWeight:800, color:"#fff", letterSpacing:"-0.02em" }}>€{totalBalance.toFixed(2)}</div>
           </div>
-          <div style={{ fontSize:32 }}>🌱</div>
         </div>
       )}
 
-      {/* expenses header */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12, animation:"fadeUp 0.4s ease 0.2s both" }}>
-        <div style={{ fontSize:11, letterSpacing:"0.14em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:700 }}>Expenses</div>
-        <div onClick={()=>openModal(()=>setShowExpense(true))} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:20, background:"rgba(168,213,194,0.12)", border:"1px solid rgba(168,213,194,0.25)", cursor:"pointer", color:"#A8D5C2", fontSize:12, fontWeight:700, fontFamily:"'Sora',sans-serif" }}>
-          <Icons.Plus/> Add
+      {deposits.length > 0 && (
+        <div style={{ marginBottom:16 }}>
+          <SecHead T={T} mt={0}>Salary log</SecHead>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {deposits.map(d=>(
+              <div key={d.id} onClick={()=>openModal(()=>setEditDep(d))} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:T.card, border:"1px solid "+T.line, borderRadius:16, cursor:"pointer", boxShadow:T.shadow }}>
+                <Chip n="coins" c="gr" T={T} size={34} is={16}/>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:T.ink }}>Salary</div>
+                  <div style={{ fontSize:10.5, color:T.ink3, fontWeight:500 }}>{fmtDate(d.date)} · tap to edit</div>
+                </div>
+                <div style={{ fontSize:14.5, fontWeight:800, color:tt.gr.fg }}>+€{d.amount.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* expense list */}
+      <SecHead T={T} mt={0}>Expenses</SecHead>
       {expenses.length === 0 ? (
-        <div style={{ padding:"28px 20px", textAlign:"center", background:"rgba(255,255,255,0.03)", borderRadius:20, border:"1px dashed rgba(255,255,255,0.08)", animation:"fadeUp 0.4s ease 0.22s both" }}>
-          <div style={{ fontSize:28, marginBottom:8 }}>💸</div>
-          <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif" }}>No expenses yet</div>
-          <div style={{ fontSize:12, color:"rgba(255,255,255,0.15)", fontFamily:"'Sora',sans-serif", marginTop:4 }}>Tap Add to log your first expense</div>
+        <div style={{ padding:"24px 20px", textAlign:"center", background:T.card, borderRadius:20, border:"1px dashed "+T.dashed }}>
+          <div style={{ fontSize:12.5, fontWeight:600, color:T.ink3 }}>No expenses yet. Tap "Add expense" above.</div>
         </div>
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {expenses.map((e,i)=>(
-            <div key={e.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 15px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:16, animation:`fadeUp 0.3s ease ${i*0.04}s both` }}>
-              <div style={{ fontSize:20, width:32, textAlign:"center" }}>{e.emoji}</div>
+          {expenses.map((e,i)=>{ const M=JARMETA[e.jar]||JARMETA.play; return (
+            <div key={e.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:T.card, border:"1px solid "+T.line, borderRadius:16, boxShadow:T.shadow, animation:"fadeUp .3s ease "+(i*0.03)+"s both" }}>
+              <Chip n={M.icon} c={M.c==="ink"?"or":M.c} T={T} size={34} is={16}/>
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,255,255,0.85)", fontFamily:"'Sora',sans-serif" }}>{e.cat}</div>
-                <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif" }}>{e.note||e.date} · {JARS.find(j=>j.key===e.jar)?.label}</div>
+                <div style={{ fontSize:13, fontWeight:700, color:T.ink, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{e.cat}</div>
+                <div style={{ fontSize:10.5, color:T.ink3, fontWeight:500 }}>{(e.note||fmtDate(e.date))+" · "+((JARS.find(j=>j.key===e.jar)||{}).label||"")}</div>
               </div>
-              <div style={{ fontSize:15, fontWeight:800, color:"#F0D0D8", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px" }}>-€{e.amount.toFixed(2)}</div>
-              <button onClick={()=>deleteExpense(e.id)} style={{ background:"none", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.15)", padding:4 }}><Icons.Trash/></button>
+              <div style={{ fontSize:14, fontWeight:800, color:tt.ro.fg }}>-€{e.amount.toFixed(2)}</div>
+              <div onClick={()=>deleteExpense(e.id)} style={{ color:T.ink3, cursor:"pointer", padding:4 }}><Ic n="trash" s={16}/></div>
             </div>
-          ))}
+          );})}
         </div>
       )}
 
-      {/* SUBSCRIPTIONS */}
-      <div style={{ marginTop:20 }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-          <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Subscriptions</div>
-          <div onClick={()=>openModal(()=>setShowAddSub(true))} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:20, background:"rgba(168,213,194,0.12)", border:"1px solid rgba(168,213,194,0.25)", cursor:"pointer", color:"#A8D5C2", fontSize:12, fontWeight:700, fontFamily:"'Sora',sans-serif" }}>
-            <Icons.Plus/> Add
-          </div>
+      <SecHead T={T} right={
+        <div onClick={()=>openModal(()=>setShowAddSub(true))} style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px 7px 9px", borderRadius:999, background:T.card, border:"1px solid "+T.line, cursor:"pointer", boxShadow:T.shadow }}>
+          <Chip n="plus" c="vi" T={T} size={22} is={12} style={{ borderRadius:"50%" }}/>
+          <span style={{ fontSize:11.5, fontWeight:700, color:T.ink }}>Add</span>
         </div>
-        {subs.length===0 ? (
-          <div style={{ padding:"20px", textAlign:"center", background:"rgba(255,255,255,0.03)", borderRadius:18, border:"1px dashed rgba(255,255,255,0.07)" }}>
-            <div style={{ fontSize:12, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif" }}>No subscriptions yet. Add Netflix, Spotify, etc.</div>
-          </div>
-        ) : (
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {subs.map((s,i)=>{
-              const daysUntil = Math.ceil((new Date(s.nextDate)-new Date())/(1000*60*60*24));
-              const urgent = daysUntil<=2;
-              return (
-                <div key={s.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 15px", background: urgent?"rgba(255,179,71,0.08)":"rgba(255,255,255,0.04)", border: urgent?"1px solid rgba(255,179,71,0.2)":"1px solid rgba(255,255,255,0.07)", borderRadius:16 }}>
-                  <div style={{ fontSize:20 }}>{s.emoji||"📱"}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif" }}>{s.name}</div>
-                    <div style={{ fontSize:11, color: urgent?"#FFB347":"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>
-                      {urgent ? `⚠️ Due in ${daysUntil} day${daysUntil===1?"":"s"}` : `Next: ${new Date(s.nextDate).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}`}
-                    </div>
-                  </div>
-                  <div style={{ fontSize:14, fontWeight:800, color:"#F0D0D8", fontFamily:"'Sora',sans-serif" }}>{currency}{s.amount}</div>
-                  <button onClick={()=>setSubs(p=>p.filter(x=>x.id!==s.id))} style={{ background:"none", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.15)", padding:4 }}><Icons.Trash/></button>
+      }>Subscriptions</SecHead>
+      {subs.length===0 ? (
+        <div style={{ padding:"18px", textAlign:"center", background:T.card, borderRadius:18, border:"1px dashed "+T.dashed }}>
+          <div style={{ fontSize:12, color:T.ink3, fontWeight:600 }}>No subscriptions yet. Add Netflix, Spotify, gym...</div>
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {subs.map(s=>{
+            const daysUntil=Math.ceil((new Date(s.nextDate)-new Date())/(1000*60*60*24));
+            const urgent=daysUntil<=2;
+            return (
+              <div key={s.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:T.card, border:urgent?("1.4px solid "+PAL.am):("1px solid "+T.line), borderRadius:16, boxShadow:T.shadow }}>
+                <Chip n="clock" c="vi" T={T} size={34} is={16}/>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:T.ink }}>{s.name}</div>
+                  <div style={{ fontSize:10.5, color:urgent?tt.am.fg:T.ink3, fontWeight:urgent?700:500 }}>{urgent?"Due in "+daysUntil+" day"+(daysUntil===1?"":"s"):"Next: "+new Date(s.nextDate).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}</div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {showSalary && <SalaryModal current={salary} onSave={handleSetSalary} onClose={()=>closeModal(()=>setShowSalary(false))}/>}
-      {showExpense && <AddExpenseModal onAdd={addExpense} onClose={()=>closeModal(()=>setShowExpense(false))}/>}
-      {selectedJar && <JarInfoModal jar={selectedJar} allocated={salary*selectedJar.pct} spent={spentPerJar(selectedJar.key)} onBorrow={()=>{ setBorrowFromJar(selectedJar); setSelectedJar(null); }} onClose={()=>closeModal(()=>setSelectedJar(null))}/>}
-      {borrowFromJar && <BorrowModal needyJar={borrowFromJar} allJars={JARS} onBorrow={borrowMoney} onClose={()=>setBorrowFromJar(null)}/>}
-      {showAddSub && (
-        <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-          <div onClick={()=>closeModal(()=>setShowAddSub(false))} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", display:"flex", flexDirection:"column" }}>
-            <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"24px 22px 8px", flex:1 }}>
-              <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 20px" }}/>
-              <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:20 }}>Add Subscription</div>
-              <AddSubForm onAdd={(sub)=>{ setSubs(p=>[...p,{id:Date.now().toString(),...sub}]); closeModal(()=>setShowAddSub(false)); }} currency={currency}/>
-            </div>
-          </div>
+                <div style={{ fontSize:13.5, fontWeight:800, color:T.ink }}>{currency}{s.amount}</div>
+                <div onClick={()=>setSubs(p=>p.filter(x=>x.id!==s.id))} style={{ color:T.ink3, cursor:"pointer", padding:4 }}><Ic n="trash" s={16}/></div>
+              </div>
+            );
+          })}
         </div>
+      )}
+
+      {(showAddSalary || editDep) && <SalaryModal T={T} editing={editDep} onSave={saveDeposit} onDelete={deleteDeposit} onClose={()=>closeModal(()=>{ setShowAddSalary(false); setEditDep(null); })}/>}
+      {showExpense && <AddExpenseModal T={T} onAdd={addExpense} onClose={()=>closeModal(()=>setShowExpense(false))}/>}
+      {selectedJar && <JarInfoModal T={T} jar={selectedJar} totalIn={jarIn(selectedJar.key)} totalSpent={jarSpent(selectedJar.key)} balance={jarBalance(selectedJar.key)} monthIn={jarMonthIn(selectedJar.key)} monthSpent={jarMonthSpent(selectedJar.key)} onBorrow={()=>{ setBorrowFromJar(selectedJar); setSelectedJar(null); }} onClose={()=>closeModal(()=>setSelectedJar(null))}/>}
+      {borrowFromJar && <BorrowModal T={T} needyJar={borrowFromJar} allJars={JARS} onBorrow={borrowMoney} onClose={()=>closeModal(()=>setBorrowFromJar(null))}/>}
+      {showAddSub && (
+        <Sheet T={T} onClose={()=>closeModal(()=>setShowAddSub(false))}>
+          <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT, marginBottom:16 }}>Add Subscription</div>
+          <AddSubForm T={T} currency={currency} onAdd={(sub)=>{ setSubs(p=>[...p,{id:Date.now().toString(),...sub}]); closeModal(()=>setShowAddSub(false)); }}/>
+        </Sheet>
       )}
       {showJarInfo && (
-        <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-          <div onClick={()=>{ onModalChange(false); setShowJarInfo(false); }} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", display:"flex", flexDirection:"column" }}>
-            <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"24px 22px 8px", flex:1 }}>
-              <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
-              <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>The 6 Jar System 🪙</div>
-              <div style={{ fontSize:13, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", lineHeight:1.7, marginBottom:20 }}>
-                From T. Harv Eker's "Secrets of the Millionaire Mind". Split every salary into 6 jars — each with a purpose. This simple system changes how you think about money.
+        <Sheet T={T} onClose={()=>{ onModalChange(false); setShowJarInfo(false); }}>
+          <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT, marginBottom:4 }}>The 6 Jar System</div>
+          <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, lineHeight:1.7, marginBottom:16 }}>From T. Harv Eker's "Secrets of the Millionaire Mind". Every salary is split into 6 jars, each with a purpose. Jars keep their balance and grow over time — nothing resets.</div>
+          {JARS.map(jar=>{ const M=JARMETA[jar.key]; return (
+            <div key={jar.key} style={{ display:"flex", gap:12, background:T.card, border:"1px solid "+T.line, borderRadius:18, padding:"13px 14px", marginBottom:9, boxShadow:T.shadow }}>
+              <Chip n={M.icon} c={M.c==="ink"?"or":M.c} T={T} size={38} is={18}/>
+              <div>
+                <div style={{ fontSize:13.5, fontWeight:800, color:T.ink }}>{jar.label} — {Math.round(jar.pct*100)}%</div>
+                <div style={{ fontSize:11.5, color:T.ink2, fontWeight:500, lineHeight:1.6, marginTop:2 }}>{jar.desc}</div>
               </div>
-              {JARS.map(jar=>(
-                <div key={jar.key} style={{ background:jar.color, borderRadius:18, padding:"16px", marginBottom:10 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
-                    <span style={{ fontSize:22 }}>{jar.emoji}</span>
-                    <div>
-                      <div style={{ fontSize:15, fontWeight:800, color:jar.text, fontFamily:"'Sora',sans-serif" }}>{jar.label} — {Math.round(jar.pct*100)}%</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize:12, color:jar.text, opacity:0.7, fontFamily:"'Sora',sans-serif", lineHeight:1.6 }}>{jar.desc}</div>
-                </div>
-              ))}
             </div>
-            <div style={{ padding:"12px 22px 44px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
-              <button onClick={()=>{ onModalChange(false); setShowJarInfo(false); }} style={{ width:"100%", padding:"15px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer" }}>Got it!</button>
-            </div>
-          </div>
-        </div>
+          );})}
+          <CTA T={T} onClick={()=>{ onModalChange(false); setShowJarInfo(false); }} style={{ marginTop:6 }}>Got it</CTA>
+        </Sheet>
       )}
     </div>
   );
@@ -1265,9 +1096,176 @@ const WORDS = {
     {w:"Lento",      t:"Slow",        p:"LEN-toh",        e:"🐢"}, {w:"Feliz",      t:"Happy",       p:"feh-LEES",       e:"😊"},
     {w:"Triste",     t:"Sad",         p:"TREES-teh",      e:"😢"}, {w:"Cansado",    t:"Tired",       p:"kahn-SAH-doh",   e:"😴"},
     {w:"Hambre",     t:"Hungry",      p:"AHM-breh",       e:"🤤"}, {w:"Sed",        t:"Thirsty",     p:"sed",            e:"😮"},
-    {w:"Familia",    t:"Family",      p:"fah-MEE-lyah",   e:"👨‍👩‍👧"},{w:"Madre",      t:"Mother",      p:"MAH-dreh",       e:"👩"},
+    {w:"Familia",    t:"Family",      p:"fah-MEE-lyah",   e:"👨‍👩‍👧"}, {w:"Madre",      t:"Mother",      p:"MAH-dreh",       e:"👩"},
     {w:"Padre",      t:"Father",      p:"PAH-dreh",       e:"👨"}, {w:"Libro",      t:"Book",        p:"LEE-broh",       e:"📚"},
     {w:"Ciudad",     t:"City",        p:"syoo-DAHD",      e:"🏙"}, {w:"Playa",      t:"Beach",       p:"PLAH-yah",       e:"🏖"},
+    {w:"Ser",t:"To be (permanent)",p:"sehr",e:"🧍"}, {w:"Estar",t:"To be (state)",p:"es-TAR",e:"📍"},
+    {w:"Tener",t:"To have",p:"teh-NEHR",e:"🤲"}, {w:"Hacer",t:"To do/make",p:"ah-SEHR",e:"🔨"},
+    {w:"Decir",t:"To say",p:"deh-SEER",e:"🗣"}, {w:"Poder",t:"To be able",p:"poh-DEHR",e:"💪"},
+    {w:"Querer",t:"To want/love",p:"keh-REHR",e:"🙌"}, {w:"Saber",t:"To know",p:"sah-BEHR",e:"🧠"},
+    {w:"Deber",t:"To have to",p:"deh-BEHR",e:"📋"}, {w:"Ver",t:"To see",p:"behr",e:"👀"},
+    {w:"Ir",t:"To go",p:"eer",e:"🚶"}, {w:"Venir",t:"To come",p:"beh-NEER",e:"👋"},
+    {w:"Dar",t:"To give",p:"dar",e:"🎁"}, {w:"Hablar",t:"To speak",p:"ah-BLAR",e:"💬"},
+    {w:"Encontrar",t:"To find",p:"en-kon-TRAR",e:"🔍"}, {w:"Sentir",t:"To feel",p:"sen-TEER",e:"💗"},
+    {w:"Tomar",t:"To take/drink",p:"toh-MAR",e:"✊"}, {w:"Mirar",t:"To look at",p:"mee-RAR",e:"👁"},
+    {w:"Poner",t:"To put",p:"poh-NEHR",e:"📥"}, {w:"Pensar",t:"To think",p:"pen-SAR",e:"💭"},
+    {w:"Creer",t:"To believe",p:"kreh-EHR",e:"🙏"}, {w:"Llevar",t:"To carry/wear",p:"yeh-BAR",e:"🎒"},
+    {w:"Vivir",t:"To live",p:"bee-BEER",e:"🌱"}, {w:"Volver",t:"To return",p:"bol-BEHR",e:"🔙"},
+    {w:"Entender",t:"To understand",p:"en-ten-DEHR",e:"💡"}, {w:"Llegar",t:"To arrive",p:"yeh-GAR",e:"🏁"},
+    {w:"Conocer",t:"To know (people)",p:"koh-noh-SEHR",e:"🤝"}, {w:"Recordar",t:"To remember",p:"reh-kor-DAR",e:"🧾"},
+    {w:"Llamar",t:"To call",p:"yah-MAR",e:"📞"}, {w:"Esperar",t:"To wait/hope",p:"es-peh-RAR",e:"⏳"},
+    {w:"Terminar",t:"To finish",p:"ter-mee-NAR",e:"🏁"}, {w:"Comer",t:"To eat",p:"koh-MEHR",e:"🍽"},
+    {w:"Beber",t:"To drink",p:"beh-BEHR",e:"🥤"}, {w:"Dormir",t:"To sleep",p:"dor-MEER",e:"😴"},
+    {w:"Abrir",t:"To open",p:"ah-BREER",e:"🔓"}, {w:"Cerrar",t:"To close",p:"seh-RRAR",e:"🔒"},
+    {w:"Comprar",t:"To buy",p:"kom-PRAR",e:"🛒"}, {w:"Pagar",t:"To pay",p:"pah-GAR",e:"💳"},
+    {w:"Leer",t:"To read",p:"leh-EHR",e:"📖"}, {w:"Escribir",t:"To write",p:"es-kree-BEER",e:"✍️"},
+    {w:"Escuchar",t:"To listen",p:"es-koo-CHAR",e:"🎧"}, {w:"Jugar",t:"To play",p:"hoo-GAR",e:"🎮"},
+    {w:"Correr",t:"To run",p:"koh-RREHR",e:"🏃"}, {w:"Caminar",t:"To walk",p:"kah-mee-NAR",e:"🚶"},
+    {w:"Ayudar",t:"To help",p:"ah-yoo-DAR",e:"🆘"}, {w:"Amar",t:"To love",p:"ah-MAR",e:"❤️"},
+    {w:"Trabajar",t:"To work",p:"trah-bah-HAR",e:"💼"}, {w:"Estudiar",t:"To study",p:"es-too-DYAR",e:"📚"},
+    {w:"Aprender",t:"To learn",p:"ah-pren-DEHR",e:"🎓"}, {w:"Enseñar",t:"To teach",p:"en-sen-YAR",e:"👩‍🏫"},
+    {w:"Empezar",t:"To begin",p:"em-peh-SAR",e:"▶️"}, {w:"Buscar",t:"To search",p:"boos-KAR",e:"🔎"},
+    {w:"Usar",t:"To use",p:"oo-SAR",e:"🛠"}, {w:"Preguntar",t:"To ask",p:"preh-goon-TAR",e:"❓"},
+    {w:"Responder",t:"To answer",p:"res-pon-DEHR",e:"💬"}, {w:"Salir",t:"To go out",p:"sah-LEER",e:"🚪"},
+    {w:"Entrar",t:"To enter",p:"en-TRAR",e:"➡️"}, {w:"Perder",t:"To lose",p:"per-DEHR",e:"🫥"},
+    {w:"Ganar",t:"To win/earn",p:"gah-NAR",e:"🏆"}, {w:"Cambiar",t:"To change",p:"kam-BYAR",e:"🔄"},
+    {w:"Yo",t:"I",p:"yoh",e:"🙋"}, {w:"Tú",t:"You",p:"too",e:"👉"},
+    {w:"Él",t:"He",p:"el",e:"👨"}, {w:"Ella",t:"She",p:"EH-yah",e:"👩"},
+    {w:"Nosotros",t:"We",p:"noh-SOH-trohs",e:"👥"}, {w:"Ellos",t:"They",p:"EH-yohs",e:"👪"},
+    {w:"Esto",t:"This",p:"ES-toh",e:"👇"}, {w:"Eso",t:"That",p:"EH-soh",e:"👉"},
+    {w:"Todo",t:"Everything",p:"TOH-doh",e:"🌐"}, {w:"Nada",t:"Nothing",p:"NAH-dah",e:"🚫"},
+    {w:"Algo",t:"Something",p:"AHL-goh",e:"❔"}, {w:"Alguien",t:"Someone",p:"AHL-gyen",e:"👤"},
+    {w:"Nadie",t:"Nobody",p:"NAH-dyeh",e:"🙅"}, {w:"Mucho",t:"A lot",p:"MOO-choh",e:"📈"},
+    {w:"Poco",t:"Little/few",p:"POH-koh",e:"🤏"}, {w:"Demasiado",t:"Too much",p:"deh-mah-SYAH-doh",e:"🛑"},
+    {w:"Más",t:"More",p:"mahs",e:"➕"}, {w:"Menos",t:"Less",p:"MEH-nohs",e:"➖"},
+    {w:"También",t:"Also",p:"tahm-BYEN",e:"➕"}, {w:"Siempre",t:"Always",p:"SYEM-preh",e:"♾️"},
+    {w:"Nunca",t:"Never",p:"NOON-kah",e:"🚫"}, {w:"Ya",t:"Already",p:"yah",e:"✔️"},
+    {w:"Todavía",t:"Still/yet",p:"toh-dah-BEE-ah",e:"🔁"}, {w:"Ahora",t:"Now",p:"ah-OH-rah",e:"⏱"},
+    {w:"Después",t:"After/later",p:"des-PWES",e:"⏭"}, {w:"Antes",t:"Before",p:"AHN-tes",e:"⏮"},
+    {w:"Aquí",t:"Here",p:"ah-KEE",e:"📍"}, {w:"Allí",t:"There",p:"ah-YEE",e:"🗺"},
+    {w:"Dónde",t:"Where",p:"DON-deh",e:"🧭"}, {w:"Cuándo",t:"When",p:"KWAN-doh",e:"📅"},
+    {w:"Por qué",t:"Why",p:"por KEH",e:"❓"}, {w:"Cómo",t:"How",p:"KOH-moh",e:"🤔"},
+    {w:"Quién",t:"Who",p:"kyen",e:"👤"}, {w:"Qué",t:"What",p:"keh",e:"❔"},
+    {w:"Cuál",t:"Which",p:"kwahl",e:"🔀"}, {w:"Cuánto",t:"How much",p:"KWAN-toh",e:"⚖️"},
+    {w:"Uno",t:"One",p:"OO-noh",e:"1️⃣"}, {w:"Dos",t:"Two",p:"dohs",e:"2️⃣"},
+    {w:"Tres",t:"Three",p:"trehs",e:"3️⃣"}, {w:"Cuatro",t:"Four",p:"KWAH-troh",e:"4️⃣"},
+    {w:"Cinco",t:"Five",p:"SEEN-koh",e:"5️⃣"}, {w:"Seis",t:"Six",p:"says",e:"6️⃣"},
+    {w:"Siete",t:"Seven",p:"SYEH-teh",e:"7️⃣"}, {w:"Ocho",t:"Eight",p:"OH-choh",e:"8️⃣"},
+    {w:"Nueve",t:"Nine",p:"NWEH-beh",e:"9️⃣"}, {w:"Diez",t:"Ten",p:"dyes",e:"🔟"},
+    {w:"Once",t:"Eleven",p:"ON-seh",e:"🔢"}, {w:"Doce",t:"Twelve",p:"DOH-seh",e:"🔢"},
+    {w:"Veinte",t:"Twenty",p:"BAYN-teh",e:"🔢"}, {w:"Treinta",t:"Thirty",p:"TRAYN-tah",e:"🔢"},
+    {w:"Cuarenta",t:"Forty",p:"kwah-REN-tah",e:"🔢"}, {w:"Cincuenta",t:"Fifty",p:"seen-KWEN-tah",e:"🔢"},
+    {w:"Cien",t:"Hundred",p:"syen",e:"💯"}, {w:"Mil",t:"Thousand",p:"meel",e:"🔢"},
+    {w:"Primero",t:"First",p:"pree-MEH-roh",e:"🥇"}, {w:"Segundo",t:"Second",p:"seh-GOON-doh",e:"🥈"},
+    {w:"Último",t:"Last",p:"OOL-tee-moh",e:"🔚"}, {w:"Lunes",t:"Monday",p:"LOO-nes",e:"📅"},
+    {w:"Martes",t:"Tuesday",p:"MAR-tes",e:"📅"}, {w:"Miércoles",t:"Wednesday",p:"MYER-koh-les",e:"📅"},
+    {w:"Jueves",t:"Thursday",p:"HWEH-bes",e:"📅"}, {w:"Viernes",t:"Friday",p:"BYER-nes",e:"📅"},
+    {w:"Sábado",t:"Saturday",p:"SAH-bah-doh",e:"📅"}, {w:"Domingo",t:"Sunday",p:"doh-MEEN-goh",e:"📅"},
+    {w:"Hoy",t:"Today",p:"oy",e:"📆"}, {w:"Mañana",t:"Tomorrow/morning",p:"mahn-YAH-nah",e:"🌅"},
+    {w:"Ayer",t:"Yesterday",p:"ah-YEHR",e:"🌇"}, {w:"Semana",t:"Week",p:"seh-MAH-nah",e:"🗓"},
+    {w:"Mes",t:"Month",p:"mes",e:"🗓"}, {w:"Año",t:"Year",p:"AHN-yoh",e:"🎆"},
+    {w:"Día",t:"Day",p:"DEE-ah",e:"☀️"}, {w:"Noche",t:"Night",p:"NOH-cheh",e:"🌙"},
+    {w:"Tarde",t:"Afternoon/late",p:"TAR-deh",e:"🌆"}, {w:"Hora",t:"Hour",p:"OH-rah",e:"🕐"},
+    {w:"Minuto",t:"Minute",p:"mee-NOO-toh",e:"⏱"}, {w:"Enero",t:"January",p:"eh-NEH-roh",e:"❄️"},
+    {w:"Febrero",t:"February",p:"feh-BREH-roh",e:"💘"}, {w:"Marzo",t:"March",p:"MAR-soh",e:"🌸"},
+    {w:"Abril",t:"April",p:"ah-BREEL",e:"🌷"}, {w:"Mayo",t:"May",p:"MAH-yoh",e:"🌼"},
+    {w:"Junio",t:"June",p:"HOO-nyoh",e:"☀️"}, {w:"Julio",t:"July",p:"HOO-lyoh",e:"🏖"},
+    {w:"Agosto",t:"August",p:"ah-GOS-toh",e:"🌞"}, {w:"Septiembre",t:"September",p:"sep-TYEM-breh",e:"🍂"},
+    {w:"Octubre",t:"October",p:"ok-TOO-breh",e:"🎃"}, {w:"Noviembre",t:"November",p:"noh-BYEM-breh",e:"🌧"},
+    {w:"Diciembre",t:"December",p:"dee-SYEM-breh",e:"🎄"}, {w:"Rojo",t:"Red",p:"ROH-hoh",e:"🔴"},
+    {w:"Azul",t:"Blue",p:"ah-SOOL",e:"🔵"}, {w:"Verde",t:"Green",p:"BEHR-deh",e:"🟢"},
+    {w:"Amarillo",t:"Yellow",p:"ah-mah-REE-yoh",e:"🟡"}, {w:"Negro",t:"Black",p:"NEH-groh",e:"⚫"},
+    {w:"Blanco",t:"White",p:"BLAHN-koh",e:"⚪"}, {w:"Gris",t:"Grey",p:"grees",e:"🩶"},
+    {w:"Marrón",t:"Brown",p:"mah-RRON",e:"🟤"}, {w:"Rosa",t:"Pink",p:"ROH-sah",e:"🌸"},
+    {w:"Naranja",t:"Orange",p:"nah-RAHN-hah",e:"🟠"}, {w:"Morado",t:"Purple",p:"moh-RAH-doh",e:"🟣"},
+    {w:"Hijo",t:"Son",p:"EE-hoh",e:"👦"}, {w:"Hija",t:"Daughter",p:"EE-hah",e:"👧"},
+    {w:"Hermano",t:"Brother",p:"er-MAH-noh",e:"👬"}, {w:"Hermana",t:"Sister",p:"er-MAH-nah",e:"👭"},
+    {w:"Abuelo",t:"Grandfather",p:"ah-BWEH-loh",e:"👴"}, {w:"Abuela",t:"Grandmother",p:"ah-BWEH-lah",e:"👵"},
+    {w:"Tío",t:"Uncle",p:"TEE-oh",e:"👨"}, {w:"Tía",t:"Aunt",p:"TEE-ah",e:"👩"},
+    {w:"Marido",t:"Husband",p:"mah-REE-doh",e:"🤵"}, {w:"Mujer",t:"Woman/wife",p:"moo-HEHR",e:"👩"},
+    {w:"Niño",t:"Child",p:"NEEN-yoh",e:"👶"}, {w:"Chico",t:"Boy",p:"CHEE-koh",e:"🧑"},
+    {w:"Chica",t:"Girl",p:"CHEE-kah",e:"👧"}, {w:"Hombre",t:"Man",p:"OM-breh",e:"👨"},
+    {w:"Gente",t:"People",p:"HEN-teh",e:"👥"}, {w:"Persona",t:"Person",p:"per-SOH-nah",e:"👤"},
+    {w:"Cabeza",t:"Head",p:"kah-BEH-sah",e:"🗣"}, {w:"Ojo",t:"Eye",p:"OH-hoh",e:"👁"},
+    {w:"Mano",t:"Hand",p:"MAH-noh",e:"✋"}, {w:"Pie",t:"Foot",p:"pyeh",e:"🦶"},
+    {w:"Corazón",t:"Heart",p:"koh-rah-SON",e:"❤️"}, {w:"Boca",t:"Mouth",p:"BOH-kah",e:"👄"},
+    {w:"Nariz",t:"Nose",p:"nah-REES",e:"👃"}, {w:"Oreja",t:"Ear",p:"oh-REH-hah",e:"👂"},
+    {w:"Brazo",t:"Arm",p:"BRAH-soh",e:"💪"}, {w:"Pierna",t:"Leg",p:"PYER-nah",e:"🦵"},
+    {w:"Pelo",t:"Hair",p:"PEH-loh",e:"💇"}, {w:"Cara",t:"Face",p:"KAH-rah",e:"🙂"},
+    {w:"Pan",t:"Bread",p:"pahn",e:"🍞"}, {w:"Leche",t:"Milk",p:"LEH-cheh",e:"🥛"},
+    {w:"Vino",t:"Wine",p:"BEE-noh",e:"🍷"}, {w:"Cerveza",t:"Beer",p:"ser-BEH-sah",e:"🍺"},
+    {w:"Café",t:"Coffee",p:"kah-FEH",e:"☕"}, {w:"Té",t:"Tea",p:"teh",e:"🍵"},
+    {w:"Carne",t:"Meat",p:"KAR-neh",e:"🥩"}, {w:"Pescado",t:"Fish (food)",p:"pes-KAH-doh",e:"🐟"},
+    {w:"Pollo",t:"Chicken",p:"POH-yoh",e:"🍗"}, {w:"Arroz",t:"Rice",p:"ah-RROS",e:"🍚"},
+    {w:"Queso",t:"Cheese",p:"KEH-soh",e:"🧀"}, {w:"Huevo",t:"Egg",p:"WEH-boh",e:"🥚"},
+    {w:"Fruta",t:"Fruit",p:"FROO-tah",e:"🍎"}, {w:"Manzana",t:"Apple",p:"man-SAH-nah",e:"🍏"},
+    {w:"Plátano",t:"Banana",p:"PLAH-tah-noh",e:"🍌"}, {w:"Verdura",t:"Vegetables",p:"ber-DOO-rah",e:"🥦"},
+    {w:"Tomate",t:"Tomato",p:"toh-MAH-teh",e:"🍅"}, {w:"Patata",t:"Potato",p:"pah-TAH-tah",e:"🥔"},
+    {w:"Ensalada",t:"Salad",p:"en-sah-LAH-dah",e:"🥗"}, {w:"Azúcar",t:"Sugar",p:"ah-SOO-kar",e:"🍬"},
+    {w:"Sal",t:"Salt",p:"sahl",e:"🧂"}, {w:"Aceite",t:"Oil",p:"ah-SAY-teh",e:"🫒"},
+    {w:"Dulce",t:"Sweet",p:"DOOL-seh",e:"🍰"}, {w:"Helado",t:"Ice cream",p:"eh-LAH-doh",e:"🍨"},
+    {w:"Desayuno",t:"Breakfast",p:"deh-sah-YOO-noh",e:"🥐"}, {w:"Almuerzo",t:"Lunch",p:"al-MWER-soh",e:"🍽"},
+    {w:"Cena",t:"Dinner",p:"SEH-nah",e:"🌙"}, {w:"Restaurante",t:"Restaurant",p:"res-tow-RAHN-teh",e:"🍴"},
+    {w:"Mesa",t:"Table",p:"MEH-sah",e:"🪑"}, {w:"Puerta",t:"Door",p:"PWER-tah",e:"🚪"},
+    {w:"Ventana",t:"Window",p:"ben-TAH-nah",e:"🪟"}, {w:"Habitación",t:"Room",p:"ah-bee-tah-SYON",e:"🛏"},
+    {w:"Cocina",t:"Kitchen",p:"koh-SEE-nah",e:"🍳"}, {w:"Baño",t:"Bathroom",p:"BAHN-yoh",e:"🛁"},
+    {w:"Cama",t:"Bed",p:"KAH-mah",e:"🛌"}, {w:"Silla",t:"Chair",p:"SEE-yah",e:"🪑"},
+    {w:"Llave",t:"Key",p:"YAH-beh",e:"🔑"}, {w:"Luz",t:"Light",p:"loos",e:"💡"},
+    {w:"Calle",t:"Street",p:"KAH-yeh",e:"🛣"}, {w:"Tienda",t:"Shop",p:"TYEN-dah",e:"🏪"},
+    {w:"Mercado",t:"Market",p:"mer-KAH-doh",e:"🛍"}, {w:"Escuela",t:"School",p:"es-KWEH-lah",e:"🏫"},
+    {w:"Hospital",t:"Hospital",p:"os-pee-TAHL",e:"🏥"}, {w:"Iglesia",t:"Church",p:"ee-GLEH-syah",e:"⛪"},
+    {w:"Banco",t:"Bank",p:"BAHN-koh",e:"🏦"}, {w:"Oficina",t:"Office",p:"oh-fee-SEE-nah",e:"🏢"},
+    {w:"Estación",t:"Station",p:"es-tah-SYON",e:"🚉"}, {w:"Aeropuerto",t:"Airport",p:"ah-eh-roh-PWER-toh",e:"✈️"},
+    {w:"Hotel",t:"Hotel",p:"oh-TEL",e:"🏨"}, {w:"Coche",t:"Car",p:"KOH-cheh",e:"🚗"},
+    {w:"Tren",t:"Train",p:"tren",e:"🚆"}, {w:"Autobús",t:"Bus",p:"ow-toh-BOOS",e:"🚌"},
+    {w:"Avión",t:"Airplane",p:"ah-BYON",e:"🛩"}, {w:"Bicicleta",t:"Bicycle",p:"bee-see-KLEH-tah",e:"🚲"},
+    {w:"Billete",t:"Ticket",p:"bee-YEH-teh",e:"🎫"}, {w:"Nuevo",t:"New",p:"NWEH-boh",e:"✨"},
+    {w:"Viejo",t:"Old",p:"BYEH-hoh",e:"🏚"}, {w:"Joven",t:"Young",p:"HOH-ben",e:"🧒"},
+    {w:"Bonito",t:"Pretty",p:"boh-NEE-toh",e:"😍"}, {w:"Feo",t:"Ugly",p:"FEH-oh",e:"🫣"},
+    {w:"Bueno",t:"Good",p:"BWEH-noh",e:"👌"}, {w:"Caliente",t:"Hot",p:"kah-LYEN-teh",e:"🔥"},
+    {w:"Frío",t:"Cold",p:"FREE-oh",e:"🧊"}, {w:"Alto",t:"Tall/high",p:"AHL-toh",e:"📏"},
+    {w:"Bajo",t:"Short/low",p:"BAH-hoh",e:"📉"}, {w:"Largo",t:"Long",p:"LAR-goh",e:"📏"},
+    {w:"Corto",t:"Short (length)",p:"KOR-toh",e:"✂️"}, {w:"Fuerte",t:"Strong",p:"FWER-teh",e:"💪"},
+    {w:"Débil",t:"Weak",p:"DEH-beel",e:"🪶"}, {w:"Fácil",t:"Easy",p:"FAH-seel",e:"🟢"},
+    {w:"Difícil",t:"Difficult",p:"dee-FEE-seel",e:"🔴"}, {w:"Importante",t:"Important",p:"eem-por-TAHN-teh",e:"⭐"},
+    {w:"Correcto",t:"Correct",p:"koh-RREK-toh",e:"✅"}, {w:"Equivocado",t:"Wrong",p:"eh-kee-boh-KAH-doh",e:"❌"},
+    {w:"Verdadero",t:"True",p:"ber-dah-DEH-roh",e:"✔️"}, {w:"Falso",t:"False",p:"FAHL-soh",e:"✖️"},
+    {w:"Lleno",t:"Full",p:"YEH-noh",e:"🈵"}, {w:"Vacío",t:"Empty",p:"bah-SEE-oh",e:"🈳"},
+    {w:"Abierto",t:"Open",p:"ah-BYER-toh",e:"🔓"}, {w:"Cerrado",t:"Closed",p:"seh-RRAH-doh",e:"🔒"},
+    {w:"Limpio",t:"Clean",p:"LEEM-pyoh",e:"🧼"}, {w:"Sucio",t:"Dirty",p:"SOO-syoh",e:"🧹"},
+    {w:"Rico",t:"Rich/tasty",p:"REE-koh",e:"💎"}, {w:"Pobre",t:"Poor",p:"POH-breh",e:"🪙"},
+    {w:"Libre",t:"Free",p:"LEE-breh",e:"🕊"}, {w:"Ocupado",t:"Busy",p:"oh-koo-PAH-doh",e:"📵"},
+    {w:"Listo",t:"Ready/clever",p:"LEES-toh",e:"🚦"}, {w:"Seguro",t:"Safe/sure",p:"seh-GOO-roh",e:"🛡"},
+    {w:"Mismo",t:"Same",p:"MEES-moh",e:"🟰"}, {w:"Diferente",t:"Different",p:"dee-feh-REN-teh",e:"🔀"},
+    {w:"Caro",t:"Expensive",p:"KAH-roh",e:"💸"}, {w:"Barato",t:"Cheap",p:"bah-RAH-toh",e:"🏷"},
+    {w:"Sol",t:"Sun",p:"sohl",e:"☀️"}, {w:"Luna",t:"Moon",p:"LOO-nah",e:"🌙"},
+    {w:"Estrella",t:"Star",p:"es-TREH-yah",e:"⭐"}, {w:"Cielo",t:"Sky",p:"SYEH-loh",e:"🌤"},
+    {w:"Mar",t:"Sea",p:"mar",e:"🌊"}, {w:"Montaña",t:"Mountain",p:"mon-TAHN-yah",e:"⛰"},
+    {w:"Río",t:"River",p:"REE-oh",e:"🏞"}, {w:"Árbol",t:"Tree",p:"AR-bol",e:"🌳"},
+    {w:"Flor",t:"Flower",p:"flor",e:"🌸"}, {w:"Lluvia",t:"Rain",p:"YOO-byah",e:"🌧"},
+    {w:"Nieve",t:"Snow",p:"NYEH-beh",e:"❄️"}, {w:"Viento",t:"Wind",p:"BYEN-toh",e:"💨"},
+    {w:"Fuego",t:"Fire",p:"FWEH-goh",e:"🔥"}, {w:"Tierra",t:"Earth",p:"TYEH-rrah",e:"🌍"},
+    {w:"Aire",t:"Air",p:"AY-reh",e:"🌬"}, {w:"Cosa",t:"Thing",p:"KOH-sah",e:"📦"},
+    {w:"Vida",t:"Life",p:"BEE-dah",e:"🌱"}, {w:"Mundo",t:"World",p:"MOON-doh",e:"🌎"},
+    {w:"País",t:"Country",p:"pah-EES",e:"🗺"}, {w:"Lugar",t:"Place",p:"loo-GAR",e:"📍"},
+    {w:"Parte",t:"Part",p:"PAR-teh",e:"🧩"}, {w:"Vez",t:"Time (occasion)",p:"bes",e:"🔁"},
+    {w:"Nombre",t:"Name",p:"NOM-breh",e:"🏷"}, {w:"Palabra",t:"Word",p:"pah-LAH-brah",e:"🔤"},
+    {w:"Pregunta",t:"Question",p:"preh-GOON-tah",e:"❓"}, {w:"Respuesta",t:"Answer",p:"res-PWES-tah",e:"💬"},
+    {w:"Problema",t:"Problem",p:"proh-BLEH-mah",e:"⚠️"}, {w:"Idea",t:"Idea",p:"ee-DEH-ah",e:"💡"},
+    {w:"Historia",t:"Story/history",p:"ees-TOH-ryah",e:"📜"}, {w:"Música",t:"Music",p:"MOO-see-kah",e:"🎵"},
+    {w:"Película",t:"Movie",p:"peh-LEE-koo-lah",e:"🎬"}, {w:"Foto",t:"Photo",p:"FOH-toh",e:"📷"},
+    {w:"Teléfono",t:"Telephone",p:"teh-LEH-foh-noh",e:"📱"}, {w:"Juego",t:"Game",p:"HWEH-goh",e:"🎲"},
+    {w:"Deporte",t:"Sport",p:"deh-POR-teh",e:"⚽"}, {w:"Fútbol",t:"Football",p:"FOOT-bol",e:"⚽"},
+    {w:"Buenos días",t:"Good morning",p:"BWEH-nohs DEE-ahs",e:"🌅"}, {w:"Buenas tardes",t:"Good afternoon",p:"BWEH-nahs TAR-des",e:"🌆"},
+    {w:"Buenas noches",t:"Good night",p:"BWEH-nahs NOH-ches",e:"🌙"}, {w:"Adiós",t:"Goodbye",p:"ah-DYOS",e:"👋"},
+    {w:"Hasta luego",t:"See you later",p:"AHS-tah LWEH-goh",e:"👋"}, {w:"Perdón",t:"Sorry/excuse me",p:"per-DON",e:"🙇"},
+    {w:"De nada",t:"You're welcome",p:"deh NAH-dah",e:"🤲"}, {w:"Está bien",t:"It's okay",p:"es-TAH byen",e:"👌"},
+    {w:"No lo sé",t:"I don't know",p:"noh loh seh",e:"🤷"}, {w:"No entiendo",t:"I don't understand",p:"noh en-TYEN-doh",e:"😕"},
+    {w:"¿Cuánto cuesta?",t:"How much is it?",p:"KWAN-toh KWES-tah",e:"💶"}, {w:"¿Dónde está?",t:"Where is it?",p:"DON-deh es-TAH",e:"🧭"},
+    {w:"¿Qué hora es?",t:"What time is it?",p:"keh OH-rah es",e:"🕐"}, {w:"Me llamo",t:"My name is",p:"meh YAH-moh",e:"🪪"},
+    {w:"Mucho gusto",t:"Nice to meet you",p:"MOO-choh GOOS-toh",e:"🤝"}, {w:"¡Ayuda!",t:"Help!",p:"ah-YOO-dah",e:"🆘"},
+    {w:"¡Salud!",t:"Cheers/bless you",p:"sah-LOOD",e:"🥂"}, {w:"Felicidades",t:"Congratulations",p:"feh-lee-see-DAH-des",e:"🎉"},
+    {w:"Bienvenido",t:"Welcome",p:"byen-beh-NEE-doh",e:"🎊"}, {w:"¡Vamos!",t:"Let's go!",p:"BAH-mohs",e:"🚀"}
   ],
   fr: [
     {w:"Bonjour",    t:"Hello",       p:"bon-ZHOOR",      e:"🙋"}, {w:"Merci",      t:"Thank you",   p:"mair-SEE",       e:"🙏"},
@@ -1282,9 +1280,176 @@ const WORDS = {
     {w:"Lent",       t:"Slow",        p:"lon",            e:"🐢"}, {w:"Heureux",    t:"Happy",       p:"uh-RUH",         e:"😊"},
     {w:"Triste",     t:"Sad",         p:"treest",         e:"😢"}, {w:"Fatigué",    t:"Tired",       p:"fah-tee-GAY",    e:"😴"},
     {w:"Faim",       t:"Hungry",      p:"fan",            e:"🤤"}, {w:"Soif",       t:"Thirsty",     p:"swaf",           e:"😮"},
-    {w:"Famille",    t:"Family",      p:"fah-MEEY",       e:"👨‍👩‍👧"},{w:"Mère",       t:"Mother",      p:"mair",           e:"👩"},
+    {w:"Famille",    t:"Family",      p:"fah-MEEY",       e:"👨‍👩‍👧"}, {w:"Mère",       t:"Mother",      p:"mair",           e:"👩"},
     {w:"Père",       t:"Father",      p:"pair",           e:"👨"}, {w:"Livre",      t:"Book",        p:"leevr",          e:"📚"},
     {w:"Ville",      t:"City",        p:"veel",           e:"🏙"}, {w:"Plage",      t:"Beach",       p:"plazh",          e:"🏖"},
+    {w:"Être",t:"To be",p:"EH-truh",e:"🧍"}, {w:"Avoir",t:"To have",p:"ah-VWAR",e:"🤲"},
+    {w:"Faire",t:"To do/make",p:"fehr",e:"🔨"}, {w:"Dire",t:"To say",p:"deer",e:"🗣"},
+    {w:"Pouvoir",t:"To be able",p:"poo-VWAR",e:"💪"}, {w:"Vouloir",t:"To want",p:"voo-LWAR",e:"🙌"},
+    {w:"Savoir",t:"To know",p:"sah-VWAR",e:"🧠"}, {w:"Devoir",t:"To have to",p:"duh-VWAR",e:"📋"},
+    {w:"Voir",t:"To see",p:"vwar",e:"👀"}, {w:"Aller",t:"To go",p:"ah-LEH",e:"🚶"},
+    {w:"Venir",t:"To come",p:"vuh-NEER",e:"👋"}, {w:"Donner",t:"To give",p:"doh-NEH",e:"🎁"},
+    {w:"Parler",t:"To speak",p:"par-LEH",e:"💬"}, {w:"Trouver",t:"To find",p:"troo-VEH",e:"🔍"},
+    {w:"Sentir",t:"To feel/smell",p:"sahn-TEER",e:"💗"}, {w:"Prendre",t:"To take",p:"PRAHN-druh",e:"✊"},
+    {w:"Regarder",t:"To look at",p:"ruh-gar-DEH",e:"👁"}, {w:"Mettre",t:"To put",p:"MEH-truh",e:"📥"},
+    {w:"Penser",t:"To think",p:"pahn-SEH",e:"💭"}, {w:"Croire",t:"To believe",p:"krwar",e:"🙏"},
+    {w:"Porter",t:"To carry/wear",p:"por-TEH",e:"🎒"}, {w:"Vivre",t:"To live",p:"VEE-vruh",e:"🌱"},
+    {w:"Revenir",t:"To come back",p:"ruh-vuh-NEER",e:"🔙"}, {w:"Comprendre",t:"To understand",p:"kom-PRAHN-druh",e:"💡"},
+    {w:"Arriver",t:"To arrive",p:"ah-ree-VEH",e:"🏁"}, {w:"Connaître",t:"To know (people)",p:"koh-NEH-truh",e:"🤝"},
+    {w:"Appeler",t:"To call",p:"ah-PLEH",e:"📞"}, {w:"Attendre",t:"To wait",p:"ah-TAHN-druh",e:"⏳"},
+    {w:"Finir",t:"To finish",p:"fee-NEER",e:"🏁"}, {w:"Manger",t:"To eat",p:"mahn-JEH",e:"🍽"},
+    {w:"Boire",t:"To drink",p:"bwar",e:"🥤"}, {w:"Dormir",t:"To sleep",p:"dor-MEER",e:"😴"},
+    {w:"Ouvrir",t:"To open",p:"oo-VREER",e:"🔓"}, {w:"Fermer",t:"To close",p:"fer-MEH",e:"🔒"},
+    {w:"Acheter",t:"To buy",p:"ash-TEH",e:"🛒"}, {w:"Payer",t:"To pay",p:"peh-YEH",e:"💳"},
+    {w:"Lire",t:"To read",p:"leer",e:"📖"}, {w:"Écrire",t:"To write",p:"eh-KREER",e:"✍️"},
+    {w:"Écouter",t:"To listen",p:"eh-koo-TEH",e:"🎧"}, {w:"Jouer",t:"To play",p:"zhoo-EH",e:"🎮"},
+    {w:"Courir",t:"To run",p:"koo-REER",e:"🏃"}, {w:"Marcher",t:"To walk",p:"mar-SHEH",e:"🚶"},
+    {w:"Aider",t:"To help",p:"eh-DEH",e:"🆘"}, {w:"Aimer",t:"To love/like",p:"eh-MEH",e:"❤️"},
+    {w:"Travailler",t:"To work",p:"trah-vah-YEH",e:"💼"}, {w:"Étudier",t:"To study",p:"eh-tü-DYEH",e:"📚"},
+    {w:"Apprendre",t:"To learn",p:"ah-PRAHN-druh",e:"🎓"}, {w:"Enseigner",t:"To teach",p:"ahn-seh-NYEH",e:"👩‍🏫"},
+    {w:"Commencer",t:"To begin",p:"koh-mahn-SEH",e:"▶️"}, {w:"Chercher",t:"To search",p:"sher-SHEH",e:"🔎"},
+    {w:"Utiliser",t:"To use",p:"ü-tee-lee-ZEH",e:"🛠"}, {w:"Demander",t:"To ask",p:"duh-mahn-DEH",e:"❓"},
+    {w:"Répondre",t:"To answer",p:"reh-PON-druh",e:"💬"}, {w:"Sortir",t:"To go out",p:"sor-TEER",e:"🚪"},
+    {w:"Entrer",t:"To enter",p:"ahn-TREH",e:"➡️"}, {w:"Perdre",t:"To lose",p:"PEHR-druh",e:"🫥"},
+    {w:"Gagner",t:"To win/earn",p:"gah-NYEH",e:"🏆"}, {w:"Essayer",t:"To try",p:"eh-seh-YEH",e:"🎯"},
+    {w:"Changer",t:"To change",p:"shahn-JEH",e:"🔄"}, {w:"Je",t:"I",p:"zhuh",e:"🙋"},
+    {w:"Tu",t:"You",p:"tü",e:"👉"}, {w:"Il",t:"He",p:"eel",e:"👨"},
+    {w:"Elle",t:"She",p:"el",e:"👩"}, {w:"Nous",t:"We",p:"noo",e:"👥"},
+    {w:"Vous",t:"You (formal/plural)",p:"voo",e:"👫"}, {w:"Ils",t:"They",p:"eel",e:"👪"},
+    {w:"Ceci",t:"This",p:"suh-SEE",e:"👇"}, {w:"Cela",t:"That",p:"suh-LAH",e:"👉"},
+    {w:"Tout",t:"Everything/all",p:"too",e:"🌐"}, {w:"Rien",t:"Nothing",p:"ryan",e:"🚫"},
+    {w:"Quelque chose",t:"Something",p:"kel-kuh SHOZ",e:"❔"}, {w:"Quelqu'un",t:"Someone",p:"kel-KUHN",e:"👤"},
+    {w:"Personne",t:"Nobody/person",p:"pehr-SON",e:"🙅"}, {w:"Beaucoup",t:"A lot",p:"boh-KOO",e:"📈"},
+    {w:"Peu",t:"Little/few",p:"puh",e:"🤏"}, {w:"Trop",t:"Too much",p:"troh",e:"🛑"},
+    {w:"Plus",t:"More",p:"plü",e:"➕"}, {w:"Moins",t:"Less",p:"mwan",e:"➖"},
+    {w:"Aussi",t:"Also",p:"oh-SEE",e:"➕"}, {w:"Toujours",t:"Always",p:"too-ZHOOR",e:"♾️"},
+    {w:"Jamais",t:"Never",p:"zhah-MEH",e:"🚫"}, {w:"Déjà",t:"Already",p:"deh-ZHAH",e:"✔️"},
+    {w:"Encore",t:"Still/again",p:"ahn-KOR",e:"🔁"}, {w:"Maintenant",t:"Now",p:"mant-NAHN",e:"⏱"},
+    {w:"Après",t:"After",p:"ah-PREH",e:"⏭"}, {w:"Avant",t:"Before",p:"ah-VAHN",e:"⏮"},
+    {w:"Ici",t:"Here",p:"ee-SEE",e:"📍"}, {w:"Là",t:"There",p:"lah",e:"🗺"},
+    {w:"Où",t:"Where",p:"oo",e:"🧭"}, {w:"Quand",t:"When",p:"kahn",e:"📅"},
+    {w:"Pourquoi",t:"Why",p:"poor-KWAH",e:"❓"}, {w:"Comment",t:"How",p:"koh-MAHN",e:"🤔"},
+    {w:"Qui",t:"Who",p:"kee",e:"👤"}, {w:"Quoi",t:"What",p:"kwah",e:"❔"},
+    {w:"Quel",t:"Which",p:"kel",e:"🔀"}, {w:"Combien",t:"How much",p:"kom-BYAN",e:"⚖️"},
+    {w:"Un",t:"One",p:"uhn",e:"1️⃣"}, {w:"Deux",t:"Two",p:"duh",e:"2️⃣"},
+    {w:"Trois",t:"Three",p:"trwah",e:"3️⃣"}, {w:"Quatre",t:"Four",p:"KAH-truh",e:"4️⃣"},
+    {w:"Cinq",t:"Five",p:"sank",e:"5️⃣"}, {w:"Six",t:"Six",p:"sees",e:"6️⃣"},
+    {w:"Sept",t:"Seven",p:"set",e:"7️⃣"}, {w:"Huit",t:"Eight",p:"weet",e:"8️⃣"},
+    {w:"Neuf",t:"Nine",p:"nuhf",e:"9️⃣"}, {w:"Dix",t:"Ten",p:"dees",e:"🔟"},
+    {w:"Onze",t:"Eleven",p:"onz",e:"🔢"}, {w:"Douze",t:"Twelve",p:"dooz",e:"🔢"},
+    {w:"Vingt",t:"Twenty",p:"van",e:"🔢"}, {w:"Trente",t:"Thirty",p:"trahnt",e:"🔢"},
+    {w:"Quarante",t:"Forty",p:"kah-RAHNT",e:"🔢"}, {w:"Cinquante",t:"Fifty",p:"san-KAHNT",e:"🔢"},
+    {w:"Cent",t:"Hundred",p:"sahn",e:"💯"}, {w:"Mille",t:"Thousand",p:"meel",e:"🔢"},
+    {w:"Premier",t:"First",p:"pruh-MYEH",e:"🥇"}, {w:"Deuxième",t:"Second",p:"duh-ZYEM",e:"🥈"},
+    {w:"Dernier",t:"Last",p:"dehr-NYEH",e:"🔚"}, {w:"Lundi",t:"Monday",p:"luhn-DEE",e:"📅"},
+    {w:"Mardi",t:"Tuesday",p:"mar-DEE",e:"📅"}, {w:"Mercredi",t:"Wednesday",p:"mehr-kruh-DEE",e:"📅"},
+    {w:"Jeudi",t:"Thursday",p:"zhuh-DEE",e:"📅"}, {w:"Vendredi",t:"Friday",p:"vahn-druh-DEE",e:"📅"},
+    {w:"Samedi",t:"Saturday",p:"sam-DEE",e:"📅"}, {w:"Dimanche",t:"Sunday",p:"dee-MAHNSH",e:"📅"},
+    {w:"Aujourd'hui",t:"Today",p:"oh-zhoor-DWEE",e:"📆"}, {w:"Demain",t:"Tomorrow",p:"duh-MAN",e:"🌅"},
+    {w:"Hier",t:"Yesterday",p:"yehr",e:"🌇"}, {w:"Semaine",t:"Week",p:"suh-MEN",e:"🗓"},
+    {w:"Mois",t:"Month",p:"mwah",e:"🗓"}, {w:"Année",t:"Year",p:"ah-NEH",e:"🎆"},
+    {w:"Jour",t:"Day",p:"zhoor",e:"☀️"}, {w:"Nuit",t:"Night",p:"nwee",e:"🌙"},
+    {w:"Matin",t:"Morning",p:"mah-TAN",e:"🌄"}, {w:"Soir",t:"Evening",p:"swar",e:"🌆"},
+    {w:"Heure",t:"Hour",p:"uhr",e:"🕐"}, {w:"Minute",t:"Minute",p:"mee-NÜT",e:"⏱"},
+    {w:"Janvier",t:"January",p:"zhahn-VYEH",e:"❄️"}, {w:"Février",t:"February",p:"feh-VRYEH",e:"💘"},
+    {w:"Mars",t:"March",p:"mars",e:"🌸"}, {w:"Avril",t:"April",p:"ah-VREEL",e:"🌷"},
+    {w:"Mai",t:"May",p:"meh",e:"🌼"}, {w:"Juin",t:"June",p:"zhwan",e:"☀️"},
+    {w:"Juillet",t:"July",p:"zhwee-YEH",e:"🏖"}, {w:"Août",t:"August",p:"oot",e:"🌞"},
+    {w:"Septembre",t:"September",p:"sep-TAHM-bruh",e:"🍂"}, {w:"Octobre",t:"October",p:"ok-TOH-bruh",e:"🎃"},
+    {w:"Novembre",t:"November",p:"noh-VAHM-bruh",e:"🌧"}, {w:"Décembre",t:"December",p:"deh-SAHM-bruh",e:"🎄"},
+    {w:"Rouge",t:"Red",p:"roozh",e:"🔴"}, {w:"Bleu",t:"Blue",p:"bluh",e:"🔵"},
+    {w:"Vert",t:"Green",p:"vehr",e:"🟢"}, {w:"Jaune",t:"Yellow",p:"zhohn",e:"🟡"},
+    {w:"Noir",t:"Black",p:"nwar",e:"⚫"}, {w:"Blanc",t:"White",p:"blahn",e:"⚪"},
+    {w:"Gris",t:"Grey",p:"gree",e:"🩶"}, {w:"Marron",t:"Brown",p:"mah-RON",e:"🟤"},
+    {w:"Rose",t:"Pink",p:"rohz",e:"🌸"}, {w:"Orange",t:"Orange",p:"oh-RAHNZH",e:"🟠"},
+    {w:"Violet",t:"Purple",p:"vyoh-LEH",e:"🟣"}, {w:"Fils",t:"Son",p:"fees",e:"👦"},
+    {w:"Fille",t:"Daughter/girl",p:"fee",e:"👧"}, {w:"Frère",t:"Brother",p:"frehr",e:"👬"},
+    {w:"Sœur",t:"Sister",p:"suhr",e:"👭"}, {w:"Grand-père",t:"Grandfather",p:"grahn-PEHR",e:"👴"},
+    {w:"Grand-mère",t:"Grandmother",p:"grahn-MEHR",e:"👵"}, {w:"Oncle",t:"Uncle",p:"ON-kluh",e:"👨"},
+    {w:"Tante",t:"Aunt",p:"tahnt",e:"👩"}, {w:"Mari",t:"Husband",p:"mah-REE",e:"🤵"},
+    {w:"Femme",t:"Woman/wife",p:"fam",e:"👩"}, {w:"Enfant",t:"Child",p:"ahn-FAHN",e:"👶"},
+    {w:"Garçon",t:"Boy",p:"gar-SON",e:"🧑"}, {w:"Homme",t:"Man",p:"om",e:"👨"},
+    {w:"Gens",t:"People",p:"zhahn",e:"👥"}, {w:"Tête",t:"Head",p:"tet",e:"🗣"},
+    {w:"Œil",t:"Eye",p:"uhy",e:"👁"}, {w:"Main",t:"Hand",p:"man",e:"✋"},
+    {w:"Pied",t:"Foot",p:"pyeh",e:"🦶"}, {w:"Cœur",t:"Heart",p:"kuhr",e:"❤️"},
+    {w:"Bouche",t:"Mouth",p:"boosh",e:"👄"}, {w:"Nez",t:"Nose",p:"neh",e:"👃"},
+    {w:"Oreille",t:"Ear",p:"oh-RAY",e:"👂"}, {w:"Bras",t:"Arm",p:"brah",e:"💪"},
+    {w:"Jambe",t:"Leg",p:"zhahmb",e:"🦵"}, {w:"Cheveux",t:"Hair",p:"shuh-VUH",e:"💇"},
+    {w:"Visage",t:"Face",p:"vee-ZAHZH",e:"🙂"}, {w:"Pain",t:"Bread",p:"pan",e:"🍞"},
+    {w:"Lait",t:"Milk",p:"leh",e:"🥛"}, {w:"Vin",t:"Wine",p:"van",e:"🍷"},
+    {w:"Bière",t:"Beer",p:"byehr",e:"🍺"}, {w:"Café",t:"Coffee",p:"kah-FEH",e:"☕"},
+    {w:"Thé",t:"Tea",p:"teh",e:"🍵"}, {w:"Viande",t:"Meat",p:"vyahnd",e:"🥩"},
+    {w:"Poisson",t:"Fish",p:"pwah-SON",e:"🐟"}, {w:"Poulet",t:"Chicken",p:"poo-LEH",e:"🍗"},
+    {w:"Riz",t:"Rice",p:"ree",e:"🍚"}, {w:"Pâtes",t:"Pasta",p:"paht",e:"🍝"},
+    {w:"Fromage",t:"Cheese",p:"froh-MAHZH",e:"🧀"}, {w:"Œuf",t:"Egg",p:"uhf",e:"🥚"},
+    {w:"Fruit",t:"Fruit",p:"frwee",e:"🍎"}, {w:"Pomme",t:"Apple",p:"pom",e:"🍏"},
+    {w:"Banane",t:"Banana",p:"bah-NAHN",e:"🍌"}, {w:"Légumes",t:"Vegetables",p:"leh-GÜM",e:"🥦"},
+    {w:"Tomate",t:"Tomato",p:"toh-MAHT",e:"🍅"}, {w:"Pomme de terre",t:"Potato",p:"pom duh TEHR",e:"🥔"},
+    {w:"Salade",t:"Salad",p:"sah-LAHD",e:"🥗"}, {w:"Sucre",t:"Sugar",p:"SÜ-kruh",e:"🍬"},
+    {w:"Sel",t:"Salt",p:"sel",e:"🧂"}, {w:"Huile",t:"Oil",p:"weel",e:"🫒"},
+    {w:"Beurre",t:"Butter",p:"buhr",e:"🧈"}, {w:"Gâteau",t:"Cake",p:"gah-TOH",e:"🍰"},
+    {w:"Glace",t:"Ice cream",p:"glahs",e:"🍨"}, {w:"Petit-déjeuner",t:"Breakfast",p:"puh-tee deh-zhuh-NEH",e:"🥐"},
+    {w:"Déjeuner",t:"Lunch",p:"deh-zhuh-NEH",e:"🍽"}, {w:"Dîner",t:"Dinner",p:"dee-NEH",e:"🌙"},
+    {w:"Restaurant",t:"Restaurant",p:"res-toh-RAHN",e:"🍴"}, {w:"Table",t:"Table",p:"TAH-bluh",e:"🪑"},
+    {w:"Porte",t:"Door",p:"port",e:"🚪"}, {w:"Fenêtre",t:"Window",p:"fuh-NEH-truh",e:"🪟"},
+    {w:"Chambre",t:"Bedroom",p:"SHAHM-bruh",e:"🛏"}, {w:"Cuisine",t:"Kitchen",p:"kwee-ZEEN",e:"🍳"},
+    {w:"Salle de bain",t:"Bathroom",p:"sal duh BAN",e:"🛁"}, {w:"Lit",t:"Bed",p:"lee",e:"🛌"},
+    {w:"Chaise",t:"Chair",p:"shez",e:"🪑"}, {w:"Clé",t:"Key",p:"kleh",e:"🔑"},
+    {w:"Lumière",t:"Light",p:"lü-MYEHR",e:"💡"}, {w:"Rue",t:"Street",p:"rü",e:"🛣"},
+    {w:"Magasin",t:"Shop",p:"mah-gah-ZAN",e:"🏪"}, {w:"Marché",t:"Market",p:"mar-SHEH",e:"🛍"},
+    {w:"École",t:"School",p:"eh-KOL",e:"🏫"}, {w:"Hôpital",t:"Hospital",p:"oh-pee-TAHL",e:"🏥"},
+    {w:"Église",t:"Church",p:"eh-GLEEZ",e:"⛪"}, {w:"Banque",t:"Bank",p:"bahnk",e:"🏦"},
+    {w:"Bureau",t:"Office/desk",p:"bü-ROH",e:"🏢"}, {w:"Gare",t:"Station",p:"gar",e:"🚉"},
+    {w:"Aéroport",t:"Airport",p:"ah-eh-roh-POR",e:"✈️"}, {w:"Hôtel",t:"Hotel",p:"oh-TEL",e:"🏨"},
+    {w:"Voiture",t:"Car",p:"vwah-TÜR",e:"🚗"}, {w:"Train",t:"Train",p:"tran",e:"🚆"},
+    {w:"Bus",t:"Bus",p:"büs",e:"🚌"}, {w:"Avion",t:"Airplane",p:"ah-VYON",e:"🛩"},
+    {w:"Vélo",t:"Bicycle",p:"veh-LOH",e:"🚲"}, {w:"Billet",t:"Ticket",p:"bee-YEH",e:"🎫"},
+    {w:"Nouveau",t:"New",p:"noo-VOH",e:"✨"}, {w:"Vieux",t:"Old",p:"vyuh",e:"🏚"},
+    {w:"Jeune",t:"Young",p:"zhuhn",e:"🧒"}, {w:"Beau",t:"Beautiful",p:"boh",e:"😍"},
+    {w:"Laid",t:"Ugly",p:"leh",e:"🫣"}, {w:"Bon",t:"Good",p:"bon",e:"👌"},
+    {w:"Chaud",t:"Hot",p:"shoh",e:"🔥"}, {w:"Froid",t:"Cold",p:"frwah",e:"🧊"},
+    {w:"Haut",t:"High/tall",p:"oh",e:"📏"}, {w:"Bas",t:"Low",p:"bah",e:"📉"},
+    {w:"Long",t:"Long",p:"lon",e:"📏"}, {w:"Court",t:"Short",p:"koor",e:"✂️"},
+    {w:"Fort",t:"Strong",p:"for",e:"💪"}, {w:"Faible",t:"Weak",p:"FEH-bluh",e:"🪶"},
+    {w:"Facile",t:"Easy",p:"fah-SEEL",e:"🟢"}, {w:"Difficile",t:"Difficult",p:"dee-fee-SEEL",e:"🔴"},
+    {w:"Important",t:"Important",p:"am-por-TAHN",e:"⭐"}, {w:"Juste",t:"Right/fair",p:"zhüst",e:"✅"},
+    {w:"Faux",t:"False/wrong",p:"foh",e:"❌"}, {w:"Vrai",t:"True",p:"vreh",e:"✔️"},
+    {w:"Plein",t:"Full",p:"plan",e:"🈵"}, {w:"Vide",t:"Empty",p:"veed",e:"🈳"},
+    {w:"Ouvert",t:"Open",p:"oo-VEHR",e:"🔓"}, {w:"Fermé",t:"Closed",p:"fer-MEH",e:"🔒"},
+    {w:"Propre",t:"Clean",p:"PROH-pruh",e:"🧼"}, {w:"Sale",t:"Dirty",p:"sahl",e:"🧹"},
+    {w:"Riche",t:"Rich",p:"reesh",e:"💎"}, {w:"Pauvre",t:"Poor",p:"POH-vruh",e:"🪙"},
+    {w:"Libre",t:"Free",p:"LEE-bruh",e:"🕊"}, {w:"Occupé",t:"Busy",p:"oh-kü-PEH",e:"📵"},
+    {w:"Prêt",t:"Ready",p:"preh",e:"🚦"}, {w:"Sûr",t:"Sure/safe",p:"sür",e:"🛡"},
+    {w:"Même",t:"Same",p:"mem",e:"🟰"}, {w:"Différent",t:"Different",p:"dee-feh-RAHN",e:"🔀"},
+    {w:"Cher",t:"Expensive/dear",p:"shehr",e:"💸"}, {w:"Pas cher",t:"Cheap",p:"pah SHEHR",e:"🏷"},
+    {w:"Soleil",t:"Sun",p:"soh-LAY",e:"☀️"}, {w:"Lune",t:"Moon",p:"lün",e:"🌙"},
+    {w:"Étoile",t:"Star",p:"eh-TWAHL",e:"⭐"}, {w:"Ciel",t:"Sky",p:"syel",e:"🌤"},
+    {w:"Mer",t:"Sea",p:"mehr",e:"🌊"}, {w:"Montagne",t:"Mountain",p:"mon-TAHN-yuh",e:"⛰"},
+    {w:"Rivière",t:"River",p:"ree-VYEHR",e:"🏞"}, {w:"Arbre",t:"Tree",p:"AR-bruh",e:"🌳"},
+    {w:"Fleur",t:"Flower",p:"fluhr",e:"🌸"}, {w:"Pluie",t:"Rain",p:"plwee",e:"🌧"},
+    {w:"Neige",t:"Snow",p:"nezh",e:"❄️"}, {w:"Vent",t:"Wind",p:"vahn",e:"💨"},
+    {w:"Feu",t:"Fire",p:"fuh",e:"🔥"}, {w:"Terre",t:"Earth",p:"tehr",e:"🌍"},
+    {w:"Air",t:"Air",p:"ehr",e:"🌬"}, {w:"Chose",t:"Thing",p:"shohz",e:"📦"},
+    {w:"Vie",t:"Life",p:"vee",e:"🌱"}, {w:"Monde",t:"World",p:"mond",e:"🌎"},
+    {w:"Pays",t:"Country",p:"peh-EE",e:"🗺"}, {w:"Endroit",t:"Place",p:"ahn-DRWAH",e:"📍"},
+    {w:"Partie",t:"Part",p:"par-TEE",e:"🧩"}, {w:"Fois",t:"Time (occasion)",p:"fwah",e:"🔁"},
+    {w:"Nom",t:"Name",p:"non",e:"🏷"}, {w:"Mot",t:"Word",p:"moh",e:"🔤"},
+    {w:"Question",t:"Question",p:"kes-TYON",e:"❓"}, {w:"Réponse",t:"Answer",p:"reh-PONS",e:"💬"},
+    {w:"Problème",t:"Problem",p:"proh-BLEM",e:"⚠️"}, {w:"Idée",t:"Idea",p:"ee-DEH",e:"💡"},
+    {w:"Histoire",t:"Story/history",p:"ees-TWAHR",e:"📜"}, {w:"Musique",t:"Music",p:"mü-ZEEK",e:"🎵"},
+    {w:"Film",t:"Movie",p:"feelm",e:"🎬"}, {w:"Photo",t:"Photo",p:"foh-TOH",e:"📷"},
+    {w:"Téléphone",t:"Telephone",p:"teh-leh-FON",e:"📱"}, {w:"Jeu",t:"Game",p:"zhuh",e:"🎲"},
+    {w:"Sport",t:"Sport",p:"spor",e:"⚽"}, {w:"Football",t:"Football",p:"foot-BAHL",e:"⚽"},
+    {w:"Salut",t:"Hi/bye",p:"sah-LÜ",e:"🙋"}, {w:"Bonsoir",t:"Good evening",p:"bon-SWAR",e:"🌆"},
+    {w:"Bonne nuit",t:"Good night",p:"bon NWEE",e:"🌙"}, {w:"Au revoir",t:"Goodbye",p:"oh ruh-VWAR",e:"👋"},
+    {w:"À bientôt",t:"See you soon",p:"ah byan-TOH",e:"👋"}, {w:"Pardon",t:"Sorry/excuse me",p:"par-DON",e:"🙇"},
+    {w:"De rien",t:"You're welcome",p:"duh RYAN",e:"🤲"}, {w:"D'accord",t:"Okay/agreed",p:"dah-KOR",e:"👌"},
+    {w:"Je ne sais pas",t:"I don't know",p:"zhuh nuh seh PAH",e:"🤷"}, {w:"Je ne comprends pas",t:"I don't understand",p:"zhuh nuh kom-prahn PAH",e:"😕"},
+    {w:"Combien ça coûte?",t:"How much is it?",p:"kom-byan sah KOOT",e:"💶"}, {w:"Où est...?",t:"Where is...?",p:"oo EH",e:"🧭"},
+    {w:"Quelle heure est-il?",t:"What time is it?",p:"kel UHR eh-TEEL",e:"🕐"}, {w:"Je m'appelle",t:"My name is",p:"zhuh mah-PEL",e:"🪪"},
+    {w:"Enchanté",t:"Nice to meet you",p:"ahn-shahn-TEH",e:"🤝"}, {w:"Au secours!",t:"Help!",p:"oh suh-KOOR",e:"🆘"},
+    {w:"Santé!",t:"Cheers!",p:"sahn-TEH",e:"🥂"}, {w:"Félicitations",t:"Congratulations",p:"feh-lee-see-tah-SYON",e:"🎉"},
+    {w:"Bienvenue",t:"Welcome",p:"byan-vuh-NÜ",e:"🎊"}, {w:"Allons-y!",t:"Let's go!",p:"ah-lon-ZEE",e:"🚀"}
   ],
   it: [
     {w:"Ciao",       t:"Hello/Bye",   p:"CHOW",           e:"🙋"}, {w:"Grazie",     t:"Thank you",   p:"GRAT-syeh",      e:"🙏"},
@@ -1301,7 +1466,176 @@ const WORDS = {
     {w:"Fame",       t:"Hungry",      p:"FAH-meh",        e:"🤤"}, {w:"Sete",       t:"Thirsty",     p:"SEH-teh",        e:"😮"},
     {w:"Famiglia",   t:"Family",      p:"fah-MEE-lyah",   e:"👨‍👩‍👧"},{w:"Madre",      t:"Mother",      p:"MAH-dreh",       e:"👩"},
     {w:"Padre",      t:"Father",      p:"PAH-dreh",       e:"👨"}, {w:"Libro",      t:"Book",        p:"LEE-broh",       e:"📚"},
-    {w:"Città",      t:"City",        p:"cheet-TAH",      e:"🏙"}, {w:"Spiaggia",   t:"Beach",       p:"SPYAH-jah",      e:"🏖"},
+    {w:"Città",      t:"City",        p:"cheet-TAH",      e:"🏙"}, {w:"Spiaggia",   t:"Beach",       p:"SPYAH-jah",      e:"🏖"},,
+    {w:"Essere",t:"To be",p:"ES-seh-reh",e:"🧍"}, {w:"Avere",t:"To have",p:"ah-VEH-reh",e:"🤲"},
+    {w:"Fare",t:"To do/make",p:"FAH-reh",e:"🔨"}, {w:"Dire",t:"To say",p:"DEE-reh",e:"🗣"},
+    {w:"Potere",t:"To be able",p:"poh-TEH-reh",e:"💪"}, {w:"Volere",t:"To want",p:"voh-LEH-reh",e:"🙌"},
+    {w:"Sapere",t:"To know",p:"sah-PEH-reh",e:"🧠"}, {w:"Dovere",t:"To have to",p:"doh-VEH-reh",e:"📋"},
+    {w:"Vedere",t:"To see",p:"veh-DEH-reh",e:"👀"}, {w:"Andare",t:"To go",p:"ahn-DAH-reh",e:"🚶"},
+    {w:"Venire",t:"To come",p:"veh-NEE-reh",e:"👋"}, {w:"Dare",t:"To give",p:"DAH-reh",e:"🎁"},
+    {w:"Parlare",t:"To speak",p:"par-LAH-reh",e:"💬"}, {w:"Trovare",t:"To find",p:"troh-VAH-reh",e:"🔍"},
+    {w:"Sentire",t:"To hear/feel",p:"sen-TEE-reh",e:"👂"}, {w:"Prendere",t:"To take",p:"PREN-deh-reh",e:"✊"},
+    {w:"Guardare",t:"To look at",p:"gwar-DAH-reh",e:"👁"}, {w:"Mettere",t:"To put",p:"MET-teh-reh",e:"📥"},
+    {w:"Pensare",t:"To think",p:"pen-SAH-reh",e:"💭"}, {w:"Credere",t:"To believe",p:"KREH-deh-reh",e:"🙏"},
+    {w:"Portare",t:"To bring",p:"por-TAH-reh",e:"🎒"}, {w:"Vivere",t:"To live",p:"VEE-veh-reh",e:"🌱"},
+    {w:"Tornare",t:"To return",p:"tor-NAH-reh",e:"🔙"}, {w:"Capire",t:"To understand",p:"kah-PEE-reh",e:"💡"},
+    {w:"Arrivare",t:"To arrive",p:"ar-ree-VAH-reh",e:"🏁"}, {w:"Conoscere",t:"To know (people)",p:"koh-NOH-sheh-reh",e:"🤝"},
+    {w:"Ricordare",t:"To remember",p:"ree-kor-DAH-reh",e:"🧾"}, {w:"Chiamare",t:"To call",p:"kyah-MAH-reh",e:"📞"},
+    {w:"Aspettare",t:"To wait",p:"ah-spet-TAH-reh",e:"⏳"}, {w:"Finire",t:"To finish",p:"fee-NEE-reh",e:"🏁"},
+    {w:"Mangiare",t:"To eat",p:"man-JAH-reh",e:"🍽"}, {w:"Bere",t:"To drink",p:"BEH-reh",e:"🥤"},
+    {w:"Dormire",t:"To sleep",p:"dor-MEE-reh",e:"😴"}, {w:"Aprire",t:"To open",p:"ah-PREE-reh",e:"🔓"},
+    {w:"Chiudere",t:"To close",p:"KYOO-deh-reh",e:"🔒"}, {w:"Comprare",t:"To buy",p:"kom-PRAH-reh",e:"🛒"},
+    {w:"Pagare",t:"To pay",p:"pah-GAH-reh",e:"💳"}, {w:"Leggere",t:"To read",p:"LED-jeh-reh",e:"📖"},
+    {w:"Scrivere",t:"To write",p:"SKREE-veh-reh",e:"✍️"}, {w:"Ascoltare",t:"To listen",p:"ah-skol-TAH-reh",e:"🎧"},
+    {w:"Giocare",t:"To play",p:"joh-KAH-reh",e:"🎮"}, {w:"Correre",t:"To run",p:"KOR-reh-reh",e:"🏃"},
+    {w:"Camminare",t:"To walk",p:"kam-mee-NAH-reh",e:"🚶"}, {w:"Aiutare",t:"To help",p:"ah-yoo-TAH-reh",e:"🆘"},
+    {w:"Amare",t:"To love",p:"ah-MAH-reh",e:"❤️"}, {w:"Lavorare",t:"To work",p:"lah-voh-RAH-reh",e:"💼"},
+    {w:"Studiare",t:"To study",p:"stoo-DYAH-reh",e:"📚"}, {w:"Imparare",t:"To learn",p:"eem-pah-RAH-reh",e:"🎓"},
+    {w:"Insegnare",t:"To teach",p:"een-sen-YAH-reh",e:"👩‍🏫"}, {w:"Cominciare",t:"To begin",p:"koh-meen-CHAH-reh",e:"▶️"},
+    {w:"Cercare",t:"To search",p:"cher-KAH-reh",e:"🔎"}, {w:"Usare",t:"To use",p:"oo-ZAH-reh",e:"🛠"},
+    {w:"Chiedere",t:"To ask",p:"KYEH-deh-reh",e:"❓"}, {w:"Rispondere",t:"To answer",p:"ree-SPON-deh-reh",e:"💬"},
+    {w:"Uscire",t:"To go out",p:"oo-SHEE-reh",e:"🚪"}, {w:"Entrare",t:"To enter",p:"en-TRAH-reh",e:"➡️"},
+    {w:"Perdere",t:"To lose",p:"PEHR-deh-reh",e:"🫥"}, {w:"Vincere",t:"To win",p:"VEEN-cheh-reh",e:"🏆"},
+    {w:"Provare",t:"To try",p:"proh-VAH-reh",e:"🎯"}, {w:"Cambiare",t:"To change",p:"kam-BYAH-reh",e:"🔄"},
+    {w:"Io",t:"I",p:"EE-oh",e:"🙋"}, {w:"Tu",t:"You",p:"too",e:"👉"},
+    {w:"Lui",t:"He",p:"LOO-ee",e:"👨"}, {w:"Lei",t:"She",p:"lay",e:"👩"},
+    {w:"Noi",t:"We",p:"noy",e:"👥"}, {w:"Voi",t:"You (plural)",p:"voy",e:"👫"},
+    {w:"Loro",t:"They",p:"LOH-roh",e:"👪"}, {w:"Questo",t:"This",p:"KWES-toh",e:"👇"},
+    {w:"Quello",t:"That",p:"KWEL-loh",e:"👉"}, {w:"Tutto",t:"Everything",p:"TOOT-toh",e:"🌐"},
+    {w:"Niente",t:"Nothing",p:"NYEN-teh",e:"🚫"}, {w:"Qualcosa",t:"Something",p:"kwal-KOH-zah",e:"❔"},
+    {w:"Qualcuno",t:"Someone",p:"kwal-KOO-noh",e:"👤"}, {w:"Nessuno",t:"Nobody",p:"nes-SOO-noh",e:"🙅"},
+    {w:"Molto",t:"A lot/very",p:"MOL-toh",e:"📈"}, {w:"Poco",t:"Little/few",p:"POH-koh",e:"🤏"},
+    {w:"Troppo",t:"Too much",p:"TROP-poh",e:"🛑"}, {w:"Più",t:"More",p:"pyoo",e:"➕"},
+    {w:"Meno",t:"Less",p:"MEH-noh",e:"➖"}, {w:"Anche",t:"Also",p:"AHN-keh",e:"➕"},
+    {w:"Sempre",t:"Always",p:"SEM-preh",e:"♾️"}, {w:"Mai",t:"Never",p:"my",e:"🚫"},
+    {w:"Già",t:"Already",p:"jah",e:"✔️"}, {w:"Ancora",t:"Still/again",p:"ahn-KOH-rah",e:"🔁"},
+    {w:"Adesso",t:"Now",p:"ah-DES-soh",e:"⏱"}, {w:"Dopo",t:"After/later",p:"DOH-poh",e:"⏭"},
+    {w:"Prima",t:"Before/first",p:"PREE-mah",e:"⏮"}, {w:"Qui",t:"Here",p:"kwee",e:"📍"},
+    {w:"Lì",t:"There",p:"lee",e:"🗺"}, {w:"Dove",t:"Where",p:"DOH-veh",e:"🧭"},
+    {w:"Quando",t:"When",p:"KWAN-doh",e:"📅"}, {w:"Perché",t:"Why/because",p:"per-KEH",e:"❓"},
+    {w:"Come",t:"How",p:"KOH-meh",e:"🤔"}, {w:"Chi",t:"Who",p:"kee",e:"👤"},
+    {w:"Cosa",t:"What/thing",p:"KOH-zah",e:"❔"}, {w:"Quale",t:"Which",p:"KWAH-leh",e:"🔀"},
+    {w:"Quanto",t:"How much",p:"KWAN-toh",e:"⚖️"}, {w:"Uno",t:"One",p:"OO-noh",e:"1️⃣"},
+    {w:"Due",t:"Two",p:"DOO-eh",e:"2️⃣"}, {w:"Tre",t:"Three",p:"treh",e:"3️⃣"},
+    {w:"Quattro",t:"Four",p:"KWAT-troh",e:"4️⃣"}, {w:"Cinque",t:"Five",p:"CHEEN-kweh",e:"5️⃣"},
+    {w:"Sei",t:"Six",p:"say",e:"6️⃣"}, {w:"Sette",t:"Seven",p:"SET-teh",e:"7️⃣"},
+    {w:"Otto",t:"Eight",p:"OT-toh",e:"8️⃣"}, {w:"Nove",t:"Nine",p:"NOH-veh",e:"9️⃣"},
+    {w:"Dieci",t:"Ten",p:"DYEH-chee",e:"🔟"}, {w:"Undici",t:"Eleven",p:"OON-dee-chee",e:"🔢"},
+    {w:"Dodici",t:"Twelve",p:"DOH-dee-chee",e:"🔢"}, {w:"Venti",t:"Twenty",p:"VEN-tee",e:"🔢"},
+    {w:"Trenta",t:"Thirty",p:"TREN-tah",e:"🔢"}, {w:"Quaranta",t:"Forty",p:"kwah-RAHN-tah",e:"🔢"},
+    {w:"Cinquanta",t:"Fifty",p:"cheen-KWAN-tah",e:"🔢"}, {w:"Cento",t:"Hundred",p:"CHEN-toh",e:"💯"},
+    {w:"Mille",t:"Thousand",p:"MEEL-leh",e:"🔢"}, {w:"Primo",t:"First",p:"PREE-moh",e:"🥇"},
+    {w:"Secondo",t:"Second",p:"seh-KON-doh",e:"🥈"}, {w:"Ultimo",t:"Last",p:"OOL-tee-moh",e:"🔚"},
+    {w:"Lunedì",t:"Monday",p:"loo-neh-DEE",e:"📅"}, {w:"Martedì",t:"Tuesday",p:"mar-teh-DEE",e:"📅"},
+    {w:"Mercoledì",t:"Wednesday",p:"mer-koh-leh-DEE",e:"📅"}, {w:"Giovedì",t:"Thursday",p:"joh-veh-DEE",e:"📅"},
+    {w:"Venerdì",t:"Friday",p:"veh-ner-DEE",e:"📅"}, {w:"Sabato",t:"Saturday",p:"SAH-bah-toh",e:"📅"},
+    {w:"Domenica",t:"Sunday",p:"doh-MEH-nee-kah",e:"📅"}, {w:"Oggi",t:"Today",p:"OD-jee",e:"📆"},
+    {w:"Domani",t:"Tomorrow",p:"doh-MAH-nee",e:"🌅"}, {w:"Ieri",t:"Yesterday",p:"YEH-ree",e:"🌇"},
+    {w:"Settimana",t:"Week",p:"set-tee-MAH-nah",e:"🗓"}, {w:"Mese",t:"Month",p:"MEH-zeh",e:"🗓"},
+    {w:"Anno",t:"Year",p:"AHN-noh",e:"🎆"}, {w:"Giorno",t:"Day",p:"JOR-noh",e:"☀️"},
+    {w:"Notte",t:"Night",p:"NOT-teh",e:"🌙"}, {w:"Mattina",t:"Morning",p:"mat-TEE-nah",e:"🌄"},
+    {w:"Sera",t:"Evening",p:"SEH-rah",e:"🌆"}, {w:"Ora",t:"Hour/now",p:"OH-rah",e:"🕐"},
+    {w:"Minuto",t:"Minute",p:"mee-NOO-toh",e:"⏱"}, {w:"Gennaio",t:"January",p:"jen-NAH-yoh",e:"❄️"},
+    {w:"Febbraio",t:"February",p:"feb-BRAH-yoh",e:"💘"}, {w:"Marzo",t:"March",p:"MAR-tsoh",e:"🌸"},
+    {w:"Aprile",t:"April",p:"ah-PREE-leh",e:"🌷"}, {w:"Maggio",t:"May",p:"MAD-joh",e:"🌼"},
+    {w:"Giugno",t:"June",p:"JOON-yoh",e:"☀️"}, {w:"Luglio",t:"July",p:"LOOL-yoh",e:"🏖"},
+    {w:"Agosto",t:"August",p:"ah-GOS-toh",e:"🌞"}, {w:"Settembre",t:"September",p:"set-TEM-breh",e:"🍂"},
+    {w:"Ottobre",t:"October",p:"ot-TOH-breh",e:"🎃"}, {w:"Novembre",t:"November",p:"noh-VEM-breh",e:"🌧"},
+    {w:"Dicembre",t:"December",p:"dee-CHEM-breh",e:"🎄"}, {w:"Rosso",t:"Red",p:"ROS-soh",e:"🔴"},
+    {w:"Blu",t:"Blue",p:"bloo",e:"🔵"}, {w:"Verde",t:"Green",p:"VEHR-deh",e:"🟢"},
+    {w:"Giallo",t:"Yellow",p:"JAHL-loh",e:"🟡"}, {w:"Nero",t:"Black",p:"NEH-roh",e:"⚫"},
+    {w:"Bianco",t:"White",p:"BYAHN-koh",e:"⚪"}, {w:"Grigio",t:"Grey",p:"GREE-joh",e:"🩶"},
+    {w:"Marrone",t:"Brown",p:"mar-ROH-neh",e:"🟤"}, {w:"Rosa",t:"Pink",p:"ROH-zah",e:"🌸"},
+    {w:"Arancione",t:"Orange (color)",p:"ah-ran-CHOH-neh",e:"🟠"}, {w:"Viola",t:"Purple",p:"VYOH-lah",e:"🟣"},
+    {w:"Figlio",t:"Son",p:"FEEL-yoh",e:"👦"}, {w:"Figlia",t:"Daughter",p:"FEEL-yah",e:"👧"},
+    {w:"Fratello",t:"Brother",p:"frah-TEL-loh",e:"👬"}, {w:"Sorella",t:"Sister",p:"soh-REL-lah",e:"👭"},
+    {w:"Nonno",t:"Grandfather",p:"NON-noh",e:"👴"}, {w:"Nonna",t:"Grandmother",p:"NON-nah",e:"👵"},
+    {w:"Zio",t:"Uncle",p:"TSEE-oh",e:"👨"}, {w:"Zia",t:"Aunt",p:"TSEE-ah",e:"👩"},
+    {w:"Marito",t:"Husband",p:"mah-REE-toh",e:"🤵"}, {w:"Moglie",t:"Wife",p:"MOHL-yeh",e:"👰"},
+    {w:"Bambino",t:"Child",p:"bam-BEE-noh",e:"👶"}, {w:"Ragazzo",t:"Boy",p:"rah-GAT-tsoh",e:"🧑"},
+    {w:"Ragazza",t:"Girl",p:"rah-GAT-tsah",e:"👧"}, {w:"Uomo",t:"Man",p:"WOH-moh",e:"👨"},
+    {w:"Donna",t:"Woman",p:"DON-nah",e:"👩"}, {w:"Gente",t:"People",p:"JEN-teh",e:"👥"},
+    {w:"Persona",t:"Person",p:"per-SOH-nah",e:"👤"}, {w:"Testa",t:"Head",p:"TES-tah",e:"🗣"},
+    {w:"Occhio",t:"Eye",p:"OK-kyoh",e:"👁"}, {w:"Mano",t:"Hand",p:"MAH-noh",e:"✋"},
+    {w:"Piede",t:"Foot",p:"PYEH-deh",e:"🦶"}, {w:"Cuore",t:"Heart",p:"KWOH-reh",e:"❤️"},
+    {w:"Bocca",t:"Mouth",p:"BOK-kah",e:"👄"}, {w:"Naso",t:"Nose",p:"NAH-zoh",e:"👃"},
+    {w:"Orecchio",t:"Ear",p:"oh-REK-kyoh",e:"👂"}, {w:"Braccio",t:"Arm",p:"BRAT-choh",e:"💪"},
+    {w:"Gamba",t:"Leg",p:"GAM-bah",e:"🦵"}, {w:"Capelli",t:"Hair",p:"kah-PEL-lee",e:"💇"},
+    {w:"Pane",t:"Bread",p:"PAH-neh",e:"🍞"}, {w:"Latte",t:"Milk",p:"LAHT-teh",e:"🥛"},
+    {w:"Vino",t:"Wine",p:"VEE-noh",e:"🍷"}, {w:"Birra",t:"Beer",p:"BEER-rah",e:"🍺"},
+    {w:"Caffè",t:"Coffee",p:"kahf-FEH",e:"☕"}, {w:"Tè",t:"Tea",p:"teh",e:"🍵"},
+    {w:"Carne",t:"Meat",p:"KAR-neh",e:"🥩"}, {w:"Pesce",t:"Fish",p:"PEH-sheh",e:"🐟"},
+    {w:"Pollo",t:"Chicken",p:"POL-loh",e:"🍗"}, {w:"Riso",t:"Rice",p:"REE-zoh",e:"🍚"},
+    {w:"Pasta",t:"Pasta",p:"PAHS-tah",e:"🍝"}, {w:"Formaggio",t:"Cheese",p:"for-MAD-joh",e:"🧀"},
+    {w:"Uovo",t:"Egg",p:"WOH-voh",e:"🥚"}, {w:"Frutta",t:"Fruit",p:"FROOT-tah",e:"🍎"},
+    {w:"Mela",t:"Apple",p:"MEH-lah",e:"🍏"}, {w:"Arancia",t:"Orange (fruit)",p:"ah-RAHN-chah",e:"🍊"},
+    {w:"Banana",t:"Banana",p:"bah-NAH-nah",e:"🍌"}, {w:"Verdura",t:"Vegetables",p:"ver-DOO-rah",e:"🥦"},
+    {w:"Pomodoro",t:"Tomato",p:"poh-moh-DOH-roh",e:"🍅"}, {w:"Patata",t:"Potato",p:"pah-TAH-tah",e:"🥔"},
+    {w:"Insalata",t:"Salad",p:"een-sah-LAH-tah",e:"🥗"}, {w:"Zucchero",t:"Sugar",p:"TSOOK-keh-roh",e:"🍬"},
+    {w:"Sale",t:"Salt",p:"SAH-leh",e:"🧂"}, {w:"Olio",t:"Oil",p:"OH-lyoh",e:"🫒"},
+    {w:"Dolce",t:"Sweet/dessert",p:"DOL-cheh",e:"🍰"}, {w:"Gelato",t:"Ice cream",p:"jeh-LAH-toh",e:"🍨"},
+    {w:"Colazione",t:"Breakfast",p:"koh-lah-TSYOH-neh",e:"🥐"}, {w:"Pranzo",t:"Lunch",p:"PRAHN-tsoh",e:"🍽"},
+    {w:"Cena",t:"Dinner",p:"CHEH-nah",e:"🌙"}, {w:"Ristorante",t:"Restaurant",p:"rees-toh-RAHN-teh",e:"🍴"},
+    {w:"Tavolo",t:"Table",p:"TAH-voh-loh",e:"🪑"}, {w:"Porta",t:"Door",p:"POR-tah",e:"🚪"},
+    {w:"Finestra",t:"Window",p:"fee-NES-trah",e:"🪟"}, {w:"Camera",t:"Room/bedroom",p:"KAH-meh-rah",e:"🛏"},
+    {w:"Cucina",t:"Kitchen",p:"koo-CHEE-nah",e:"🍳"}, {w:"Bagno",t:"Bathroom",p:"BAHN-yoh",e:"🛁"},
+    {w:"Letto",t:"Bed",p:"LET-toh",e:"🛌"}, {w:"Sedia",t:"Chair",p:"SEH-dyah",e:"🪑"},
+    {w:"Chiave",t:"Key",p:"KYAH-veh",e:"🔑"}, {w:"Luce",t:"Light",p:"LOO-cheh",e:"💡"},
+    {w:"Strada",t:"Street/road",p:"STRAH-dah",e:"🛣"}, {w:"Negozio",t:"Shop",p:"neh-GOH-tsyoh",e:"🏪"},
+    {w:"Mercato",t:"Market",p:"mer-KAH-toh",e:"🛍"}, {w:"Scuola",t:"School",p:"SKWOH-lah",e:"🏫"},
+    {w:"Ospedale",t:"Hospital",p:"os-peh-DAH-leh",e:"🏥"}, {w:"Chiesa",t:"Church",p:"KYEH-zah",e:"⛪"},
+    {w:"Banca",t:"Bank",p:"BAHN-kah",e:"🏦"}, {w:"Ufficio",t:"Office",p:"oof-FEE-choh",e:"🏢"},
+    {w:"Stazione",t:"Station",p:"stah-TSYOH-neh",e:"🚉"}, {w:"Aeroporto",t:"Airport",p:"ah-eh-roh-POR-toh",e:"✈️"},
+    {w:"Albergo",t:"Hotel",p:"al-BEHR-goh",e:"🏨"}, {w:"Macchina",t:"Car",p:"MAHK-kee-nah",e:"🚗"},
+    {w:"Treno",t:"Train",p:"TREH-noh",e:"🚆"}, {w:"Autobus",t:"Bus",p:"OW-toh-boos",e:"🚌"},
+    {w:"Aereo",t:"Airplane",p:"ah-EH-reh-oh",e:"🛩"}, {w:"Bicicletta",t:"Bicycle",p:"bee-chee-KLET-tah",e:"🚲"},
+    {w:"Biglietto",t:"Ticket",p:"beel-YET-toh",e:"🎫"}, {w:"Nuovo",t:"New",p:"NWOH-voh",e:"✨"},
+    {w:"Vecchio",t:"Old",p:"VEK-kyoh",e:"🏚"}, {w:"Giovane",t:"Young",p:"JOH-vah-neh",e:"🧒"},
+    {w:"Bello",t:"Beautiful",p:"BEL-loh",e:"😍"}, {w:"Brutto",t:"Ugly",p:"BROOT-toh",e:"🫣"},
+    {w:"Buono",t:"Good (things)",p:"BWOH-noh",e:"👌"}, {w:"Caldo",t:"Hot",p:"KAHL-doh",e:"🔥"},
+    {w:"Freddo",t:"Cold",p:"FRED-doh",e:"🧊"}, {w:"Alto",t:"Tall/high",p:"AHL-toh",e:"📏"},
+    {w:"Basso",t:"Short/low",p:"BAHS-soh",e:"📉"}, {w:"Lungo",t:"Long",p:"LOON-goh",e:"📏"},
+    {w:"Corto",t:"Short (length)",p:"KOR-toh",e:"✂️"}, {w:"Forte",t:"Strong",p:"FOR-teh",e:"💪"},
+    {w:"Debole",t:"Weak",p:"DEH-boh-leh",e:"🪶"}, {w:"Facile",t:"Easy",p:"FAH-chee-leh",e:"🟢"},
+    {w:"Difficile",t:"Difficult",p:"deef-FEE-chee-leh",e:"🔴"}, {w:"Importante",t:"Important",p:"eem-por-TAHN-teh",e:"⭐"},
+    {w:"Giusto",t:"Right/correct",p:"JOOS-toh",e:"✅"}, {w:"Sbagliato",t:"Wrong",p:"zbal-YAH-toh",e:"❌"},
+    {w:"Vero",t:"True",p:"VEH-roh",e:"✔️"}, {w:"Falso",t:"False",p:"FAHL-soh",e:"✖️"},
+    {w:"Pieno",t:"Full",p:"PYEH-noh",e:"🈵"}, {w:"Vuoto",t:"Empty",p:"VWOH-toh",e:"🈳"},
+    {w:"Aperto",t:"Open",p:"ah-PEHR-toh",e:"🔓"}, {w:"Chiuso",t:"Closed",p:"KYOO-zoh",e:"🔒"},
+    {w:"Pulito",t:"Clean",p:"poo-LEE-toh",e:"🧼"}, {w:"Sporco",t:"Dirty",p:"SPOR-koh",e:"🧹"},
+    {w:"Ricco",t:"Rich",p:"REEK-koh",e:"💎"}, {w:"Povero",t:"Poor",p:"POH-veh-roh",e:"🪙"},
+    {w:"Libero",t:"Free",p:"LEE-beh-roh",e:"🕊"}, {w:"Occupato",t:"Busy/occupied",p:"ok-koo-PAH-toh",e:"📵"},
+    {w:"Pronto",t:"Ready",p:"PRON-toh",e:"🚦"}, {w:"Sicuro",t:"Safe/sure",p:"see-KOO-roh",e:"🛡"},
+    {w:"Stesso",t:"Same",p:"STES-soh",e:"🟰"}, {w:"Diverso",t:"Different",p:"dee-VEHR-soh",e:"🔀"},
+    {w:"Caro",t:"Expensive/dear",p:"KAH-roh",e:"💸"}, {w:"Economico",t:"Cheap",p:"eh-koh-NOH-mee-koh",e:"🏷"},
+    {w:"Sole",t:"Sun",p:"SOH-leh",e:"☀️"}, {w:"Luna",t:"Moon",p:"LOO-nah",e:"🌙"},
+    {w:"Stella",t:"Star",p:"STEL-lah",e:"⭐"}, {w:"Cielo",t:"Sky",p:"CHEH-loh",e:"🌤"},
+    {w:"Mare",t:"Sea",p:"MAH-reh",e:"🌊"}, {w:"Montagna",t:"Mountain",p:"mon-TAHN-yah",e:"⛰"},
+    {w:"Fiume",t:"River",p:"FYOO-meh",e:"🏞"}, {w:"Albero",t:"Tree",p:"AHL-beh-roh",e:"🌳"},
+    {w:"Fiore",t:"Flower",p:"FYOH-reh",e:"🌸"}, {w:"Pioggia",t:"Rain",p:"PYOD-jah",e:"🌧"},
+    {w:"Neve",t:"Snow",p:"NEH-veh",e:"❄️"}, {w:"Vento",t:"Wind",p:"VEN-toh",e:"💨"},
+    {w:"Fuoco",t:"Fire",p:"FWOH-koh",e:"🔥"}, {w:"Terra",t:"Earth/ground",p:"TEHR-rah",e:"🌍"},
+    {w:"Aria",t:"Air",p:"AH-ryah",e:"🌬"}, {w:"Vita",t:"Life",p:"VEE-tah",e:"🌱"},
+    {w:"Mondo",t:"World",p:"MON-doh",e:"🌎"}, {w:"Paese",t:"Country/town",p:"pah-EH-zeh",e:"🗺"},
+    {w:"Posto",t:"Place",p:"POS-toh",e:"📍"}, {w:"Parte",t:"Part",p:"PAR-teh",e:"🧩"},
+    {w:"Volta",t:"Time (occasion)",p:"VOL-tah",e:"🔁"}, {w:"Modo",t:"Way/manner",p:"MOH-doh",e:"🛤"},
+    {w:"Nome",t:"Name",p:"NOH-meh",e:"🏷"}, {w:"Parola",t:"Word",p:"pah-ROH-lah",e:"🔤"},
+    {w:"Domanda",t:"Question",p:"doh-MAHN-dah",e:"❓"}, {w:"Risposta",t:"Answer",p:"rees-POS-tah",e:"💬"},
+    {w:"Problema",t:"Problem",p:"proh-BLEH-mah",e:"⚠️"}, {w:"Idea",t:"Idea",p:"ee-DEH-ah",e:"💡"},
+    {w:"Storia",t:"Story/history",p:"STOH-ryah",e:"📜"}, {w:"Musica",t:"Music",p:"MOO-zee-kah",e:"🎵"},
+    {w:"Film",t:"Movie",p:"feelm",e:"🎬"}, {w:"Foto",t:"Photo",p:"FOH-toh",e:"📷"},
+    {w:"Telefono",t:"Telephone",p:"teh-LEH-foh-noh",e:"📱"}, {w:"Gioco",t:"Game",p:"JOH-koh",e:"🎲"},
+    {w:"Sport",t:"Sport",p:"sport",e:"⚽"}, {w:"Calcio",t:"Football/soccer",p:"KAHL-choh",e:"⚽"},
+    {w:"Buongiorno",t:"Good morning",p:"bwon-JOR-noh",e:"🌅"}, {w:"Buonasera",t:"Good evening",p:"bwoh-nah-SEH-rah",e:"🌆"},
+    {w:"Buonanotte",t:"Good night",p:"bwoh-nah-NOT-teh",e:"🌙"}, {w:"Arrivederci",t:"Goodbye",p:"ar-ree-veh-DEHR-chee",e:"👋"},
+    {w:"Scusa",t:"Sorry/excuse me",p:"SKOO-zah",e:"🙇"}, {w:"Prego",t:"You're welcome",p:"PREH-goh",e:"🤲"},
+    {w:"Va bene",t:"Okay/alright",p:"vah BEH-neh",e:"👌"}, {w:"Non lo so",t:"I don't know",p:"non loh soh",e:"🤷"},
+    {w:"Non capisco",t:"I don't understand",p:"non kah-PEES-koh",e:"😕"}, {w:"Quanto costa?",t:"How much is it?",p:"KWAN-toh KOS-tah",e:"💶"},
+    {w:"Dov'è?",t:"Where is it?",p:"doh-VEH",e:"🧭"}, {w:"Che ore sono?",t:"What time is it?",p:"keh OH-reh SOH-noh",e:"🕐"},
+    {w:"Mi chiamo",t:"My name is",p:"mee KYAH-moh",e:"🪪"}, {w:"Piacere",t:"Nice to meet you",p:"pyah-CHEH-reh",e:"🤝"},
+    {w:"Aiuto!",t:"Help!",p:"ah-YOO-toh",e:"🆘"}, {w:"Salute!",t:"Cheers/bless you",p:"sah-LOO-teh",e:"🥂"},
+    {w:"Auguri",t:"Best wishes",p:"ow-GOO-ree",e:"🎉"}, {w:"Benvenuto",t:"Welcome",p:"ben-veh-NOO-toh",e:"🎊"},
+    {w:"A presto",t:"See you soon",p:"ah PRES-toh",e:"👋"}, {w:"Andiamo!",t:"Let's go!",p:"ahn-DYAH-moh",e:"🚀"}
   ],
   de: [
     {w:"Hallo",      t:"Hello",       p:"HAH-loh",        e:"🙋"}, {w:"Danke",      t:"Thank you",   p:"DAHN-keh",       e:"🙏"},
@@ -1439,12 +1773,14 @@ const CONVERSATIONS = {
 
 function shuffle(arr) { return [...arr].sort(()=>Math.random()-0.5); }
 
-function LearningPage() {
+function LearningPage({ darkMode=true }) {
+  const T=THEME(darkMode);
+  const tt=tints(T);
   const [lang, setLang] = useState(()=>load("rslv_lang",""));
   const [history, setHistory] = useState(()=>load("rslv_learn_history",[]));
   const [streak, setStreak] = useState(()=>load("rslv_learn_streak",0));
-  const [screen, setScreen] = useState("home"); // home|pick|session|puzzle|quiz|convo|done
-  const [sessionSize, setSessionSize] = useState(5);
+  const [goal, setGoal] = useState(()=>load("rslv_learn_goal",5));
+  const [screen, setScreen] = useState("home");
   const [sessionWords, setSessionWords] = useState([]);
   const [wordIdx, setWordIdx] = useState(0);
   const [puzzleIdx, setPuzzleIdx] = useState(0);
@@ -1452,21 +1788,24 @@ function LearningPage() {
   const [quizIdx, setQuizIdx] = useState(0);
   const [quizChoices, setQuizChoices] = useState([]);
   const [quizScore, setQuizScore] = useState(0);
-  const [answer, setAnswer] = useState(null); // null|"correct"|"wrong"
+  const [answer, setAnswer] = useState(null);
   const [flipped, setFlipped] = useState(false);
 
   useEffect(()=>{ save("rslv_lang",lang); },[lang]);
   useEffect(()=>{ save("rslv_learn_history",history); },[history]);
+  useEffect(()=>{ save("rslv_learn_goal",goal); },[goal]);
 
   const learnedWords = history.map(h=>h.word);
   const allWords = lang ? WORDS[lang] || [] : [];
   const unlearnedWords = allWords.filter(w=>!learnedWords.includes(w.w));
+  const selectedLang = LANGUAGES.find(l=>l.code===lang);
+  const totalLearned = history.filter(h=>h.lang===lang).length;
+  const learnedToday = history.filter(h=>h.lang===lang&&h.date===TODAY()).length;
 
   const startSession = (size, jumpTo) => {
     const pool = unlearnedWords.length >= size ? unlearnedWords : allWords;
     const words = shuffle(pool).slice(0, size);
     setSessionWords(words);
-    setSessionSize(size);
     setWordIdx(0);
     setFlipped(false);
     if (jumpTo === "puzzle") {
@@ -1490,20 +1829,12 @@ function LearningPage() {
     if (wordIdx < sessionWords.length - 1) { setWordIdx(i=>i+1); setFlipped(false); }
     else startPuzzle();
   };
-
-  const startPuzzle = () => {
-    setPuzzleIdx(0);
-    setAnswer(null);
-    makePuzzleChoices(0);
-    setScreen("puzzle");
-  };
-
+  const startPuzzle = () => { setPuzzleIdx(0); setAnswer(null); makePuzzleChoices(0); setScreen("puzzle"); };
   const makePuzzleChoices = (idx) => {
     const correct = sessionWords[idx];
     const others = shuffle(allWords.filter(w=>w.w!==correct.w)).slice(0,3);
     setPuzzleChoices(shuffle([correct,...others]));
   };
-
   const answerPuzzle = (choice) => {
     if (answer) return;
     const correct = sessionWords[puzzleIdx];
@@ -1515,21 +1846,12 @@ function LearningPage() {
       else startQuiz();
     }, isCorrect ? 600 : 1200);
   };
-
-  const startQuiz = () => {
-    setQuizIdx(0);
-    setQuizScore(0);
-    setAnswer(null);
-    makeQuizChoices(0);
-    setScreen("quiz");
-  };
-
+  const startQuiz = () => { setQuizIdx(0); setQuizScore(0); setAnswer(null); makeQuizChoices(0); setScreen("quiz"); };
   const makeQuizChoices = (idx) => {
     const correct = sessionWords[idx];
     const others = shuffle(allWords.filter(w=>w.w!==correct.w)).slice(0,3);
     setQuizChoices(shuffle([correct,...others]));
   };
-
   const answerQuiz = (choice) => {
     if (answer) return;
     const correct = sessionWords[quizIdx];
@@ -1542,7 +1864,6 @@ function LearningPage() {
       else setScreen("convo");
     }, isCorrect ? 600 : 1200);
   };
-
   const finishSession = () => {
     const today = TODAY();
     const newEntries = sessionWords.map(w=>({word:w.w, lang, date:today}));
@@ -1557,50 +1878,51 @@ function LearningPage() {
     setScreen("done");
   };
 
-  const selectedLang = LANGUAGES.find(l=>l.code===lang);
-  const totalLearned = history.filter(h=>h.lang===lang).length;
-
-  // ── MASCOT SVG ──
   const Mascot = ({ mood="happy", size=80 }) => {
     const faces = {
-      happy:   <><circle cx="35" cy="38" r="6" fill="#1a3028"/><circle cx="65" cy="38" r="6" fill="#1a3028"/><path d="M30 52 Q50 64 70 52" stroke="#1a3028" strokeWidth="3" strokeLinecap="round" fill="none"/></>,
-      excited: <><circle cx="35" cy="36" r="7" fill="#1a3028"/><circle cx="65" cy="36" r="7" fill="#1a3028"/><circle cx="37" cy="34" r="2" fill="white"/><circle cx="67" cy="34" r="2" fill="white"/><path d="M28 52 Q50 68 72 52" stroke="#1a3028" strokeWidth="3.5" strokeLinecap="round" fill="none"/></>,
-      wrong:   <><circle cx="35" cy="40" r="6" fill="#1a3028"/><circle cx="65" cy="40" r="6" fill="#1a3028"/><path d="M30 60 Q50 50 70 60" stroke="#1a3028" strokeWidth="3" strokeLinecap="round" fill="none"/></>,
-      cool:    <><rect x="25" y="34" width="20" height="10" rx="5" fill="#1a3028"/><rect x="55" y="34" width="20" height="10" rx="5" fill="#1a3028"/><path d="M30 54 Q50 66 70 54" stroke="#1a3028" strokeWidth="3" strokeLinecap="round" fill="none"/></>,
+      happy:   <><circle cx="35" cy="38" r="6" fill="#7A2E0E"/><circle cx="65" cy="38" r="6" fill="#7A2E0E"/><path d="M30 52 Q50 64 70 52" stroke="#7A2E0E" strokeWidth="3" strokeLinecap="round" fill="none"/></>,
+      excited: <><circle cx="35" cy="36" r="7" fill="#7A2E0E"/><circle cx="65" cy="36" r="7" fill="#7A2E0E"/><circle cx="37" cy="34" r="2" fill="white"/><circle cx="67" cy="34" r="2" fill="white"/><path d="M28 52 Q50 68 72 52" stroke="#7A2E0E" strokeWidth="3.5" strokeLinecap="round" fill="none"/></>,
+      wrong:   <><circle cx="35" cy="40" r="6" fill="#7A2E0E"/><circle cx="65" cy="40" r="6" fill="#7A2E0E"/><path d="M30 60 Q50 50 70 60" stroke="#7A2E0E" strokeWidth="3" strokeLinecap="round" fill="none"/></>,
+      cool:    <><rect x="25" y="34" width="20" height="10" rx="5" fill="#7A2E0E"/><rect x="55" y="34" width="20" height="10" rx="5" fill="#7A2E0E"/><path d="M30 54 Q50 66 70 54" stroke="#7A2E0E" strokeWidth="3" strokeLinecap="round" fill="none"/></>,
     };
     return (
       <svg width={size} height={size} viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="46" fill="#A8D5C2"/>
-        <circle cx="50" cy="50" r="46" fill="url(#mg)" opacity="0.3"/>
-        <defs><radialGradient id="mg" cx="40%" cy="35%"><stop offset="0%" stopColor="white" stopOpacity="0.6"/><stop offset="100%" stopColor="transparent"/></radialGradient></defs>
-        {/* ears */}
-        <ellipse cx="12" cy="42" rx="10" ry="14" fill="#A8D5C2"/>
-        <ellipse cx="88" cy="42" rx="10" ry="14" fill="#A8D5C2"/>
-        <ellipse cx="12" cy="42" rx="6" ry="9" fill="#C8E6DA"/>
-        <ellipse cx="88" cy="42" rx="6" ry="9" fill="#C8E6DA"/>
-        {/* face */}
+        <circle cx="50" cy="50" r="46" fill="#FFB374"/>
+        <circle cx="50" cy="50" r="46" fill="url(#mg)" opacity="0.35"/>
+        <defs><radialGradient id="mg" cx="40%" cy="35%"><stop offset="0%" stopColor="white" stopOpacity="0.65"/><stop offset="100%" stopColor="transparent"/></radialGradient></defs>
+        <ellipse cx="12" cy="42" rx="10" ry="14" fill="#FFB374"/>
+        <ellipse cx="88" cy="42" rx="10" ry="14" fill="#FFB374"/>
+        <ellipse cx="12" cy="42" rx="6" ry="9" fill="#FFD3AB"/>
+        <ellipse cx="88" cy="42" rx="6" ry="9" fill="#FFD3AB"/>
         {faces[mood]}
-        {/* cheeks */}
-        <circle cx="22" cy="55" r="8" fill="#ff9999" opacity="0.3"/>
-        <circle cx="78" cy="55" r="8" fill="#ff9999" opacity="0.3"/>
+        <circle cx="22" cy="55" r="8" fill="#FF6B6B" opacity="0.28"/>
+        <circle cx="78" cy="55" r="8" fill="#FF6B6B" opacity="0.28"/>
       </svg>
     );
   };
 
-  // ── SCREENS ──
+  const TopBar = ({ pct, right, grad }) => (
+    <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
+      <Chip n="close" c="ink" T={T} size={34} is={15} onClick={()=>setScreen("home")}/>
+      <div style={{ flex:1, height:9, borderRadius:9, background:T.track, overflow:"hidden" }}>
+        <div style={{ height:"100%", borderRadius:9, width:pct+"%", background:grad||GRAD.gr, transition:"width 0.4s ease" }}/>
+      </div>
+      <div style={{ fontSize:12, fontWeight:700, color:T.ink3, fontFamily:FONT, flexShrink:0 }}>{right}</div>
+    </div>
+  );
 
   if (screen==="pick") return (
-    <div style={{ padding:"0 18px 32px", animation:"tabIn 0.25s ease both" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
-        <button onClick={()=>setScreen("home")} style={{ background:"rgba(255,255,255,0.06)", border:"none", borderRadius:10, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:18 }}>‹</button>
-        <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Pick a Language</div>
+    <div style={{ padding:"0 18px 32px", animation:"tabIn 0.25s ease both", fontFamily:FONT }}>
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:22 }}>
+        <Chip n="back" c="ink" T={T} size={36} is={17} onClick={()=>setScreen("home")}/>
+        <div style={{ fontSize:21, fontWeight:800, color:T.ink }}>Pick a language</div>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
         {LANGUAGES.map(l=>(
           <div key={l.code} onClick={()=>{ setLang(l.code); setScreen("home"); }}
-            style={{ background: lang===l.code?"rgba(168,213,194,0.15)":"rgba(255,255,255,0.04)", border: lang===l.code?"1.5px solid rgba(168,213,194,0.4)":"1px solid rgba(255,255,255,0.07)", borderRadius:18, padding:"18px 16px", cursor:"pointer", transition:"all 0.2s", display:"flex", alignItems:"center", gap:12 }}>
-            <div style={{ fontSize:32 }}>{l.flag}</div>
-            <div style={{ fontSize:14, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif" }}>{l.name}</div>
+            style={{ background:T.card, border: lang===l.code?("1.6px solid "+PAL.or):("1px solid "+T.line), borderRadius:18, padding:"16px 14px", cursor:"pointer", display:"flex", alignItems:"center", gap:11, boxShadow:T.shadow }}>
+            <div style={{ fontSize:28, lineHeight:1 }}>{l.flag}</div>
+            <div style={{ fontSize:13.5, fontWeight:700, color:T.ink }}>{l.name}</div>
           </div>
         ))}
       </div>
@@ -1609,50 +1931,32 @@ function LearningPage() {
 
   if (screen==="session") {
     const word = sessionWords[wordIdx];
-    const progress = ((wordIdx)/sessionWords.length)*100;
     return (
-      <div style={{ padding:"0 18px 32px", animation:"tabIn 0.25s ease both" }}>
-        {/* top bar */}
-        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
-          <button onClick={()=>setScreen("home")} style={{ background:"rgba(255,255,255,0.06)", border:"none", borderRadius:10, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.4)", fontSize:18, flexShrink:0 }}>✕</button>
-          <div style={{ flex:1, height:10, borderRadius:10, background:"rgba(255,255,255,0.07)", overflow:"hidden" }}>
-            <div style={{ height:"100%", borderRadius:10, width:`${progress}%`, background:"linear-gradient(90deg,#A8D5C2,#C5B8E8)", transition:"width 0.4s ease" }}/>
-          </div>
-          <div style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", flexShrink:0 }}>{wordIdx+1}/{sessionWords.length}</div>
+      <div style={{ padding:"0 18px 32px", animation:"tabIn 0.25s ease both", fontFamily:FONT }}>
+        <TopBar pct={(wordIdx/sessionWords.length)*100} right={(wordIdx+1)+"/"+sessionWords.length} grad={GRAD.gr}/>
+        <div style={{ textAlign:"center", marginBottom:14 }}>
+          <div style={{ fontSize:11, letterSpacing:"0.14em", color:T.ink3, textTransform:"uppercase", fontWeight:700 }}>Learn this word</div>
         </div>
-
-        {/* label */}
-        <div style={{ textAlign:"center", marginBottom:16 }}>
-          <div style={{ fontSize:12, letterSpacing:"0.15em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:700 }}>Learn this word</div>
-        </div>
-
-        {/* big word card */}
         <div onClick={()=>setFlipped(f=>!f)}
-          style={{ background: flipped ? "linear-gradient(135deg,#1a3d2e,#0f2a1e)" : "linear-gradient(135deg,#1e1a3a,#12141E)", border: flipped?"1.5px solid rgba(168,213,194,0.3)":"1.5px solid rgba(197,184,232,0.2)", borderRadius:28, padding:"36px 24px 32px", textAlign:"center", cursor:"pointer", marginBottom:16, minHeight:280, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:12, transition:"all 0.3s ease", animation:"cardIn 0.35s ease both" }}>
-          {/* giant emoji */}
-          <div style={{ fontSize:96, lineHeight:1, animation:"cardIn 0.4s ease both", filter:"drop-shadow(0 8px 20px rgba(0,0,0,0.3))" }}>{word.e}</div>
-          <div style={{ fontSize:38, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-1px" }}>{word.w}</div>
+          style={{ background:flipped?GRAD.gr:T.card, border:flipped?"none":("1px solid "+T.line), borderRadius:28, padding:"34px 22px 30px", textAlign:"center", cursor:"pointer", marginBottom:14, minHeight:270, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:10, transition:"all 0.3s ease", animation:"cardIn 0.35s ease both", boxShadow:T.shadow }}>
+          <div style={{ fontSize:72, lineHeight:1 }}>{word.e}</div>
+          <div style={{ fontSize:36, fontWeight:800, color:flipped?"#fff":T.ink, letterSpacing:"-0.02em" }}>{word.w}</div>
           {flipped ? (
             <div style={{ animation:"fadeUp 0.25s ease both" }}>
-              <div style={{ fontSize:22, color:"#A8D5C2", fontFamily:"'Sora',sans-serif", fontWeight:700, marginBottom:6 }}>{word.t}</div>
-              <div style={{ fontSize:14, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif", letterSpacing:"0.05em" }}>/{word.p}/</div>
+              <div style={{ fontSize:21, color:"#fff", fontWeight:700, marginBottom:5 }}>{word.t}</div>
+              <div style={{ fontSize:13, color:"rgba(255,255,255,.8)", fontWeight:500, letterSpacing:"0.04em" }}>/{word.p}/</div>
             </div>
           ) : (
-            <div style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", borderRadius:20, background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.08)" }}>
-              <span style={{ fontSize:14 }}>👆</span>
-              <span style={{ fontSize:12, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif" }}>Tap to reveal</span>
+            <div style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 16px", borderRadius:999, background:T.chip }}>
+              <span style={{ fontSize:12, color:T.ink2, fontWeight:600 }}>Tap to reveal</span>
             </div>
           )}
+          <div onClick={e=>{ e.stopPropagation(); speak(word.w, lang); }} style={{ marginTop:4, width:42, height:42, borderRadius:"50%", background:flipped?"rgba(255,255,255,.25)":tt.bl.bg, color:flipped?"#fff":tt.bl.fg, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><Ic n="sound" s={18}/></div>
         </div>
-
-        {/* mascot */}
-        <div style={{ display:"flex", justifyContent:"center", marginBottom:16 }}>
-          <Mascot mood={flipped?"excited":"happy"} size={60}/>
+        <div style={{ display:"flex", justifyContent:"center", marginBottom:14 }}>
+          <Mascot mood={flipped?"excited":"happy"} size={58}/>
         </div>
-
-        <button onClick={nextWord} style={{ width:"100%", padding:"17px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:18, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer", boxShadow:"0 6px 20px rgba(168,213,194,0.25)" }}>
-          {wordIdx < sessionWords.length-1 ? "Got it →" : "Start Puzzle 🧩"}
-        </button>
+        <CTA T={T} onClick={nextWord}>{wordIdx < sessionWords.length-1 ? "Got it" : "Start puzzle"}</CTA>
       </div>
     );
   }
@@ -1660,51 +1964,36 @@ function LearningPage() {
   if (screen==="puzzle") {
     const word = sessionWords[puzzleIdx];
     return (
-      <div style={{ padding:"0 18px 32px", animation:"tabIn 0.25s ease both" }}>
-        {/* top bar */}
-        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
-          <button onClick={()=>setScreen("home")} style={{ background:"rgba(255,255,255,0.06)", border:"none", borderRadius:10, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.4)", fontSize:18, flexShrink:0 }}>✕</button>
-          <div style={{ flex:1, height:10, borderRadius:10, background:"rgba(255,255,255,0.07)", overflow:"hidden" }}>
-            <div style={{ height:"100%", borderRadius:10, width:`${((puzzleIdx+1)/sessionWords.length)*100}%`, background:"linear-gradient(90deg,#FFB347,#FF8C42)", transition:"width 0.4s ease" }}/>
-          </div>
-          <div style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", flexShrink:0 }}>{puzzleIdx+1}/{sessionWords.length}</div>
+      <div style={{ padding:"0 18px 32px", animation:"tabIn 0.25s ease both", fontFamily:FONT }}>
+        <TopBar pct={((puzzleIdx+1)/sessionWords.length)*100} right={(puzzleIdx+1)+"/"+sessionWords.length} grad={GRAD.vi}/>
+        <div style={{ textAlign:"center", marginBottom:6 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:tt.vi.fg, letterSpacing:"0.1em", textTransform:"uppercase" }}>Picture puzzle</div>
+          <div style={{ fontSize:13, color:T.ink2, fontWeight:500, marginTop:3 }}>Which word matches this?</div>
         </div>
-
-        <div style={{ textAlign:"center", marginBottom:8 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,179,71,0.7)", fontFamily:"'Sora',sans-serif", letterSpacing:"0.1em", textTransform:"uppercase" }}>🧩 Picture Puzzle</div>
-          <div style={{ fontSize:14, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif", marginTop:4 }}>Which word matches this?</div>
+        <div style={{ textAlign:"center", margin:"18px 0 24px", animation:"cardIn 0.3s ease both" }}>
+          <div style={{ fontSize:104, lineHeight:1 }}>{word.e}</div>
         </div>
-
-        {/* giant emoji */}
-        <div style={{ textAlign:"center", margin:"20px 0 28px", animation:"cardIn 0.3s ease both" }}>
-          <div style={{ fontSize:110, lineHeight:1, filter:"drop-shadow(0 12px 28px rgba(0,0,0,0.4))" }}>{word.e}</div>
-        </div>
-
-        {/* answer grid */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:11, marginBottom:14 }}>
           {puzzleChoices.map(c=>{
             const isCorrect = c.w===word.w;
             const selected = answer !== null;
-            let bg, border, color;
-            if (!selected) { bg="rgba(255,255,255,0.06)"; border="1.5px solid rgba(255,255,255,0.1)"; color="#fff"; }
-            else if (isCorrect) { bg="rgba(168,213,194,0.2)"; border="2px solid #A8D5C2"; color="#A8D5C2"; }
-            else { bg="rgba(220,80,80,0.1)"; border="1.5px solid rgba(220,80,80,0.2)"; color="rgba(255,255,255,0.3)"; }
+            let bg=T.card, border="1px solid "+T.line, color=T.ink, sub=T.ink3;
+            if (selected && isCorrect) { bg=tints(T).gr.bg; border="2px solid "+PAL.gr; color=tt.gr.fg; sub=tt.gr.fg; }
+            else if (selected) { bg=tints(T).red.bg; border="1px solid transparent"; color=T.ink3; sub=T.ink3; }
             return (
               <div key={c.w} onClick={()=>answerPuzzle(c)}
-                style={{ background:bg, border, borderRadius:20, padding:"18px 12px", textAlign:"center", cursor:selected?"default":"pointer", transition:"all 0.2s", animation:"cardIn 0.3s ease both" }}>
-                <div style={{ fontSize:16, fontWeight:800, color, fontFamily:"'Sora',sans-serif" }}>{c.w}</div>
-                <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:4 }}>{c.t}</div>
+                style={{ background:bg, border, borderRadius:20, padding:"17px 12px", textAlign:"center", cursor:selected?"default":"pointer", transition:"all 0.2s", boxShadow:selected?"none":T.shadow }}>
+                <div style={{ fontSize:15.5, fontWeight:800, color }}>{c.w}</div>
+                <div style={{ fontSize:10.5, color:sub, fontWeight:500, marginTop:3 }}>{c.t}</div>
               </div>
             );
           })}
         </div>
-
-        {/* feedback mascot */}
         {answer && (
-          <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderRadius:18, background: answer==="correct"?"rgba(168,213,194,0.1)":"rgba(220,80,80,0.1)", border: answer==="correct"?"1px solid rgba(168,213,194,0.2)":"1px solid rgba(220,80,80,0.2)", animation:"fadeUp 0.2s ease both" }}>
-            <Mascot mood={answer==="correct"?"excited":"wrong"} size={44}/>
-            <div style={{ fontSize:14, fontWeight:700, color: answer==="correct"?"#A8D5C2":"#ff6b6b", fontFamily:"'Sora',sans-serif" }}>
-              {answer==="correct" ? "🎉 Correct! Well done!" : `❌ It was: ${word.w} (${word.t})`}
+          <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 15px", borderRadius:18, background: answer==="correct"?tints(T).gr.bg:tints(T).red.bg, animation:"fadeUp 0.2s ease both" }}>
+            <Mascot mood={answer==="correct"?"excited":"wrong"} size={42}/>
+            <div style={{ fontSize:13.5, fontWeight:700, color: answer==="correct"?tt.gr.fg:PAL.red }}>
+              {answer==="correct" ? "Correct! Well done." : "It was: "+word.w+" ("+word.t+")"}
             </div>
           </div>
         )}
@@ -1715,49 +2004,35 @@ function LearningPage() {
   if (screen==="quiz") {
     const word = sessionWords[quizIdx];
     return (
-      <div style={{ padding:"0 18px 32px", animation:"tabIn 0.25s ease both" }}>
-        {/* top bar */}
-        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
-          <button onClick={()=>setScreen("home")} style={{ background:"rgba(255,255,255,0.06)", border:"none", borderRadius:10, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.4)", fontSize:18, flexShrink:0 }}>✕</button>
-          <div style={{ flex:1, height:10, borderRadius:10, background:"rgba(255,255,255,0.07)", overflow:"hidden" }}>
-            <div style={{ height:"100%", borderRadius:10, width:`${((quizIdx+1)/sessionWords.length)*100}%`, background:"linear-gradient(90deg,#C5B8E8,#F5DDD0)", transition:"width 0.4s ease" }}/>
-          </div>
-          <div style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", flexShrink:0 }}>{quizScore}✓</div>
+      <div style={{ padding:"0 18px 32px", animation:"tabIn 0.25s ease both", fontFamily:FONT }}>
+        <TopBar pct={((quizIdx+1)/sessionWords.length)*100} right={quizScore+" right"} grad={GRAD.bl}/>
+        <div style={{ textAlign:"center", marginBottom:14 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:tt.bl.fg, letterSpacing:"0.1em", textTransform:"uppercase" }}>Quick quiz</div>
+          <div style={{ fontSize:13, color:T.ink2, fontWeight:500, marginTop:3 }}>What does this mean?</div>
         </div>
-
-        <div style={{ textAlign:"center", marginBottom:16 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:"rgba(197,184,232,0.7)", fontFamily:"'Sora',sans-serif", letterSpacing:"0.1em", textTransform:"uppercase" }}>⚡ Quick Q&A</div>
-          <div style={{ fontSize:14, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif", marginTop:4 }}>What does this mean?</div>
+        <div style={{ background:GRAD.bl, borderRadius:26, padding:"34px 22px", textAlign:"center", marginBottom:20, animation:"cardIn 0.3s ease both" }}>
+          <div style={{ fontSize:13, color:"rgba(255,255,255,.85)", fontWeight:600, marginBottom:8 }}>{selectedLang && (selectedLang.flag+" "+selectedLang.name)}</div>
+          <div style={{ fontSize:42, fontWeight:800, color:"#fff", letterSpacing:"-0.02em" }}>{word.w}</div>
+          <div onClick={()=>speak(word.w, lang)} style={{ margin:"14px auto 0", width:42, height:42, borderRadius:"50%", background:"rgba(255,255,255,.25)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><Ic n="sound" s={18}/></div>
         </div>
-
-        {/* word display */}
-        <div style={{ background:"linear-gradient(135deg,#1e1a3a,#12141E)", border:"1.5px solid rgba(197,184,232,0.2)", borderRadius:26, padding:"40px 24px", textAlign:"center", marginBottom:24, animation:"cardIn 0.3s ease both" }}>
-          <div style={{ fontSize:18, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:10 }}>{selectedLang?.flag} {selectedLang?.name}</div>
-          <div style={{ fontSize:46, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-1.5px" }}>{word.w}</div>
-          <div style={{ fontSize:24, marginTop:12 }}>{word.e}</div>
-        </div>
-
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:11, marginBottom:14 }}>
           {quizChoices.map(c=>{
             const isCorrect = c.w===word.w;
             const selected = answer !== null;
-            let bg, border, color;
-            if (!selected) { bg="rgba(255,255,255,0.06)"; border="1.5px solid rgba(255,255,255,0.1)"; color="#fff"; }
-            else if (isCorrect) { bg="rgba(168,213,194,0.2)"; border="2px solid #A8D5C2"; color="#A8D5C2"; }
-            else { bg="rgba(220,80,80,0.1)"; border="1.5px solid rgba(220,80,80,0.2)"; color="rgba(255,255,255,0.3)"; }
+            let bg=T.card, border="1px solid "+T.line, color=T.ink;
+            if (selected && isCorrect) { bg=tints(T).gr.bg; border="2px solid "+PAL.gr; color=tt.gr.fg; }
+            else if (selected) { bg=tints(T).red.bg; border="1px solid transparent"; color=T.ink3; }
             return (
               <div key={c.w} onClick={()=>answerQuiz(c)}
-                style={{ background:bg, border, borderRadius:20, padding:"18px 12px", textAlign:"center", cursor:selected?"default":"pointer", transition:"all 0.2s" }}>
-                <div style={{ fontSize:15, fontWeight:700, color, fontFamily:"'Sora',sans-serif" }}>{c.t}</div>
+                style={{ background:bg, border, borderRadius:20, padding:"17px 12px", textAlign:"center", cursor:selected?"default":"pointer", transition:"all 0.2s", boxShadow:selected?"none":T.shadow }}>
+                <div style={{ fontSize:14.5, fontWeight:700, color }}>{c.t}</div>
               </div>
             );
           })}
         </div>
-
-        {/* dots */}
         <div style={{ display:"flex", justifyContent:"center", gap:6 }}>
           {sessionWords.map((_,i)=>(
-            <div key={i} style={{ width:i===quizIdx?20:8, height:8, borderRadius:8, background: i<quizIdx?"#A8D5C2":i===quizIdx?"#C5B8E8":"rgba(255,255,255,0.1)", transition:"all 0.3s" }}/>
+            <div key={i} style={{ width:i===quizIdx?20:8, height:8, borderRadius:8, background: i<quizIdx?PAL.gr:i===quizIdx?PAL.bl:T.track, transition:"all 0.3s" }}/>
           ))}
         </div>
       </div>
@@ -1767,206 +2042,181 @@ function LearningPage() {
   if (screen==="convo") {
     const convoFn = CONVERSATIONS[lang];
     const lines = convoFn ? convoFn(sessionWords).split("\n") : [];
+    const hlColor = tt.gr.fg;
     return (
-      <div style={{ padding:"0 18px 32px", animation:"tabIn 0.25s ease both" }}>
-        <div style={{ textAlign:"center", marginBottom:20 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:"rgba(168,213,194,0.6)", fontFamily:"'Sora',sans-serif", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>💬 Mini Conversation</div>
-          <div style={{ fontSize:14, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif" }}>Your words used in real life</div>
+      <div style={{ padding:"0 18px 32px", animation:"tabIn 0.25s ease both", fontFamily:FONT }}>
+        <div style={{ textAlign:"center", marginBottom:18 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:tt.gr.fg, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:3 }}>Mini conversation</div>
+          <div style={{ fontSize:13, color:T.ink2, fontWeight:500 }}>Your words used in real life</div>
         </div>
-
-        {/* highlighted words row */}
-        <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:20, justifyContent:"center" }}>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:18, justifyContent:"center" }}>
           {sessionWords.map(w=>(
-            <div key={w.w} style={{ padding:"5px 12px", borderRadius:20, background:"rgba(168,213,194,0.1)", border:"1px solid rgba(168,213,194,0.2)" }}>
-              <span style={{ fontSize:12, fontWeight:800, color:"#A8D5C2", fontFamily:"'Sora',sans-serif" }}>{w.e} {w.w}</span>
+            <div key={w.w} onClick={()=>speak(w.w,lang)} style={{ padding:"6px 13px", borderRadius:999, background:tints(T).gr.bg, cursor:"pointer" }}>
+              <span style={{ fontSize:12, fontWeight:700, color:tt.gr.fg }}>{w.w}</span>
             </div>
           ))}
         </div>
-
-        <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:24 }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:22 }}>
           {lines.filter(l=>l.trim()).map((line,i)=>{
             const isLeft = i%2===0;
             const text = line.replace("— ","");
-            const highlighted = sessionWords.reduce((acc,w)=>acc.replace(new RegExp(`\\b${w.w}\\b`,"g"),`<strong style="color:#A8D5C2">${w.w}</strong>`),text);
+            const highlighted = sessionWords.reduce((acc,w)=>acc.replace(new RegExp("\\b"+w.w+"\\b","g"),'<strong style="color:'+hlColor+'">'+w.w+"</strong>"),text);
             return (
-              <div key={i} style={{ display:"flex", justifyContent:isLeft?"flex-start":"flex-end", animation:`fadeUp 0.4s ease ${i*0.08}s both` }}>
-                {isLeft && <div style={{ fontSize:24, marginRight:8, alignSelf:"flex-end" }}>{selectedLang?.flag}</div>}
-                <div style={{ maxWidth:"78%", background:isLeft?"rgba(168,213,194,0.08)":"rgba(197,184,232,0.08)", border:isLeft?"1px solid rgba(168,213,194,0.15)":"1px solid rgba(197,184,232,0.15)", borderRadius:isLeft?"20px 20px 20px 4px":"20px 20px 4px 20px", padding:"13px 16px" }}>
-                  <div style={{ fontSize:14, color:"rgba(255,255,255,0.85)", fontFamily:"'Sora',sans-serif", lineHeight:1.55 }} dangerouslySetInnerHTML={{__html:highlighted}}/>
+              <div key={i} style={{ display:"flex", justifyContent:isLeft?"flex-start":"flex-end", alignItems:"flex-end", gap:8, animation:"fadeUp 0.4s ease "+(i*0.08)+"s both" }}>
+                {isLeft && <div style={{ fontSize:20 }}>{selectedLang && selectedLang.flag}</div>}
+                <div style={{ maxWidth:"78%", background:isLeft?T.card:tints(T).bl.bg, border:isLeft?("1px solid "+T.line):"none", borderRadius:isLeft?"20px 20px 20px 5px":"20px 20px 5px 20px", padding:"12px 15px", boxShadow:isLeft?T.shadow:"none" }}>
+                  <div style={{ fontSize:13.5, color:T.ink, fontWeight:500, lineHeight:1.55 }} dangerouslySetInnerHTML={{__html:highlighted}}/>
                 </div>
-                {!isLeft && <div style={{ fontSize:24, marginLeft:8, alignSelf:"flex-end" }}>🙂</div>}
+                {!isLeft && <Chip n="user" c="bl" T={T} size={26} is={13} style={{ borderRadius:"50%" }}/>}
               </div>
             );
           })}
         </div>
-
-        <button onClick={finishSession} style={{ width:"100%", padding:"17px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:18, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer", boxShadow:"0 6px 20px rgba(168,213,194,0.25)" }}>
-          Complete Session ✓
-        </button>
+        <CTA T={T} onClick={finishSession}>Complete Session</CTA>
       </div>
     );
   }
 
   if (screen==="done") return (
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"calc(100vh - 180px)", padding:"0 24px", textAlign:"center", animation:"tabIn 0.3s ease both" }}>
-      {/* celebration */}
-      <div style={{ marginBottom:8, animation:"cardIn 0.5s ease both" }}>
-        <Mascot mood="excited" size={100}/>
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"calc(100vh - 220px)", padding:"0 22px", textAlign:"center", animation:"tabIn 0.3s ease both", fontFamily:FONT }}>
+      <div style={{ marginBottom:10, animation:"cardIn 0.5s ease both" }}><Mascot mood="excited" size={96}/></div>
+      <div style={{ fontSize:26, fontWeight:800, color:T.ink, marginBottom:6, letterSpacing:"-0.01em" }}>Session complete!</div>
+      <div style={{ fontSize:13.5, color:T.ink2, fontWeight:500, marginBottom:24, lineHeight:1.6 }}>
+        You learned <strong style={{color:tt.gr.fg}}>{sessionWords.length} {selectedLang && selectedLang.name} words</strong>.<br/>Every word is a step forward.
       </div>
-      <div style={{ fontSize:46, marginBottom:4, animation:"cardIn 0.4s ease 0.1s both" }}>🎉</div>
-      <div style={{ fontSize:28, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:6, letterSpacing:"-0.5px" }}>Session Complete!</div>
-      <div style={{ fontSize:14, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif", marginBottom:28, lineHeight:1.6 }}>
-        You learned <strong style={{color:"#A8D5C2"}}>{sessionWords.length} {selectedLang?.name} words</strong>.<br/>Every word is a step forward.
+      <div style={{ display:"flex", gap:10, marginBottom:24, width:"100%" }}>
+        {[[sessionWords.length,"today","gr"],[totalLearned,"total","bl"],[streak,"day streak","am"]].map(([v,l,c],i)=>(
+          <div key={i} style={{ flex:1, background:tints(T)[c].bg, borderRadius:20, padding:"15px 8px" }}>
+            <div style={{ fontSize:26, fontWeight:800, color:tints(T)[c].fg, lineHeight:1 }}>{v}</div>
+            <div style={{ fontSize:9.5, color:T.ink3, fontWeight:600, marginTop:4 }}>{l}</div>
+          </div>
+        ))}
       </div>
-
-      {/* stats */}
-      <div style={{ display:"flex", gap:10, marginBottom:28, width:"100%" }}>
-        <div style={{ flex:1, background:"rgba(168,213,194,0.08)", border:"1px solid rgba(168,213,194,0.15)", borderRadius:20, padding:"16px 10px" }}>
-          <div style={{ fontSize:28, fontWeight:800, color:"#A8D5C2", fontFamily:"'Sora',sans-serif", lineHeight:1 }}>{sessionWords.length}</div>
-          <div style={{ fontSize:10, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:4 }}>today</div>
-        </div>
-        <div style={{ flex:1, background:"rgba(197,184,232,0.08)", border:"1px solid rgba(197,184,232,0.15)", borderRadius:20, padding:"16px 10px" }}>
-          <div style={{ fontSize:28, fontWeight:800, color:"#C5B8E8", fontFamily:"'Sora',sans-serif", lineHeight:1 }}>{totalLearned+sessionWords.length}</div>
-          <div style={{ fontSize:10, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:4 }}>total</div>
-        </div>
-        <div style={{ flex:1, background:"rgba(255,179,71,0.08)", border:"1px solid rgba(255,179,71,0.15)", borderRadius:20, padding:"16px 10px" }}>
-          <div style={{ fontSize:28, fontWeight:800, color:"#FFB347", fontFamily:"'Sora',sans-serif", lineHeight:1 }}>{streak}🔥</div>
-          <div style={{ fontSize:10, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:4 }}>streak</div>
-        </div>
-      </div>
-
-      <button onClick={()=>setScreen("home")} style={{ width:"100%", padding:"17px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:18, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer", boxShadow:"0 6px 20px rgba(168,213,194,0.25)" }}>
-        Back to Learning
-      </button>
+      <CTA T={T} onClick={()=>setScreen("home")}>Back to Learning</CTA>
     </div>
   );
 
-  // ── HOME SCREEN ──
+  const todayList = history.filter(h=>h.lang===lang&&h.date===TODAY());
   return (
-    <div style={{ padding:"0 18px 32px" }}>
-
-      {/* header */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20, animation:"fadeUp 0.4s ease both" }}>
+    <div style={{ padding:"0 18px 32px", fontFamily:FONT }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16, animation:"fadeUp 0.4s ease both" }}>
         <div>
-          <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:600, marginBottom:5 }}>Language Learning</div>
-          <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px" }}>Let's learn 🧠</div>
+          <div style={{ fontSize:26, fontWeight:800, color:T.ink, letterSpacing:"-0.02em" }}>Learning</div>
+          <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, marginTop:2 }}>{allWords.length>0 ? allWords.length+" words in "+(selectedLang?selectedLang.name:"") : "1,000+ words per language"}</div>
         </div>
-        <button onClick={()=>setScreen("pick")} style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, padding:"9px 14px", cursor:"pointer", color:"rgba(255,255,255,0.7)", fontSize:13, fontFamily:"'Sora',sans-serif", fontWeight:700, display:"flex", alignItems:"center", gap:6 }}>
-          {selectedLang ? <>{selectedLang.flag} {selectedLang.name}</> : "🌍 Pick"}
-        </button>
+        <div onClick={()=>setScreen("pick")} style={{ display:"flex", alignItems:"center", gap:7, background:T.card, border:"1px solid "+T.line, borderRadius:999, padding:"8px 12px 8px 10px", cursor:"pointer", boxShadow:T.shadow }}>
+          <span style={{ fontSize:17, lineHeight:1 }}>{selectedLang?selectedLang.flag:""}</span>
+          {!selectedLang && <Ic n="globe" s={16} style={{ color:tt.bl.fg }}/>}
+          <span style={{ fontSize:12.5, fontWeight:700, color:T.ink }}>{selectedLang?selectedLang.name:"Pick"}</span>
+          <Ic n="chev" s={13} style={{ color:T.ink3 }}/>
+        </div>
       </div>
 
       {!lang ? (
-        <div onClick={()=>setScreen("pick")} style={{ padding:"52px 24px", textAlign:"center", background:"linear-gradient(135deg,rgba(168,213,194,0.07),rgba(197,184,232,0.07))", borderRadius:28, border:"1.5px dashed rgba(255,255,255,0.1)", cursor:"pointer", animation:"fadeUp 0.4s ease 0.1s both" }}>
-          <div style={{ fontSize:72, marginBottom:14, filter:"drop-shadow(0 8px 20px rgba(0,0,0,0.3))" }}>🌍</div>
-          <div style={{ fontSize:20, fontWeight:800, color:"rgba(255,255,255,0.7)", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>Choose your language</div>
-          <div style={{ fontSize:13, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif", lineHeight:1.6 }}>10 languages available<br/>5 words a day is all you need</div>
+        <div onClick={()=>setScreen("pick")} style={{ padding:"46px 22px", textAlign:"center", background:T.card, borderRadius:26, border:"1.5px dashed "+T.dashed, cursor:"pointer", animation:"fadeUp 0.4s ease 0.1s both" }}>
+          <div style={{ display:"flex", justifyContent:"center", marginBottom:12 }}><Chip n="globe" c="bl" T={T} size={62} is={30}/></div>
+          <div style={{ fontSize:19, fontWeight:800, color:T.ink, marginBottom:6 }}>Choose your language</div>
+          <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, lineHeight:1.6 }}>10 languages available.<br/>{goal} words a day is all you need.</div>
         </div>
       ) : (
         <>
-          {/* mascot + streak hero */}
-          <div style={{ background:"linear-gradient(135deg,#1a2e28,#12141E)", border:"1px solid rgba(168,213,194,0.15)", borderRadius:26, padding:"20px", marginBottom:16, display:"flex", alignItems:"center", gap:16, animation:"fadeUp 0.4s ease 0.04s both" }}>
-            <Mascot mood={streak>0?"cool":"happy"} size={72}/>
+          <div style={{ background:GRAD.gr, borderRadius:26, padding:"18px", marginBottom:12, animation:"fadeUp 0.4s ease 0.04s both" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+              <Mascot mood={streak>0?"cool":"happy"} size={62}/>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:10.5, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"rgba(255,255,255,.85)" }}>Daily goal</div>
+                <div style={{ fontSize:21, fontWeight:800, color:"#fff", marginTop:2 }}>{Math.min(learnedToday,goal)} of {goal} words</div>
+              </div>
+              <div style={{ textAlign:"center", background:"rgba(255,255,255,.2)", borderRadius:16, padding:"8px 13px" }}>
+                <div style={{ fontSize:18, fontWeight:800, color:"#fff", lineHeight:1 }}>{streak}</div>
+                <div style={{ fontSize:8.5, fontWeight:700, color:"rgba(255,255,255,.85)", marginTop:2 }}>DAY STREAK</div>
+              </div>
+            </div>
+            <div style={{ height:7, borderRadius:6, background:"rgba(255,255,255,.28)", overflow:"hidden", marginTop:12 }}>
+              <div style={{ height:"100%", width:Math.min(100,(learnedToday/goal)*100)+"%", background:"#fff", borderRadius:6, transition:"width .4s" }}/>
+            </div>
+          </div>
+
+          <div style={{ display:"flex", gap:8, marginBottom:14, animation:"fadeUp 0.4s ease 0.08s both" }}>
+            {[5,10,15].map(n=>(
+              <div key={n} onClick={()=>setGoal(n)} style={{ flex:1, textAlign:"center", background:goal===n?(darkMode?"#fff":PAL.ink):T.card, color:goal===n?(darkMode?PAL.ink:"#fff"):T.ink2, border:"1px solid "+(goal===n?"transparent":T.line), borderRadius:14, padding:"9px 0", fontSize:11.5, fontWeight:700, cursor:"pointer", boxShadow:T.shadow }}>{n} / day</div>
+            ))}
+          </div>
+
+          <div style={{ background:T.card, border:"1px solid "+T.line, borderRadius:24, padding:"16px", marginBottom:11, display:"flex", alignItems:"center", gap:13, boxShadow:T.shadow, animation:"fadeUp 0.4s ease 0.12s both" }}>
+            <Chip n="book" c="gr" T={T} size={46} is={22}/>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>
-                {streak===0 ? "Start your streak today!" : `${streak} day streak — don't break it!`}
-              </div>
-              <div style={{ display:"flex", gap:8 }}>
-                <div style={{ padding:"6px 12px", borderRadius:12, background:"rgba(255,179,71,0.12)", border:"1px solid rgba(255,179,71,0.2)" }}>
-                  <span style={{ fontSize:14 }}>🔥</span>
-                  <span style={{ fontSize:14, fontWeight:800, color:"#FFB347", fontFamily:"'Sora',sans-serif", marginLeft:4 }}>{streak}</span>
-                </div>
-                <div style={{ padding:"6px 12px", borderRadius:12, background:"rgba(168,213,194,0.12)", border:"1px solid rgba(168,213,194,0.2)" }}>
-                  <span style={{ fontSize:14 }}>📚</span>
-                  <span style={{ fontSize:14, fontWeight:800, color:"#A8D5C2", fontFamily:"'Sora',sans-serif", marginLeft:4 }}>{totalLearned}</span>
-                </div>
-              </div>
+              <div style={{ fontSize:15.5, fontWeight:800, color:T.ink }}>Learn new words</div>
+              <div style={{ fontSize:11.5, color:T.ink2, fontWeight:500, marginTop:2 }}>Flip cards · hear it · remember</div>
+            </div>
+            <div onClick={()=>startSession(goal)} style={{ background:GRAD.gr, color:"#fff", borderRadius:999, padding:"10px 17px", fontSize:12.5, fontWeight:800, cursor:"pointer" }}>Start</div>
+          </div>
+
+          <div style={{ background:T.card, border:"1px solid "+T.line, borderRadius:24, padding:"16px", marginBottom:11, display:"flex", alignItems:"center", gap:13, boxShadow:T.shadow, animation:"fadeUp 0.4s ease 0.16s both" }}>
+            <Chip n="puzzle" c="vi" T={T} size={46} is={22}/>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:15.5, fontWeight:800, color:T.ink }}>Picture puzzle</div>
+              <div style={{ fontSize:11.5, color:T.ink2, fontWeight:500, marginTop:2 }}>See the picture · pick the word</div>
+            </div>
+            <div onClick={()=>startSession(goal,"puzzle")} style={{ background:GRAD.vi, color:"#fff", borderRadius:999, padding:"10px 17px", fontSize:12.5, fontWeight:800, cursor:"pointer" }}>Play</div>
+          </div>
+
+          <div style={{ background:T.card, border:"1px solid "+T.line, borderRadius:24, padding:"16px", marginBottom:16, display:"flex", alignItems:"center", gap:13, boxShadow:T.shadow, animation:"fadeUp 0.4s ease 0.2s both" }}>
+            <Chip n="target" c="bl" T={T} size={46} is={22}/>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:15.5, fontWeight:800, color:T.ink }}>Test yourself</div>
+              <div style={{ fontSize:11.5, color:T.ink2, fontWeight:500, marginTop:2 }}>Word shown · pick the meaning</div>
+            </div>
+            <div onClick={()=>startSession(goal,"quiz")} style={{ background:GRAD.bl, color:"#fff", borderRadius:999, padding:"10px 17px", fontSize:12.5, fontWeight:800, cursor:"pointer" }}>Quiz</div>
+          </div>
+
+          <div style={{ display:"flex", gap:10, marginBottom:16, animation:"fadeUp 0.4s ease 0.22s both" }}>
+            <div style={{ flex:1, background:tints(T).am.bg, borderRadius:18, padding:"13px 10px", display:"flex", alignItems:"center", gap:9 }}>
+              <Ic n="flame" s={18} style={{ color:tt.am.fg }}/>
+              <div><div style={{ fontSize:16, fontWeight:800, color:tt.am.fg, lineHeight:1 }}>{streak}</div><div style={{ fontSize:9, color:T.ink3, fontWeight:600, marginTop:2 }}>day streak</div></div>
+            </div>
+            <div style={{ flex:1, background:tints(T).gr.bg, borderRadius:18, padding:"13px 10px", display:"flex", alignItems:"center", gap:9 }}>
+              <Ic n="book" s={18} style={{ color:tt.gr.fg }}/>
+              <div><div style={{ fontSize:16, fontWeight:800, color:tt.gr.fg, lineHeight:1 }}>{totalLearned}</div><div style={{ fontSize:9, color:T.ink3, fontWeight:600, marginTop:2 }}>words learned</div></div>
             </div>
           </div>
 
-          {/* CARD 1 — Daily Words */}
-          <div style={{ borderRadius:26, marginBottom:14, animation:"fadeUp 0.4s ease 0.1s both", overflow:"hidden", position:"relative" }}>
-            <div style={{ background:"linear-gradient(135deg,#1B4332,#2D6A4F)", padding:"22px 20px 18px" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
-                <div>
-                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(212,237,218,0.7)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>📖 Daily Words</div>
-                  <div style={{ fontSize:24, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px" }}>Learn New Words</div>
-                  <div style={{ fontSize:13, color:"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif", marginTop:4 }}>Flip cards · see emoji · remember</div>
-                </div>
-                <div style={{ fontSize:56, filter:"drop-shadow(0 6px 14px rgba(0,0,0,0.4))", lineHeight:1 }}>📗</div>
+          {todayList.length > 0 && (
+            <>
+              <SecHead T={T} mt={0}>Learned today · {todayList.length}</SecHead>
+              <div style={{ display:"flex", flexDirection:"column", gap:7, marginBottom:14 }}>
+                {todayList.slice(0,10).map((h,i)=>{
+                  const wd = allWords.find(w=>w.w===h.word);
+                  return (
+                    <div key={i} style={{ display:"flex", alignItems:"center", gap:11, padding:"10px 13px", background:T.card, border:"1px solid "+T.line, borderRadius:15, boxShadow:T.shadow }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <span style={{ fontSize:13, fontWeight:700, color:T.ink }}>{h.word}</span>
+                        {wd && <span style={{ fontSize:11.5, color:T.ink3, fontWeight:500 }}> · {wd.t}</span>}
+                      </div>
+                      <div onClick={()=>speak(h.word, lang)} style={{ width:30, height:30, borderRadius:"50%", background:tints(T).bl.bg, color:tt.bl.fg, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><Ic n="sound" s={13}/></div>
+                    </div>
+                  );
+                })}
               </div>
-              {/* size picker */}
-              <div style={{ display:"flex", gap:8 }}>
-                {[5,10,15].map(n=>(
-                  <div key={n} onClick={()=>startSession(n)}
-                    style={{ flex:1, background:"rgba(255,255,255,0.12)", border:"1.5px solid rgba(255,255,255,0.2)", borderRadius:18, padding:"14px 8px", textAlign:"center", cursor:"pointer", transition:"all 0.2s", backdropFilter:"blur(4px)" }}>
-                    <div style={{ fontSize:22, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", lineHeight:1 }}>{n}</div>
-                    <div style={{ fontSize:10, color:"rgba(255,255,255,0.6)", fontFamily:"'Sora',sans-serif", marginTop:3 }}>words</div>
-                    <div style={{ fontSize:9, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif" }}>~{n}min</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+            </>
+          )}
 
-          {/* CARD 2 — Picture Puzzle */}
-          <div onClick={()=>startSession(5,"puzzle")} style={{ borderRadius:26, marginBottom:14, animation:"fadeUp 0.4s ease 0.16s both", overflow:"hidden", cursor:"pointer" }}>
-            <div style={{ background:"linear-gradient(135deg,#4A1B6D,#7B2D8B)", padding:"22px 20px" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                <div>
-                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(230,200,255,0.7)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>🧩 Picture Puzzle</div>
-                  <div style={{ fontSize:24, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px" }}>Match the Emoji</div>
-                  <div style={{ fontSize:13, color:"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif", marginTop:4, marginBottom:14 }}>See emoji · pick the right word</div>
-                  <div style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"10px 18px", borderRadius:20, background:"rgba(255,255,255,0.15)", border:"1.5px solid rgba(255,255,255,0.25)" }}>
-                    <span style={{ fontSize:13, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>▶ Play now</span>
-                  </div>
-                </div>
-                <div style={{ fontSize:64, filter:"drop-shadow(0 8px 20px rgba(0,0,0,0.5))", lineHeight:1 }}>🧩</div>
-              </div>
-            </div>
-          </div>
-
-          {/* CARD 3 — Quick Q&A */}
-          <div style={{ borderRadius:26, marginBottom:16, animation:"fadeUp 0.4s ease 0.22s both", overflow:"hidden" }}>
-            <div style={{ background:"linear-gradient(135deg,#7A3B00,#B85C00)", padding:"22px 20px 18px" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
-                <div>
-                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,220,150,0.7)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>⚡ Quick Q&A</div>
-                  <div style={{ fontSize:24, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px" }}>Test Yourself</div>
-                  <div style={{ fontSize:13, color:"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif", marginTop:4 }}>Word shown · pick translation</div>
-                </div>
-                <div style={{ fontSize:56, filter:"drop-shadow(0 6px 14px rgba(0,0,0,0.4))", lineHeight:1 }}>⚡</div>
-              </div>
-              <div style={{ display:"flex", gap:8 }}>
-                {[5,10,15].map(n=>(
-                  <div key={n} onClick={()=>startSession(n,"quiz")}
-                    style={{ flex:1, background:"rgba(255,255,255,0.12)", border:"1.5px solid rgba(255,255,255,0.2)", borderRadius:18, padding:"12px 8px", textAlign:"center", cursor:"pointer", transition:"all 0.2s" }}>
-                    <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", lineHeight:1 }}>{n}Q</div>
-                    <div style={{ fontSize:9, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", marginTop:3 }}>~{n}min</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* history strip */}
           {history.filter(h=>h.lang===lang).length > 0 && (
-            <div style={{ animation:"fadeUp 0.4s ease 0.28s both" }}>
-              <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:10 }}>Recently Learned</div>
+            <>
+              <SecHead T={T} mt={0}>Recently learned</SecHead>
               <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-                {history.filter(h=>h.lang===lang).slice(0,12).map((h,i)=>(
-                  <div key={i} style={{ padding:"5px 12px", borderRadius:20, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)" }}>
-                    <span style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif" }}>{h.word}</span>
+                {history.filter(h=>h.lang===lang).slice(0,14).map((h,i)=>(
+                  <div key={i} onClick={()=>speak(h.word, lang)} style={{ padding:"6px 13px", borderRadius:999, background:T.card, border:"1px solid "+T.line, cursor:"pointer", boxShadow:T.shadow }}>
+                    <span style={{ fontSize:12, fontWeight:600, color:T.ink2 }}>{h.word}</span>
                   </div>
                 ))}
               </div>
-            </div>
+            </>
           )}
         </>
       )}
     </div>
   );
-
 }
 
 /* ─────────────────────────────────────────────
@@ -2758,7 +3008,7 @@ const TABS = [
   { id:"fitness",   label:"Fitness",   Icon: Icons.Fitness   },
   { id:"learning",  label:"Learning",  Icon: Icons.Learning  },
   { id:"finance",   label:"Finance",   Icon: Icons.Finance   },
-  { id:"community", label:"Community", Icon: Icons.Community },
+  // { id:"community", label:"Community", Icon: Icons.Community, upcoming:true },  // removed from bottom nav — restore this line to bring it back
   { id:"profile",   label:"Profile",   Icon: ()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> },
 ];
 
@@ -2772,135 +3022,96 @@ const MEALS = [
   { key:"snacks",    label:"Snacks",    emoji:"🍎", hint:"100-200 kcal" },
 ];
 
-function MacroBar({ label, consumed, limit, color }) {
-  const pct = limit > 0 ? Math.min(100, (consumed/limit)*100) : 0;
-  const over = consumed > limit && limit > 0;
-  return (
-    <div style={{ flex:1 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-        <span style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif" }}>{label}</span>
-        <span style={{ fontSize:10, fontWeight:700, color: over?"#ff6b6b":color, fontFamily:"'Sora',sans-serif" }}>{Math.round(consumed)}/{limit}g</span>
-      </div>
-      <div style={{ height:6, borderRadius:6, background:"rgba(255,255,255,0.07)", overflow:"hidden" }}>
-        <div style={{ height:"100%", borderRadius:6, width:`${pct}%`, background: over?"#ff6b6b":color, transition:"width 0.4s ease" }}/>
-      </div>
-    </div>
-  );
-}
-
-function GoalsModal({ goals, onSave, onClose }) {
+function GoalsModal({ goals, onSave, onClose, T }) {
   const [vals, setVals] = useState({...goals});
   const set = (k,v) => setVals(p=>({...p,[k]:parseInt(v)||0}));
+  const rows=[
+    {k:"calories", label:"Calories (kcal)", ph:"e.g. 2000"},
+    {k:"protein",  label:"Protein (g)",     ph:"e.g. 150"},
+    {k:"carbs",    label:"Carbs (g)",       ph:"e.g. 250"},
+    {k:"fat",      label:"Fat (g)",         ph:"e.g. 65"},
+    {k:"water",    label:"Water (ml)",      ph:"e.g. 2500"},
+  ];
   return (
-    <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:22 }}>
-          <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Daily Goals</div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)" }}><Icons.Close/></button>
-        </div>
-        {[
-          {k:"calories", label:"🔥 Calories (kcal)", placeholder:"e.g. 2000"},
-          {k:"protein",  label:"🥩 Protein (g)",     placeholder:"e.g. 150"},
-          {k:"carbs",    label:"🍞 Carbs (g)",        placeholder:"e.g. 250"},
-          {k:"fat",      label:"🧈 Fat (g)",           placeholder:"e.g. 65"},
-          {k:"water",    label:"💧 Water (ml)",        placeholder:"e.g. 2000"},
-        ].map(({k,label,placeholder})=>(
-          <div key={k} style={{ marginBottom:14 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>{label}</div>
-            <input type="number" value={vals[k]||""} onChange={e=>set(k,e.target.value)} placeholder={placeholder}
-              style={{ width:"100%", padding:"12px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:12, color:"#fff", fontSize:15, fontFamily:"'Sora',sans-serif", fontWeight:700, outline:"none" }}/>
-          </div>
-        ))}
-        <button onClick={()=>{onSave(vals);onClose();}} style={{ width:"100%", padding:"15px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer", marginTop:8 }}>
-          Save Goals
-        </button>
+    <Sheet T={T} onClose={onClose}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT }}>Daily Goals</div>
+        <Chip n="close" c="ink" T={T} size={36} is={16} onClick={onClose}/>
       </div>
-    </div>
+      {rows.map(({k,label,ph})=>(
+        <Field key={k} T={T} label={label}>
+          <input type="number" value={vals[k]||""} onChange={e=>set(k,e.target.value)} placeholder={ph} style={inputStyle(T)}/>
+        </Field>
+      ))}
+      <CTA T={T} onClick={()=>{onSave(vals);onClose();}} style={{ marginTop:4 }}>Save Goals</CTA>
+    </Sheet>
   );
 }
 
-function ServingModal({ food, meal, onAdd, onClose }) {
+function ServingModal({ food, meal, onAdd, onClose, T }) {
   const [grams, setGrams] = useState("100");
   const [servings, setServings] = useState("1");
-  const [mode, setMode] = useState("grams"); // grams | servings
+  const [mode, setMode] = useState("grams");
   const per100 = food.nutriments || {};
   const factor = mode==="grams" ? (parseFloat(grams)||0)/100 : (parseFloat(servings)||0);
   const cal  = Math.round((per100["energy-kcal_100g"]||per100["energy-kcal"]||0) * factor);
   const prot = Math.round((per100["proteins_100g"]||per100.proteins||0) * factor * 10)/10;
   const carb = Math.round((per100["carbohydrates_100g"]||per100.carbohydrates||0) * factor * 10)/10;
   const fat  = Math.round((per100["fat_100g"]||per100.fat||0) * factor * 10)/10;
-
   const submit = () => {
     onAdd({ id:Date.now().toString(), name:food.product_name||food.name, meal, grams: mode==="grams"?parseFloat(grams):parseFloat(servings)*100, cal, prot, carb, fat, date:TODAY() });
     onClose();
   };
-
+  const tt=tints(T);
+  const MM=MEALMETA[meal]||MEALMETA.lunch;
+  const box=(l,v,fg)=>(
+    <div style={{ background:T.chip, borderRadius:14, padding:"11px 6px", textAlign:"center" }}>
+      <div style={{ fontSize:15, fontWeight:800, color:fg, fontFamily:FONT, lineHeight:1 }}>{v}</div>
+      <div style={{ fontSize:9, color:T.ink3, fontFamily:FONT, fontWeight:600, marginTop:3 }}>{l}</div>
+    </div>);
+  const qc=(list,val,setter)=>(
+    <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
+      {list.map(g=>(
+        <div key={g} onClick={()=>setter(String(g))} style={{ padding:"6px 13px", borderRadius:999, background: val===String(g)?tints(T).or.bg:T.chip, outline: val===String(g)?("1.5px solid "+PAL.or):"none", cursor:"pointer", fontSize:12, fontWeight:700, color: val===String(g)?PAL.or:T.ink2, fontFamily:FONT }}>{typeof g==="number"&&list[0]===25?g+"g":g+"x"}</div>
+      ))}
+    </div>);
   return (
-    <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 20px" }}/>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
-          <div style={{ fontSize:16, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", flex:1, paddingRight:12 }}>{food.product_name||food.name}</div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)", flexShrink:0 }}><Icons.Close/></button>
-        </div>
-
-        {/* macro preview */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:20 }}>
-          {[{l:"🔥 Cal",v:cal,c:"#FFB347"},{l:"🥩 Prot",v:`${prot}g`,c:"#F5DDD0"},{l:"🍞 Carb",v:`${carb}g`,c:"#C8E6DA"},{l:"🧈 Fat",v:`${fat}g`,c:"#D8D0F0"}].map(({l,v,c})=>(
-            <div key={l} style={{ background:"rgba(255,255,255,0.04)", borderRadius:14, padding:"12px 8px", textAlign:"center", border:`1px solid ${c}25` }}>
-              <div style={{ fontSize:16, fontWeight:800, color:c, fontFamily:"'Sora',sans-serif", lineHeight:1 }}>{v}</div>
-              <div style={{ fontSize:9, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginTop:3 }}>{l}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* mode toggle */}
-        <div style={{ display:"flex", gap:8, marginBottom:16 }}>
-          {["grams","servings"].map(m=>(
-            <button key={m} onClick={()=>setMode(m)} style={{ flex:1, padding:"10px", borderRadius:12, background:mode===m?"rgba(168,213,194,0.15)":"rgba(255,255,255,0.05)", border:mode===m?"1.5px solid rgba(168,213,194,0.4)":"1px solid rgba(255,255,255,0.08)", color:mode===m?"#A8D5C2":"rgba(255,255,255,0.4)", fontSize:13, fontWeight:700, fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>
-              {m==="grams"?"By Grams":"By Servings"}
-            </button>
-          ))}
-        </div>
-
-        {mode==="grams" ? (
-          <div style={{ marginBottom:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>GRAMS</div>
-            <input autoFocus type="number" value={grams} onChange={e=>setGrams(e.target.value)} placeholder="100"
-              style={{ width:"100%", padding:"14px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:24, fontFamily:"'Sora',sans-serif", fontWeight:800, outline:"none" }}/>
-            <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
-              {[25,50,75,100,150,200].map(g=>(
-                <div key={g} onClick={()=>setGrams(String(g))} style={{ padding:"5px 12px", borderRadius:10, background: grams===String(g)?"rgba(168,213,194,0.15)":"rgba(255,255,255,0.05)", border: grams===String(g)?"1px solid rgba(168,213,194,0.3)":"1px solid rgba(255,255,255,0.08)", cursor:"pointer", fontSize:12, fontWeight:700, color: grams===String(g)?"#A8D5C2":"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif" }}>{g}g</div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div style={{ marginBottom:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>SERVINGS</div>
-            <input autoFocus type="number" value={servings} onChange={e=>setServings(e.target.value)} placeholder="1"
-              style={{ width:"100%", padding:"14px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:24, fontFamily:"'Sora',sans-serif", fontWeight:800, outline:"none" }}/>
-            <div style={{ display:"flex", gap:6, marginTop:8 }}>
-              {[0.5,1,1.5,2,3].map(s=>(
-                <div key={s} onClick={()=>setServings(String(s))} style={{ padding:"5px 12px", borderRadius:10, background: servings===String(s)?"rgba(168,213,194,0.15)":"rgba(255,255,255,0.05)", border: servings===String(s)?"1px solid rgba(168,213,194,0.3)":"1px solid rgba(255,255,255,0.08)", cursor:"pointer", fontSize:12, fontWeight:700, color: servings===String(s)?"#A8D5C2":"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif" }}>{s}x</div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif", marginBottom:16, textAlign:"center" }}>Adding to {MEALS.find(m=>m.key===meal)?.emoji} {MEALS.find(m=>m.key===meal)?.label}</div>
-
-        <button onClick={submit} style={{ width:"100%", padding:"15px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer" }}>
-          Add to Log
-        </button>
+    <Sheet T={T} onClose={onClose}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <div style={{ fontSize:17, fontWeight:800, color:T.ink, fontFamily:FONT, flex:1, paddingRight:12, lineHeight:1.25 }}>{food.product_name||food.name}</div>
+        <Chip n="close" c="ink" T={T} size={36} is={16} onClick={onClose}/>
       </div>
-    </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:18 }}>
+        {box("Cal",cal,tt.or.fg)}{box("Prot",prot+"g",tt.ro.fg)}{box("Carb",carb+"g",tt.am.fg)}{box("Fat",fat+"g",tt.vi.fg)}
+      </div>
+      <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+        {["grams","servings"].map(m=>(
+          <button key={m} onClick={()=>setMode(m)} style={{ flex:1, padding:"10px", borderRadius:14, background:mode===m?tints(T).or.bg:T.chip, border:mode===m?("1.5px solid "+PAL.or):"1px solid transparent", color:mode===m?PAL.or:T.ink2, fontSize:12.5, fontWeight:700, fontFamily:FONT, cursor:"pointer" }}>
+            {m==="grams"?"By Grams":"By Servings"}
+          </button>
+        ))}
+      </div>
+      {mode==="grams" ? (
+        <Field T={T} label="Grams">
+          <input autoFocus type="number" value={grams} onChange={e=>setGrams(e.target.value)} placeholder="100" style={inputStyle(T,true)}/>
+          {qc([25,50,75,100,150,200],grams,setGrams)}
+        </Field>
+      ) : (
+        <Field T={T} label="Servings">
+          <input autoFocus type="number" value={servings} onChange={e=>setServings(e.target.value)} placeholder="1" style={inputStyle(T,true)}/>
+          {qc([0.5,1,1.5,2,3],servings,setServings)}
+        </Field>
+      )}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:7, marginBottom:14 }}>
+        <Chip n={MM.icon} c={MM.c} T={T} size={24} is={12} style={{ borderRadius:"50%" }}/>
+        <span style={{ fontSize:11.5, color:T.ink3, fontFamily:FONT, fontWeight:600 }}>Adding to {(MEALS.find(m=>m.key===meal)||{}).label}</span>
+      </div>
+      <CTA T={T} onClick={submit}>Add to Log</CTA>
+    </Sheet>
   );
 }
 
-function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false }) {
+function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false, T }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -2909,9 +3120,7 @@ function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const rafRef = useRef(null);
-  const canvasRef = useRef(null);
 
-  // Food search via Open Food Facts
   const search = async (q) => {
     if (!q.trim()) return;
     setLoading(true);
@@ -2928,7 +3137,6 @@ function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false }) {
     setLoading(false);
   };
 
-  // Barcode lookup by number
   const lookupBarcode = async (code) => {
     if (!code.trim()) return;
     setLoading(true);
@@ -2945,7 +3153,6 @@ function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false }) {
     setLoading(false);
   };
 
-  // Camera scanner using native BarcodeDetector API (supported on modern Chrome/Safari)
   const startScanner = async () => {
     setScanning(true);
     setResults([]);
@@ -2953,8 +3160,6 @@ function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false }) {
       const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment", width:{ ideal:1280 }, height:{ ideal:720 } } });
       streamRef.current = stream;
       if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
-
-      // Try native BarcodeDetector first (Chrome/Safari 17+)
       if ("BarcodeDetector" in window) {
         const detector = new window.BarcodeDetector({ formats:["ean_13","ean_8","upc_a","upc_e","code_128","code_39"] });
         const scan = async () => {
@@ -2971,7 +3176,6 @@ function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false }) {
         };
         rafRef.current = requestAnimationFrame(scan);
       } else {
-        // Fallback: show manual barcode input
         setScanning(false);
         alert("Camera scanning not supported on this browser. Please type the barcode number manually below.");
       }
@@ -2989,61 +3193,60 @@ function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false }) {
 
   useEffect(()=>{ if(startWithScan) startScanner(); return ()=>stopScanner(); }, []);
 
+  const tt=tints(T);
   return (
     <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"88vh", display:"flex", flexDirection:"column" }}>
-        <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 20px" }}/>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-          <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Add Food</div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)" }}><Icons.Close/></button>
+      <div onClick={onClose} style={{ position:"absolute", inset:0, background:T.overlay, backdropFilter:"blur(3px)" }}/>
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:T.sheet, borderRadius:"30px 30px 0 0", padding:"18px 20px 40px", animation:"sheetUp 0.3s ease both", maxHeight:"90vh", display:"flex", flexDirection:"column", boxShadow:T.dark?"none":"0 -8px 40px rgba(23,24,28,.12)" }}>
+        <div style={{ width:38, height:4, borderRadius:3, background:T.line2, margin:"0 auto 16px", flexShrink:0 }}/>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+          <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT }}>Add Food</div>
+          <Chip n="close" c="ink" T={T} size={36} is={16} onClick={onClose}/>
         </div>
 
-        {/* camera view */}
         {scanning && (
-          <div style={{ marginBottom:16, borderRadius:20, overflow:"hidden", position:"relative", background:"#000" }}>
+          <div style={{ marginBottom:14, borderRadius:20, overflow:"hidden", position:"relative", background:"#000", flexShrink:0 }}>
             <video ref={videoRef} autoPlay playsInline muted style={{ width:"100%", borderRadius:20, display:"block", maxHeight:200, objectFit:"cover" }}/>
             <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", pointerEvents:"none" }}>
-              <div style={{ width:200, height:80, border:"2px solid #A8D5C2", borderRadius:8, boxShadow:"0 0 0 1000px rgba(0,0,0,0.4)" }}/>
+              <div style={{ width:200, height:80, border:"2px solid "+PAL.or2, borderRadius:10, boxShadow:"0 0 0 1000px rgba(0,0,0,0.4)" }}/>
             </div>
-            <button onClick={stopScanner} style={{ position:"absolute", top:10, right:10, background:"rgba(0,0,0,0.7)", border:"none", borderRadius:10, padding:"6px 14px", color:"#fff", fontSize:12, fontFamily:"'Sora',sans-serif", fontWeight:700, cursor:"pointer" }}>✕ Stop</button>
-            <div style={{ position:"absolute", bottom:10, left:0, right:0, textAlign:"center", fontSize:11, color:"rgba(255,255,255,0.6)", fontFamily:"'Sora',sans-serif" }}>Point camera at barcode</div>
+            <button onClick={stopScanner} style={{ position:"absolute", top:10, right:10, background:"rgba(0,0,0,0.7)", border:"none", borderRadius:999, padding:"7px 14px", color:"#fff", fontSize:12, fontFamily:FONT, fontWeight:700, cursor:"pointer" }}>Stop</button>
+            <div style={{ position:"absolute", bottom:10, left:0, right:0, textAlign:"center", fontSize:11, color:"rgba(255,255,255,0.75)", fontFamily:FONT, fontWeight:600 }}>Point camera at barcode</div>
           </div>
         )}
 
-        {/* search row */}
-        <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-          <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&search(query)} placeholder="Search food e.g. chicken, pasta..."
-            style={{ flex:1, padding:"13px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:14, fontFamily:"'Sora',sans-serif", outline:"none" }}/>
-          <button onClick={()=>search(query)} style={{ padding:"0 16px", background:"rgba(168,213,194,0.15)", border:"1px solid rgba(168,213,194,0.25)", borderRadius:14, color:"#A8D5C2", fontSize:13, fontWeight:700, fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>Go</button>
-          <button onClick={()=>scanning?stopScanner():startScanner()} style={{ padding:"0 14px", background: scanning?"rgba(255,107,107,0.15)":"rgba(255,179,71,0.15)", border: scanning?"1px solid rgba(255,107,107,0.3)":"1px solid rgba(255,179,71,0.25)", borderRadius:14, color: scanning?"#ff6b6b":"#FFB347", fontSize:18, cursor:"pointer" }}>📷</button>
+        <div style={{ display:"flex", gap:8, marginBottom:9, flexShrink:0 }}>
+          <div style={{ flex:1, display:"flex", alignItems:"center", gap:8, background:T.input, borderRadius:14, padding:"0 12px" }}>
+            <Ic n="search" s={16} style={{ color:T.ink3 }}/>
+            <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&search(query)} placeholder="Search food e.g. chicken, pasta..."
+              style={{ flex:1, padding:"13px 0", background:"none", border:"none", color:T.ink, fontSize:13.5, fontWeight:600, fontFamily:FONT, outline:"none" }}/>
+          </div>
+          <button onClick={()=>search(query)} style={{ padding:"0 16px", background:GRAD.or, border:"none", borderRadius:14, color:"#fff", fontSize:13, fontWeight:700, fontFamily:FONT, cursor:"pointer" }}>Go</button>
+          <button onClick={()=>scanning?stopScanner():startScanner()} style={{ width:46, background:scanning?tt.red.bg:T.chip, border:"none", borderRadius:14, color:scanning?PAL.red:T.ink, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><Ic n="cam" s={19}/></button>
         </div>
 
-        {/* manual barcode input */}
-        <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+        <div style={{ display:"flex", gap:8, marginBottom:12, flexShrink:0 }}>
           <input value={barcodeInput} onChange={e=>setBarcodeInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&lookupBarcode(barcodeInput)} placeholder="Or type barcode number..."
-            style={{ flex:1, padding:"11px 16px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, color:"rgba(255,255,255,0.7)", fontSize:13, fontFamily:"'Sora',sans-serif", outline:"none" }}/>
-          <button onClick={()=>lookupBarcode(barcodeInput)} style={{ padding:"0 14px", background:"rgba(255,179,71,0.1)", border:"1px solid rgba(255,179,71,0.2)", borderRadius:14, color:"#FFB347", fontSize:12, fontWeight:700, fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>Lookup</button>
+            style={{ flex:1, padding:"11px 14px", background:T.input, border:"none", borderRadius:14, color:T.ink, fontSize:12.5, fontWeight:600, fontFamily:FONT, outline:"none" }}/>
+          <button onClick={()=>lookupBarcode(barcodeInput)} style={{ padding:"0 14px", background:tt.am.bg, border:"none", borderRadius:14, color:tt.am.fg, fontSize:12, fontWeight:700, fontFamily:FONT, cursor:"pointer" }}>Lookup</button>
         </div>
 
-        {/* results */}
-        <div style={{ overflowY:"auto", flex:1 }}>
+        <div style={{ overflowY:"auto", flex:1, minHeight:0 }}>
           {loading && (
-            <div style={{ textAlign:"center", padding:"28px", color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", fontSize:13 }}>
-              <div style={{ fontSize:24, marginBottom:8 }}>🔍</div>
+            <div style={{ textAlign:"center", padding:"28px", color:T.ink3, fontFamily:FONT, fontSize:13, fontWeight:600 }}>
+              <div style={{ display:"flex", justifyContent:"center", marginBottom:8 }}><Ic n="search" s={26}/></div>
               Searching...
             </div>
           )}
           {!loading && results.length===0 && query && (
-            <div style={{ textAlign:"center", padding:"28px", color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif", fontSize:13, lineHeight:1.6 }}>
-              <div style={{ fontSize:24, marginBottom:8 }}>😕</div>
+            <div style={{ textAlign:"center", padding:"28px", color:T.ink3, fontFamily:FONT, fontSize:13, fontWeight:500, lineHeight:1.6 }}>
               No results for "{query}"<br/>
               <span style={{fontSize:11}}>Try a different name or use the barcode</span>
             </div>
           )}
           {!loading && results.length===0 && !query && (
-            <div style={{ textAlign:"center", padding:"28px", color:"rgba(255,255,255,0.15)", fontFamily:"'Sora',sans-serif", fontSize:13, lineHeight:1.7 }}>
-              <div style={{ fontSize:32, marginBottom:8 }}>🍽️</div>
+            <div style={{ textAlign:"center", padding:"28px", color:T.ink3, fontFamily:FONT, fontSize:13, fontWeight:500, lineHeight:1.7 }}>
+              <div style={{ display:"flex", justifyContent:"center", marginBottom:8 }}><Ic n="fork" s={28}/></div>
               Search any food above<br/>
               <span style={{fontSize:11}}>or scan / type a barcode</span>
             </div>
@@ -3053,18 +3256,18 @@ function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false }) {
               const n = p.nutriments||{};
               const cal = Math.round(n["energy-kcal_100g"]||n["energy-kcal"]||0);
               return (
-                <div key={i} onClick={()=>onSelect(p)} style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 14px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:16, cursor:"pointer", transition:"all 0.15s" }}>
+                <div key={i} onClick={()=>onSelect(p)} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 13px", background:T.card, border:"1px solid "+T.line, borderRadius:16, cursor:"pointer", boxShadow:T.shadow }}>
                   {p.image_small_url
-                    ? <img src={p.image_small_url} alt="" style={{ width:42, height:42, borderRadius:10, objectFit:"cover", flexShrink:0 }}/>
-                    : <div style={{ width:42, height:42, borderRadius:10, background:"rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>🍽️</div>
+                    ? <img src={p.image_small_url} alt="" style={{ width:42, height:42, borderRadius:12, objectFit:"cover", flexShrink:0 }}/>
+                    : <Chip n="fork" c="am" T={T} size={42} is={19}/>
                   }
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,255,255,0.9)", fontFamily:"'Sora',sans-serif", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.product_name}</div>
-                    <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>
-                      🔥{cal} · P:{Math.round(n["proteins_100g"]||0)}g · C:{Math.round(n["carbohydrates_100g"]||0)}g · F:{Math.round(n["fat_100g"]||0)}g
+                    <div style={{ fontSize:13, fontWeight:700, color:T.ink, fontFamily:FONT, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.product_name}</div>
+                    <div style={{ fontSize:10.5, color:T.ink3, fontFamily:FONT, fontWeight:500, marginTop:2 }}>
+                      {cal} kcal · P:{Math.round(n["proteins_100g"]||0)}g · C:{Math.round(n["carbohydrates_100g"]||0)}g · F:{Math.round(n["fat_100g"]||0)}g
                     </div>
                   </div>
-                  <div style={{ fontSize:16, color:"rgba(255,255,255,0.2)" }}>›</div>
+                  <Ic n="chev" s={16} style={{ color:T.ink3 }}/>
                 </div>
               );
             })}
@@ -3075,7 +3278,8 @@ function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false }) {
   );
 }
 
-function FitnessPage({ onModalChange=()=>{} }) {
+function FitnessPage({ onModalChange=()=>{}, darkMode=true }) {
+  const T=THEME(darkMode);
   const defaultGoals = { calories:2000, protein:150, carbs:250, fat:65, water:2000 };
   const [goals, setGoals]   = useState(()=>load("rslv_fit_goals", defaultGoals));
   const [log, setLog]       = useState(()=>{ const s=load("rslv_fit_log",{date:"",entries:[]}); return s.date===TODAY()?s.entries:[]; });
@@ -3084,113 +3288,114 @@ function FitnessPage({ onModalChange=()=>{} }) {
   const [addingMeal, setAddingMeal] = useState(null);
   const [selectedFood, setSelectedFood] = useState(null);
   const [quickScan, setQuickScan] = useState(false);
-
   const openModal  = (fn) => { onModalChange(true);  fn(); };
   const closeModal = (fn) => { onModalChange(false); fn(); };
-
   useEffect(()=>{ save("rslv_fit_goals",goals); },[goals]);
   useEffect(()=>{ save("rslv_fit_log",{date:TODAY(),entries:log}); },[log]);
   useEffect(()=>{ save("rslv_fit_water",{date:TODAY(),ml:water}); },[water]);
-
   const addFood  = (entry) => setLog(p=>[...p, entry]);
   const delFood  = (id)    => setLog(p=>p.filter(e=>e.id!==id));
   const addWater = (ml)    => setWater(p=>Math.max(0,p+ml));
-
   const totals = log.reduce((a,e)=>({ cal:a.cal+e.cal, prot:a.prot+e.prot, carb:a.carb+e.carb, fat:a.fat+e.fat }),{cal:0,prot:0,carb:0,fat:0});
   const calPct = goals.calories > 0 ? Math.min(100,(totals.cal/goals.calories)*100) : 0;
   const calOver = totals.cal > goals.calories && goals.calories > 0;
   const waterPct = goals.water > 0 ? Math.min(100,(water/goals.water)*100) : 0;
-
+  const tt=tints(T);
+  const mac=(label,c,lim)=>{ const left=Math.round((lim-c)*10)/10; return (
+    <div style={{ textAlign:"center", flex:1 }}>
+      <div style={{ fontSize:10.5, fontWeight:600, color:"rgba(255,255,255,.85)" }}>{label}</div>
+      <div style={{ fontSize:15, fontWeight:800, color:"#fff", marginTop:1 }}>{Math.round(c*10)/10}g</div>
+      <div style={{ fontSize:8.5, fontWeight:600, color:"rgba(255,255,255,.8)", marginTop:1 }}>{left>=0?("of "+lim+"g · "+left+" left"):("of "+lim+"g · "+Math.abs(left)+" over")}</div>
+    </div>);};
   return (
-    <div style={{ padding:"0 18px 32px" }}>
-      {/* header */}
-      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:20, animation:"fadeUp 0.4s ease both" }}>
+    <div style={{ padding:"0 18px 32px", fontFamily:FONT }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, animation:"fadeUp .4s ease both" }}>
         <div>
-          <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:600, marginBottom:5 }}>YOUR BODY</div>
-          <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px" }}>Fitness 💪</div>
+          <div style={{ fontSize:26, fontWeight:800, color:T.ink, letterSpacing:"-0.02em" }}>Fitness</div>
+          <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, marginTop:2 }}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
         </div>
-        <div style={{ display:"flex", gap:8 }}>
-          <button onClick={()=>openModal(()=>{ setQuickScan(true); setAddingMeal("breakfast"); })} style={{ background:"rgba(255,179,71,0.12)", border:"1px solid rgba(255,179,71,0.25)", borderRadius:12, padding:"8px 14px", cursor:"pointer", color:"#FFB347", fontSize:18 }}>📷</button>
-          <button onClick={()=>openModal(()=>setShowGoals(true))} style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:12, padding:"8px 14px", cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:12, fontFamily:"'Sora',sans-serif", fontWeight:700 }}>⚙ Goals</button>
-        </div>
-      </div>
-
-      {/* calorie summary card */}
-      <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:24, padding:"20px", marginBottom:14, animation:"fadeUp 0.4s ease 0.05s both" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:10 }}>
-          <div>
-            <div style={{ fontSize:11, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:600, marginBottom:3 }}>Calories Today</div>
-            <div style={{ fontSize:36, fontWeight:800, color: calOver?"#ff6b6b":"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-1.5px", lineHeight:1 }}>{Math.round(totals.cal)}</div>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>of {goals.calories} kcal goal</div>
-          </div>
-          <div style={{ textAlign:"right" }}>
-            <div style={{ fontSize:22, fontWeight:800, color: calOver?"#ff6b6b":"#A8D5C2", fontFamily:"'Sora',sans-serif" }}>{Math.round(goals.calories - totals.cal)}</div>
-            <div style={{ fontSize:10, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif" }}>{calOver?"over":"remaining"}</div>
-          </div>
-        </div>
-        <div style={{ height:10, borderRadius:10, background:"rgba(255,255,255,0.07)", overflow:"hidden", marginBottom:14 }}>
-          <div style={{ height:"100%", borderRadius:10, width:`${calPct}%`, background: calOver?"#ff6b6b":"linear-gradient(90deg,#A8D5C2,#C5B8E8)", transition:"width 0.4s ease" }}/>
-        </div>
-        {/* macro bars */}
         <div style={{ display:"flex", gap:10 }}>
-          <MacroBar label="Protein" consumed={totals.prot} limit={goals.protein} color="#F5DDD0"/>
-          <MacroBar label="Carbs"   consumed={totals.carb} limit={goals.carbs}   color="#C8E6DA"/>
-          <MacroBar label="Fat"     consumed={totals.fat}  limit={goals.fat}     color="#D8D0F0"/>
+          <div onClick={()=>openModal(()=>{ setQuickScan(true); setAddingMeal("breakfast"); })} style={{ width:46, height:46, borderRadius:"50%", background:darkMode?"#fff":PAL.ink, color:darkMode?PAL.ink:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><Ic n="cam" s={20}/></div>
+          <div onClick={()=>openModal(()=>setShowGoals(true))} style={{ width:46, height:46, borderRadius:"50%", background:T.card, border:"1px solid "+T.line, color:T.ink, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", boxShadow:T.shadow }}><Ic n="gear" s={20}/></div>
         </div>
       </div>
 
-      {/* water */}
-      <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:20, padding:"16px 18px", marginBottom:18, animation:"fadeUp 0.4s ease 0.1s both" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif" }}>💧 Water</div>
-          <div style={{ fontSize:13, fontWeight:800, color:"#C8DFF0", fontFamily:"'Sora',sans-serif" }}>{water}ml <span style={{color:"rgba(255,255,255,0.25)",fontWeight:400}}>/ {goals.water}ml</span></div>
+      <div style={{ background:T.card, border:"1px solid "+T.line, borderRadius:26, padding:"16px 18px", marginBottom:12, display:"flex", alignItems:"center", gap:16, boxShadow:T.shadow, animation:"fadeUp .4s ease .05s both" }}>
+        <Ring pct={calPct} size={106} T={T} over={calOver}>
+          <div style={{ fontSize:21, fontWeight:800, letterSpacing:"-0.02em", lineHeight:1, color:calOver?PAL.red:T.ink, fontFamily:FONT }}>{Math.round(totals.cal).toLocaleString()}</div>
+          <div style={{ fontSize:9.5, fontWeight:600, color:T.ink3, marginTop:2, fontFamily:FONT }}>kcal</div>
+        </Ring>
+        <div>
+          <div style={{ fontSize:10.5, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:T.ink3, marginBottom:5 }}>Calories today</div>
+          <div style={{ fontSize:15.5, fontWeight:700, color:T.ink }}>of {goals.calories.toLocaleString()} kcal</div>
+          <div style={{ display:"inline-block", marginTop:8, fontSize:11, fontWeight:700, color:calOver?PAL.red:PAL.or, background:calOver?tt.red.bg:tt.or.bg, borderRadius:999, padding:"5px 11px" }}>
+            {calOver? Math.round(totals.cal-goals.calories)+" over" : Math.round(goals.calories-totals.cal)+" left"}
+          </div>
         </div>
-        <div style={{ height:6, borderRadius:6, background:"rgba(255,255,255,0.07)", overflow:"hidden", marginBottom:10 }}>
-          <div style={{ height:"100%", borderRadius:6, width:`${waterPct}%`, background:"linear-gradient(90deg,#C8DFF0,#A8D5C2)", transition:"width 0.4s ease" }}/>
+      </div>
+
+      <div style={{ background:GRAD.bl, borderRadius:24, padding:"15px 16px", marginBottom:12, animation:"fadeUp .4s ease .1s both" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:9 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:36, height:36, borderRadius:13, background:"rgba(255,255,255,.22)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n="drop" s={17}/></div>
+            <div>
+              <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,.9)" }}>Water</div>
+              <div style={{ fontSize:18, fontWeight:800, color:"#fff", lineHeight:1.1 }}>{water} <span style={{ fontSize:11, fontWeight:600, opacity:.85 }}>/ {goals.water} ml</span></div>
+            </div>
+          </div>
+          <div onClick={()=>addWater(-250)} style={{ width:34, height:34, borderRadius:"50%", background:"rgba(255,255,255,.22)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><Ic n="minus" s={15}/></div>
+        </div>
+        <div style={{ height:6, borderRadius:6, background:"rgba(255,255,255,.28)", overflow:"hidden", marginBottom:10 }}>
+          <div style={{ height:"100%", width:waterPct+"%", background:"#fff", borderRadius:6, transition:"width .4s" }}/>
         </div>
         <div style={{ display:"flex", gap:8 }}>
           {[250,500,1000].map(ml=>(
-            <button key={ml} onClick={()=>addWater(ml)} style={{ flex:1, padding:"10px 4px", background:"rgba(200,223,240,0.1)", border:"1px solid rgba(200,223,240,0.2)", borderRadius:14, color:"#C8DFF0", fontSize:13, fontWeight:700, fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>+{ml<1000?ml+"ml":"1L"}</button>
+            <button key={ml} onClick={()=>addWater(ml)} style={{ flex:1, padding:"9px 4px", background:"#fff", border:"none", borderRadius:999, color:PAL.bl3, fontSize:12.5, fontWeight:700, fontFamily:FONT, cursor:"pointer" }}>+{ml<1000?ml+" ml":"1 L"}</button>
           ))}
-          <button onClick={()=>addWater(-250)} style={{ padding:"10px 14px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, color:"rgba(255,255,255,0.3)", fontSize:13, fontWeight:700, fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>−</button>
         </div>
       </div>
 
-      {/* meal sections */}
+      <div style={{ background:GRAD.or, borderRadius:22, padding:"13px 14px", marginBottom:16, display:"flex", alignItems:"center", gap:6, animation:"fadeUp .4s ease .14s both" }}>
+        {mac("Protein",totals.prot,goals.protein)}
+        {mac("Carbs",totals.carb,goals.carbs)}
+        {mac("Fat",totals.fat,goals.fat)}
+        <div onClick={()=>openModal(()=>setShowGoals(true))} style={{ width:34, height:34, borderRadius:"50%", background:"#fff", color:PAL.or3, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}><Ic n="gear" s={16}/></div>
+      </div>
+
+      <SecHead T={T} mt={0}>Today's meals</SecHead>
       {MEALS.map((meal,mi)=>{
+        const MM=MEALMETA[meal.key]||MEALMETA.lunch;
         const mealEntries = log.filter(e=>e.meal===meal.key);
         const mealCal = mealEntries.reduce((a,e)=>a+e.cal,0);
         return (
-          <div key={meal.key} style={{ marginBottom:14, animation:`fadeUp 0.4s ease ${0.12+mi*0.05}s both` }}>
+          <div key={meal.key} style={{ marginBottom:13, animation:"fadeUp .4s ease "+(0.16+mi*0.04)+"s both" }}>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:18 }}>{meal.emoji}</span>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <Chip n={MM.icon} c={MM.c} T={T} size={34} is={16}/>
                 <div>
-                  <div style={{ fontSize:14, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif" }}>{meal.label}</div>
-                  <div style={{ fontSize:10, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif" }}>{meal.hint}</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:T.ink }}>{meal.label}</div>
+                  <div style={{ fontSize:9.5, color:T.ink3, fontWeight:600 }}>{meal.hint}</div>
                 </div>
               </div>
-              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                {mealCal > 0 && <div style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif" }}>{Math.round(mealCal)} kcal</div>}
-                <button onClick={()=>openModal(()=>setAddingMeal(meal.key))} style={{ width:32, height:32, borderRadius:10, background:"rgba(168,213,194,0.12)", border:"1px solid rgba(168,213,194,0.2)", color:"#A8D5C2", fontSize:18, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontWeight:700 }}>+</button>
+              <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+                {mealCal > 0 && <div style={{ fontSize:12, fontWeight:700, color:T.ink2 }}>{Math.round(mealCal)} kcal</div>}
+                <div onClick={()=>openModal(()=>setAddingMeal(meal.key))} style={{ width:32, height:32, borderRadius:"50%", background:MM.grad, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><Ic n="plus" s={15} sw={2.6}/></div>
               </div>
             </div>
             {mealEntries.length === 0 ? (
-              <div style={{ padding:"12px 14px", borderRadius:14, border:"1px dashed rgba(255,255,255,0.07)", textAlign:"center" }}>
-                <div style={{ fontSize:12, color:"rgba(255,255,255,0.15)", fontFamily:"'Sora',sans-serif" }}>Tap + to log a meal</div>
+              <div style={{ padding:"12px 14px", borderRadius:16, border:"1px dashed "+T.dashed, textAlign:"center" }}>
+                <div style={{ fontSize:11.5, color:T.ink3, fontWeight:500 }}>Tap + to log {meal.label.toLowerCase()}</div>
               </div>
             ) : (
               <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                 {mealEntries.map(e=>(
-                  <div key={e.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14 }}>
+                  <div key={e.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 13px", background:T.card, border:"1px solid "+T.line, borderRadius:16, boxShadow:T.shadow }}>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:13, fontWeight:600, color:"rgba(255,255,255,0.85)", fontFamily:"'Sora',sans-serif", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{e.name}</div>
-                      <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>
-                        🔥{Math.round(e.cal)} · P:{e.prot}g · C:{e.carb}g · F:{e.fat}g
-                      </div>
+                      <div style={{ fontSize:13, fontWeight:600, color:T.ink, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{e.name}</div>
+                      <div style={{ fontSize:10.5, color:T.ink3, fontWeight:500, marginTop:2 }}>{Math.round(e.cal)} kcal · P:{e.prot}g · C:{e.carb}g · F:{e.fat}g</div>
                     </div>
-                    <div style={{ fontSize:12, fontWeight:700, color:"#FFB347", fontFamily:"'Sora',sans-serif", flexShrink:0 }}>{e.grams}g</div>
-                    <button onClick={()=>delFood(e.id)} style={{ background:"none", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.15)", padding:4, flexShrink:0 }}><Icons.Trash/></button>
+                    <div style={{ fontSize:11.5, fontWeight:700, color:tt.am.fg, flexShrink:0 }}>{e.grams}g</div>
+                    <div onClick={()=>delFood(e.id)} style={{ color:T.ink3, cursor:"pointer", padding:4, flexShrink:0 }}><Ic n="trash" s={16}/></div>
                   </div>
                 ))}
               </div>
@@ -3199,9 +3404,9 @@ function FitnessPage({ onModalChange=()=>{} }) {
         );
       })}
 
-      {showGoals && <GoalsModal goals={goals} onSave={setGoals} onClose={()=>closeModal(()=>setShowGoals(false))}/>}
-      {addingMeal && !selectedFood && <FoodSearchModal meal={addingMeal} startWithScan={quickScan} onSelect={f=>{ setSelectedFood(f); setQuickScan(false); }} onClose={()=>closeModal(()=>{ setAddingMeal(null); setQuickScan(false); })}/>}
-      {selectedFood && <ServingModal food={selectedFood} meal={addingMeal} onAdd={entry=>{ addFood(entry); setSelectedFood(null); closeModal(()=>setAddingMeal(null)); }} onClose={()=>{ setSelectedFood(null); if(!addingMeal) onModalChange(false); }}/>}
+      {showGoals && <GoalsModal T={T} goals={goals} onSave={setGoals} onClose={()=>closeModal(()=>setShowGoals(false))}/>}
+      {addingMeal && !selectedFood && <FoodSearchModal T={T} meal={addingMeal} startWithScan={quickScan} onSelect={f=>{ setSelectedFood(f); setQuickScan(false); }} onClose={()=>closeModal(()=>{ setAddingMeal(null); setQuickScan(false); })}/>}
+      {selectedFood && <ServingModal T={T} food={selectedFood} meal={addingMeal} onAdd={entry=>{ addFood(entry); setSelectedFood(null); closeModal(()=>setAddingMeal(null)); }} onClose={()=>{ setSelectedFood(null); if(!addingMeal) onModalChange(false); }}/>}
     </div>
   );
 }
@@ -3210,6 +3415,8 @@ function FitnessPage({ onModalChange=()=>{} }) {
    PROFILE / APP SETTINGS PAGE
 ───────────────────────────────────────────── */
 function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }) {
+  const T=THEME(darkMode);
+  const tt=tints(T);
   const [currency, setCurrency]   = useState(()=>load("rslv_currency","€"));
   const [name, setName]           = useState(()=>load("rslv_display_name",""));
   const [avatar, setAvatar]       = useState(()=>load("rslv_avatar",""));
@@ -3226,64 +3433,46 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
   const [section, setSection]     = useState(null);
   const [token, setToken]         = useState(()=>localStorage.getItem("rslv_token")||null);
   const [showAuth, setShowAuth]   = useState(false);
+  const [showRate, setShowRate]   = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [fbText, setFbText]       = useState("");
+  const [notifTick, setNotifTick] = useState(0);
 
-  // stats
   const streak   = load("rslv_streak",0);
   const habits   = load("rslv_habits",[]);
   const history  = load("rslv_learn_history",[]);
   const salary   = load("rslv_salary",0);
   const expenses = load("rslv_expenses",[]);
   const totalSaved = salary>0 ? Math.max(0,salary-expenses.reduce((a,e)=>a+e.amount,0)) : 0;
-
   const CURRENCIES = ["€","$","£","CHF","kr","zł","Kč","Ft","lei","лв","₺","₹","¥","₩","R$"];
 
-  const saveGoal = (k,v) => {
-    const updated = {...goals,[k]:parseInt(v)||0};
-    setGoals(updated);
-    save("rslv_fit_goals",updated);
-  };
-
-  const toggleNotif = (k) => {
-    const updated = {...notifs,[k]:!notifs[k]};
-    setNotifs(updated);
-    save("rslv_notifs",updated);
-  };
+  const saveGoal = (k,v) => { const updated = {...goals,[k]:parseInt(v)||0}; setGoals(updated); save("rslv_fit_goals",updated); };
+  const toggleNotif = (k) => { const updated = {...notifs,[k]:!notifs[k]}; setNotifs(updated); save("rslv_notifs",updated); };
 
   const saveName = async () => {
-    setName(draftName);
-    setAvatar(draftAvatar);
-    setBio(draftBio);
-    save("rslv_display_name",draftName);
-    save("rslv_avatar",draftAvatar);
-    save("rslv_bio",draftBio);
-    // sync to community profile if signed in
+    setName(draftName); setAvatar(draftAvatar); setBio(draftBio);
+    save("rslv_display_name",draftName); save("rslv_avatar",draftAvatar); save("rslv_bio",draftBio);
     if(token){
       try {
         const u = await getUser(token);
         if(u?.id){
-          await sbAuthed(`profiles?id=eq.${u.id}`, token, {
-            method:"PATCH",
-            body: JSON.stringify({ full_name:draftName, avatar_url:draftAvatar, bio:draftBio }),
-          });
+          await sbAuthed(`profiles?id=eq.${u.id}`, token, { method:"PATCH", body: JSON.stringify({ full_name:draftName, avatar_url:draftAvatar, bio:draftBio }) });
         }
       } catch {}
     }
-    setEditName(false);
-    onModalChange(false);
+    setEditName(false); onModalChange(false);
   };
 
   const pickAvatar = async (e) => {
     const file = e.target.files?.[0];
     if(!file) return;
-    if(!token){ alert("Sign in to Community first to upload a photo (Settings → Sign In to Community)."); return; }
+    if(!token){ alert("Sign in first to upload a photo. (Community sign-in returns in a future update — for now the letter avatar is used.)"); return; }
     setUploadingAvatar(true);
     try {
       const small = await compressImage(file, 600, 0.85);
       const url = await uploadImage(small, token, "avatars");
       setDraftAvatar(url);
-    } catch(err) {
-      alert("Upload failed. Please try again.");
-    }
+    } catch(err) { alert("Upload failed. Please try again."); }
     setUploadingAvatar(false);
   };
 
@@ -3294,70 +3483,77 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
     setShowReset(false);
     alert("Today's data cleared.");
   };
-
   const clearAll = () => {
-    const keys = ["rslv_habits","rslv_done","rslv_streak","rslv_salary","rslv_expenses","rslv_loans","rslv_fit_goals","rslv_fit_log","rslv_fit_water","rslv_learn_history","rslv_lang","rslv_learn_streak","rslv_profile","rslv_display_name","rslv_avatar","rslv_currency"];
+    const keys = ["rslv_habits","rslv_done","rslv_streak","rslv_salary","rslv_deposits","rslv_expenses","rslv_loans","rslv_subs","rslv_fit_goals","rslv_fit_log","rslv_fit_water","rslv_learn_history","rslv_lang","rslv_learn_streak","rslv_learn_goal","rslv_profile","rslv_display_name","rslv_avatar","rslv_bio","rslv_currency","rslv_quick_actions"];
     keys.forEach(k=>localStorage.removeItem(k));
     setShowClear(false);
     window.location.reload();
   };
 
-  const Row = ({icon, label, value, onPress, danger}) => (
-    <div onClick={onPress} style={{ display:"flex", alignItems:"center", gap:14, padding:"16px 18px", cursor:onPress?"pointer":"default", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
-      <div style={{ width:34, height:34, borderRadius:10, background:danger?"rgba(255,107,107,0.12)":"rgba(168,213,194,0.13)", display:"flex", alignItems:"center", justifyContent:"center", color:danger?"#ff6b6b":"#6fae93", flexShrink:0 }}>{icon}</div>
-      <div style={{ flex:1, fontSize:14.5, fontWeight:600, color:danger?"#ff6b6b":"rgba(255,255,255,0.85)", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.01em" }}>{label}</div>
-      {value && <div style={{ fontSize:13, fontWeight:500, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif" }}>{value}</div>}
-      {onPress && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>}
+  const sendFeedback = () => {
+    const body = encodeURIComponent(fbText+"\n\n— sent from Risolvero");
+    window.location.href = "mailto:feedback@risolvero.app?subject="+encodeURIComponent("Risolvero feedback")+"&body="+body;
+  };
+
+  const Row = ({icon, c="gr", label, value, onPress, danger}) => (
+    <div onClick={onPress} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", cursor:onPress?"pointer":"default", background:T.card, border:"1px solid "+T.line, borderRadius:18, marginBottom:9, boxShadow:T.shadow }}>
+      <Chip n={icon} c={danger?"red":c} T={T} size={36} is={17}/>
+      <div style={{ flex:1, fontSize:13.5, fontWeight:700, color:danger?PAL.red:T.ink, fontFamily:FONT }}>{label}</div>
+      {value && <div style={{ fontSize:12.5, fontWeight:600, color:T.ink3, fontFamily:FONT }}>{value}</div>}
+      {onPress && <Ic n="chev" s={15} style={{ color:T.ink3 }}/>}
     </div>
   );
 
-  const Toggle = ({label, icon, value, onToggle}) => (
-    <div style={{ display:"flex", alignItems:"center", gap:14, padding:"16px 18px", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
-      <div style={{ width:34, height:34, borderRadius:10, background:"rgba(168,213,194,0.13)", display:"flex", alignItems:"center", justifyContent:"center", color:"#6fae93", flexShrink:0 }}>{icon}</div>
-      <div style={{ flex:1, fontSize:14.5, fontWeight:600, color:"rgba(255,255,255,0.85)", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.01em" }}>{label}</div>
-      <div onClick={onToggle} className={value?"rslv-toggle on":"rslv-toggle off"} style={{ width:46, height:28, borderRadius:14, background:value?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(120,120,130,0.25)", border:value?"1px solid rgba(168,213,194,0.5)":"1.5px solid rgba(120,120,130,0.45)", position:"relative", cursor:"pointer", transition:"all 0.25s", flexShrink:0, boxSizing:"border-box" }}>
-        <div style={{ position:"absolute", top:2.5, left:value?20:2.5, width:21, height:21, borderRadius:"50%", background:"#fff", border:"1px solid rgba(0,0,0,0.08)", transition:"all 0.25s", boxShadow:"0 1px 4px rgba(0,0,0,0.25)" }}/>
+  const Toggle = ({icon, c="gr", label, value, onToggle, sub}) => (
+    <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:T.card, border:"1px solid "+T.line, borderRadius:18, marginBottom:9, boxShadow:T.shadow }}>
+      <Chip n={icon} c={c} T={T} size={36} is={17}/>
+      <div style={{ flex:1 }}>
+        <div style={{ fontSize:13.5, fontWeight:700, color:T.ink, fontFamily:FONT }}>{label}</div>
+        {sub && <div style={{ fontSize:10.5, fontWeight:500, color:T.ink3, fontFamily:FONT, marginTop:1 }}>{sub}</div>}
+      </div>
+      <div onClick={onToggle} style={{ width:47, height:28, borderRadius:999, background:value?PAL.gr:(T.dark?"#34353F":"#E0E0E6"), position:"relative", cursor:"pointer", transition:"all 0.25s", flexShrink:0 }}>
+        <div style={{ position:"absolute", top:3, left:value?22:3, width:22, height:22, borderRadius:"50%", background:"#fff", transition:"all 0.25s", boxShadow:"0 1px 4px rgba(0,0,0,0.2)" }}/>
       </div>
     </div>
   );
 
-  // ── SECTION SCREENS ──
+  const Back = ({title}) => (
+    <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
+      <Chip n="back" c="ink" T={T} size={36} is={17} onClick={()=>setSection(null)}/>
+      <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT }}>{title}</div>
+    </div>
+  );
+
   if(section==="goals") return (
-    <div style={{ padding:"0 18px 32px" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
-        <button onClick={()=>setSection(null)} style={{ background:"rgba(255,255,255,0.06)", border:"none", borderRadius:10, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:18 }}>‹</button>
-        <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Daily Goals</div>
-      </div>
+    <div style={{ padding:"0 18px 32px", fontFamily:FONT }}>
+      <Back title="Daily Goals"/>
       {[
-        {k:"calories",label:"🔥 Calories",unit:"kcal"},
-        {k:"protein", label:"🥩 Protein", unit:"g"},
-        {k:"carbs",   label:"🍞 Carbs",   unit:"g"},
-        {k:"fat",     label:"🧈 Fat",      unit:"g"},
-        {k:"water",   label:"💧 Water",    unit:"ml"},
-      ].map(({k,label,unit})=>(
-        <div key={k} style={{ marginBottom:14 }}>
-          <div style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>{label}</div>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <input type="number" defaultValue={goals[k]} onBlur={e=>saveGoal(k,e.target.value)}
-              style={{ flex:1, padding:"13px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:16, fontFamily:"'Sora',sans-serif", fontWeight:700, outline:"none" }}/>
-            <div style={{ fontSize:13, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", width:32 }}>{unit}</div>
-          </div>
+        {k:"calories",label:"Calories",unit:"kcal",c:"or",icon:"flame"},
+        {k:"protein", label:"Protein", unit:"g",   c:"ro",icon:"fit"},
+        {k:"carbs",   label:"Carbs",   unit:"g",   c:"am",icon:"fork"},
+        {k:"fat",     label:"Fat",     unit:"g",   c:"vi",icon:"drop"},
+        {k:"water",   label:"Water",   unit:"ml",  c:"bl",icon:"drop"},
+      ].map(({k,label,unit,c,icon})=>(
+        <div key={k} style={{ display:"flex", alignItems:"center", gap:12, background:T.card, border:"1px solid "+T.line, borderRadius:18, padding:"11px 13px", marginBottom:10, boxShadow:T.shadow }}>
+          <Chip n={icon} c={c} T={T} size={36} is={17}/>
+          <div style={{ flex:1, fontSize:13.5, fontWeight:700, color:T.ink }}>{label}</div>
+          <input type="number" defaultValue={goals[k]} onBlur={e=>saveGoal(k,e.target.value)}
+            style={{ width:92, padding:"9px 11px", background:T.input, border:"none", borderRadius:12, color:T.ink, fontSize:15, fontFamily:FONT, fontWeight:800, outline:"none", textAlign:"right" }}/>
+          <div style={{ fontSize:12, color:T.ink3, fontWeight:600, width:30 }}>{unit}</div>
         </div>
       ))}
+      <div style={{ fontSize:11.5, color:T.ink3, fontWeight:500, lineHeight:1.6, marginTop:4 }}>These goals power the Fitness rings and macro bar. Tap a number, change it, tap away to save.</div>
     </div>
   );
 
   if(section==="currency") return (
-    <div style={{ padding:"0 18px 32px" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
-        <button onClick={()=>setSection(null)} style={{ background:"rgba(255,255,255,0.06)", border:"none", borderRadius:10, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:18 }}>‹</button>
-        <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Currency</div>
-      </div>
+    <div style={{ padding:"0 18px 32px", fontFamily:FONT }}>
+      <Back title="Currency"/>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
         {CURRENCIES.map(c=>(
           <div key={c} onClick={()=>{ setCurrency(c); save("rslv_currency",c); setSection(null); }}
-            style={{ padding:"18px 8px", borderRadius:16, background:currency===c?"rgba(168,213,194,0.15)":"rgba(255,255,255,0.04)", border:currency===c?"1.5px solid rgba(168,213,194,0.4)":"1px solid rgba(255,255,255,0.08)", textAlign:"center", cursor:"pointer", transition:"all 0.2s" }}>
-            <div style={{ fontSize:22, fontWeight:800, color:currency===c?"#A8D5C2":"rgba(255,255,255,0.6)", fontFamily:"'Sora',sans-serif" }}>{c}</div>
+            style={{ padding:"16px 8px", borderRadius:16, background:T.card, border:currency===c?("1.6px solid "+PAL.or):("1px solid "+T.line), textAlign:"center", cursor:"pointer", boxShadow:T.shadow }}>
+            <div style={{ fontSize:20, fontWeight:800, color:currency===c?PAL.or:T.ink2 }}>{c}</div>
           </div>
         ))}
       </div>
@@ -3365,31 +3561,29 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
   );
 
   if(section==="history") return (
-    <div style={{ padding:"0 18px 32px" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
-        <button onClick={()=>setSection(null)} style={{ background:"rgba(255,255,255,0.06)", border:"none", borderRadius:10, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:18 }}>‹</button>
-        <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Growth History</div>
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:20 }}>
+    <div style={{ padding:"0 18px 32px", fontFamily:FONT }}>
+      <Back title="Growth History"/>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:18 }}>
         {[
-          {label:"Day Streak",    value:`${streak}🔥`,              color:"#FFB347"},
-          {label:"Words Learned", value:history.length,             color:"#A8D5C2"},
-          {label:"Active Habits", value:habits.length,              color:"#C5B8E8"},
-          {label:"Saved",         value:`${currency}${totalSaved.toFixed(0)}`, color:"#C8E6DA"},
-        ].map(({label,value,color})=>(
-          <div key={label} style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:18, padding:"16px 14px" }}>
-            <div style={{ fontSize:24, fontWeight:800, color, fontFamily:"'Sora',sans-serif", lineHeight:1, marginBottom:4 }}>{value}</div>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif" }}>{label}</div>
+          {label:"Day streak",    value:streak,             c:"am", icon:"flame"},
+          {label:"Words learned", value:history.length,     c:"gr", icon:"book"},
+          {label:"Active habits", value:habits.length,      c:"vi", icon:"target"},
+          {label:"Saved",         value:currency+totalSaved.toFixed(0), c:"bl", icon:"coins"},
+        ].map(({label,value,c,icon})=>(
+          <div key={label} style={{ background:T.card, border:"1px solid "+T.line, borderRadius:18, padding:"14px", boxShadow:T.shadow }}>
+            <Chip n={icon} c={c} T={T} size={32} is={15} style={{ marginBottom:9 }}/>
+            <div style={{ fontSize:22, fontWeight:800, color:T.ink, lineHeight:1 }}>{value}</div>
+            <div style={{ fontSize:10.5, color:T.ink3, fontWeight:600, marginTop:4 }}>{label}</div>
           </div>
         ))}
       </div>
       {history.length>0 && (
         <>
-          <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:10 }}>Words Learned</div>
+          <SecHead T={T} mt={0}>Words learned</SecHead>
           <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
             {history.slice(0,30).map((h,i)=>(
-              <div key={i} style={{ padding:"5px 12px", borderRadius:12, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)" }}>
-                <span style={{ fontSize:12, color:"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif" }}>{h.word}</span>
+              <div key={i} style={{ padding:"5px 12px", borderRadius:999, background:T.card, border:"1px solid "+T.line }}>
+                <span style={{ fontSize:12, color:T.ink2, fontWeight:600 }}>{h.word}</span>
               </div>
             ))}
           </div>
@@ -3399,267 +3593,187 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
   );
 
   if(section==="help") return (
-    <div style={{ padding:"0 18px 32px" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
-        <button onClick={()=>setSection(null)} style={{ background:"rgba(255,255,255,0.06)", border:"none", borderRadius:10, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:18 }}>‹</button>
-        <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Help Center</div>
-      </div>
+    <div style={{ padding:"0 18px 32px", fontFamily:FONT }}>
+      <Back title="Help Center"/>
       {[
-        { q:"How does the Growth Circle work?", a:"Your Growth Circle fills based on the habits you complete each day. Each habit is worth an equal share of 100 points. Complete all habits = 100. It resets every day — fresh start, no guilt." },
-        { q:"How does the Jar System work?", a:"When you add your salary, it automatically splits into 6 jars based on T. Harv Eker's system: 55% Necessities, 10% Savings, 10% Education, 10% Play, 10% Freedom, 5% Give. Each expense deducts from the right jar." },
-        { q:"How do I join a Challenge?", a:"Go to Community → Challenges tab. Tap any challenge and hit Join. It will appear on your Home dashboard and affect your Growth Circle while active." },
+        { q:"How does the Growth score work?", a:"The ring fills as you complete habits. Each habit is worth an equal share of 100 points. Complete everything = 100. It resets every day — fresh start, no guilt." },
+        { q:"How does the Jar System work?", a:"When you add a salary, it splits into 6 jars (T. Harv Eker's system): 55% Necessities, 10% Savings, 10% Education, 10% Play, 10% Freedom, 5% Give. Each expense deducts from its jar. Jars carry over — nothing resets." },
+        { q:"Salary changed this month?", a:"Just tap Add on the income card and log the new amount with its date. Every deposit is added on top — you never overwrite old salaries. Tap any entry in the Salary Log to fix it." },
         { q:"Why is my streak broken?", a:"Your streak only continues if you complete ALL your habits every day. Miss one day and it resets to 0. Tip: keep your habit list small and realistic." },
-        { q:"How do I add a subscription reminder?", a:"Go to Finance → Subscriptions section → tap Add. Add the name, amount and renewal day. Toggle on the reminder and you'll be notified 2 days before it renews." },
-        { q:"Can I change my currency?", a:"Yes. Go to Settings → Currency and pick from 15 currencies. The change applies everywhere in the app immediately." },
+        { q:"How do subscriptions work?", a:"Finance → Subscriptions → Add. Set the name, amount and renewal date. Anything due within 2 days gets highlighted." },
+        { q:"Where is Community?", a:"Community is coming in a future update. We're launching with Habits, Fitness, Learning and Finance first." },
       ].map(({q,a},i)=>(
-        <div key={i} style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:18, padding:"16px", marginBottom:10 }}>
-          <div style={{ fontSize:14, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:8 }}>{q}</div>
-          <div style={{ fontSize:13, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", lineHeight:1.6 }}>{a}</div>
+        <div key={i} style={{ background:T.card, border:"1px solid "+T.line, borderRadius:18, padding:"15px", marginBottom:10, boxShadow:T.shadow }}>
+          <div style={{ fontSize:13.5, fontWeight:700, color:T.ink, marginBottom:7 }}>{q}</div>
+          <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, lineHeight:1.65 }}>{a}</div>
         </div>
       ))}
     </div>
   );
 
   if(section==="privacy") return (
-    <div style={{ padding:"0 18px 32px" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
-        <button onClick={()=>setSection(null)} style={{ background:"rgba(255,255,255,0.06)", border:"none", borderRadius:10, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:18 }}>‹</button>
-        <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Privacy Policy</div>
-      </div>
+    <div style={{ padding:"0 18px 32px", fontFamily:FONT }}>
+      <Back title="Privacy Policy"/>
       {[
-        { title:"Data We Collect", body:"Risolvero stores your habits, finance data, fitness logs and learning history locally on your device. Community posts and profile data are stored on our secure Supabase database." },
-        { title:"How We Use Your Data", body:"Your data is used only to power the app features you use. We never sell your data to third parties. We never share your personal information with advertisers." },
-        { title:"Community Data", body:"When you post in the community, your username and post content are visible to other users. You can delete your posts at any time." },
-        { title:"Local Storage", body:"All personal data (habits, finance, fitness, learning) is stored locally on your device using browser localStorage. Clearing app data in Settings removes everything." },
-        { title:"Third Party Services", body:"We use Supabase for community features and Open Food Facts for food database search. Both are privacy-respecting services." },
-        { title:"Contact", body:"For any privacy concerns, you can clear all your data at any time from Settings → Data → Clear All App Data." },
+        { title:"Data we collect", body:"Risolvero stores your habits, finance data, fitness logs and learning history locally on your device. Nothing leaves your phone unless you sign in to community features." },
+        { title:"How we use your data", body:"Your data powers the app features you use. We never sell your data. We never share your personal information with advertisers." },
+        { title:"Local storage", body:"All personal data lives in your device's local storage. Clearing app data in Settings removes everything permanently." },
+        { title:"Third party services", body:"We use Open Food Facts for the food database and Supabase for optional account features. Both are privacy-respecting services." },
+        { title:"Contact", body:"For any privacy concern you can clear all your data at any time: Settings → Data → Clear All App Data." },
       ].map(({title,body},i)=>(
-        <div key={i} style={{ marginBottom:16 }}>
-          <div style={{ fontSize:14, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:6 }}>{title}</div>
-          <div style={{ fontSize:13, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", lineHeight:1.7 }}>{body}</div>
+        <div key={i} style={{ marginBottom:15 }}>
+          <div style={{ fontSize:13.5, fontWeight:700, color:T.ink, marginBottom:5 }}>{title}</div>
+          <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, lineHeight:1.7 }}>{body}</div>
         </div>
       ))}
     </div>
   );
 
-  // ── MAIN SETTINGS SCREEN ──
+  const notifStatus = typeof Notification !== "undefined" ? (Notification.permission === "granted" ? "Enabled" : "Tap to allow") : "Not supported here";
+
   return (
-    <div style={{ padding:"0 0 120px" }}>
-
-      {/* header */}
-      <div style={{ padding:"0 18px 20px", animation:"fadeUp 0.4s ease both" }}>
-        <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", fontWeight:600, marginBottom:5 }}>APP</div>
-        <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px" }}>Settings</div>
+    <div style={{ padding:"0 18px 32px", fontFamily:FONT }}>
+      <div style={{ marginBottom:16, animation:"fadeUp 0.4s ease both" }}>
+        <div style={{ fontSize:26, fontWeight:800, color:T.ink, letterSpacing:"-0.02em" }}>Profile</div>
+        <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, marginTop:2 }}>Make it yours</div>
       </div>
 
-      {/* profile card */}
-      <div style={{ padding:"0 18px", marginBottom:24 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:14, padding:"20px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:24 }}>
-          <div onClick={()=>{ setDraftName(name); setDraftAvatar(avatar); setDraftBio(bio); onModalChange(true); setEditName(true); }}
-            style={{ width:60, height:60, borderRadius:18, background: avatar?"transparent":"linear-gradient(135deg,#A8D5C2,#C5B8E8)", overflow:"hidden", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, fontWeight:800, color:"#1a1d2e", fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>
-            {avatar ? <img src={avatar} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : (name?.[0]||"R")}
-          </div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:2 }}>{name||"Your Name"}</div>
-            <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", lineHeight:1.4 }}>{bio||"Tap to edit profile"}</div>
-          </div>
-          <button onClick={()=>{ setDraftName(name); setDraftAvatar(avatar); setDraftBio(bio); onModalChange(true); setEditName(true); }} style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, padding:"7px 12px", cursor:"pointer", color:"rgba(255,255,255,0.4)", fontSize:12, fontFamily:"'Sora',sans-serif", fontWeight:700 }}>Edit</button>
+      <div style={{ display:"flex", alignItems:"center", gap:13, padding:"16px", background:T.card, border:"1px solid "+T.line, borderRadius:24, marginBottom:18, boxShadow:T.shadow, animation:"fadeUp 0.4s ease 0.05s both" }}>
+        <div onClick={()=>{ setDraftName(name); setDraftAvatar(avatar); setDraftBio(bio); onModalChange(true); setEditName(true); }}
+          style={{ width:56, height:56, borderRadius:"50%", background: avatar?"transparent":GRAD.or, overflow:"hidden", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:800, color:"#fff", fontFamily:FONT, cursor:"pointer" }}>
+          {avatar ? <img src={avatar} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : ((name&&name[0])||"R")}
         </div>
-      </div>
-
-      {/* PREFERENCES */}
-      <div style={{ padding:"0 18px", marginBottom:8 }}>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Preferences</div>
-      </div>
-      <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
-        <Row icon={<Icons.Wallet/>} label="Currency" value={currency} onPress={()=>setSection("currency")}/>
-        <Row icon={<Icons.Target/>} label="Daily Goals" value={`${goals.calories} kcal`} onPress={()=>setSection("goals")}/>
-        <Row icon={<Icons.Chart/>} label="Growth History" onPress={()=>setSection("history")}/>
-        <Toggle icon={darkMode?<Icons.Moon/>:<Icons.Sun/>} label={darkMode?"Dark Mode":"Light Mode"} value={darkMode} onToggle={()=>setDarkMode(d=>!d)}/>
-      </div>
-
-      {/* NOTIFICATIONS */}
-      <div style={{ padding:"0 18px", marginBottom:8 }}>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Notifications</div>
-      </div>
-      <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
-        <Toggle icon={<Icons.Flame/>} label="Daily Habit Reminder" value={notifs.habits} onToggle={()=>toggleNotif("habits")}/>
-        <Toggle icon={<Icons.Bolt/>} label="Streak Alert" value={notifs.streak} onToggle={()=>toggleNotif("streak")}/>
-        <Toggle icon={<Icons.Wallet/>} label="Finance Reminders" value={notifs.finance} onToggle={()=>toggleNotif("finance")}/>
-        <div style={{ display:"flex", alignItems:"center", gap:14, padding:"15px 18px", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
-          <div style={{ fontSize:18, width:24, textAlign:"center" }}>⏰</div>
-          <div style={{ flex:1, fontSize:14, fontWeight:600, color:"rgba(255,255,255,0.8)", fontFamily:"'Sora',sans-serif" }}>Reminder Time</div>
-          <input type="time" defaultValue={load(NOTIF_KEY,"09:00")} onChange={e=>{ save(NOTIF_KEY,e.target.value); scheduleNotifications(); }}
-            style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, padding:"6px 12px", color:"#fff", fontSize:14, fontFamily:"'Sora',sans-serif", outline:"none", colorScheme:"dark" }}/>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:16.5, fontWeight:800, color:T.ink }}>{name||"Your name"}</div>
+          <div style={{ fontSize:11.5, color:T.ink3, fontWeight:500, lineHeight:1.4, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{bio||"Tap edit to add a short bio"}</div>
         </div>
-        <div onClick={async()=>{ const granted = await requestNotifPermission(); if(granted) scheduleNotifications(); }} style={{ display:"flex", alignItems:"center", gap:14, padding:"15px 18px", cursor:"pointer" }}>
-          <div style={{ fontSize:18, width:24, textAlign:"center" }}>🔔</div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:14, fontWeight:600, color:"#A8D5C2", fontFamily:"'Sora',sans-serif" }}>Enable Notifications</div>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>
-              {typeof Notification !== "undefined" ? Notification.permission === "granted" ? "✅ Notifications enabled" : "Tap to allow notifications" : "Not supported on this browser"}
-            </div>
-          </div>
-        </div>
+        <div onClick={()=>{ setDraftName(name); setDraftAvatar(avatar); setDraftBio(bio); onModalChange(true); setEditName(true); }} style={{ background:darkMode?"#fff":PAL.ink, color:darkMode?PAL.ink:"#fff", borderRadius:999, padding:"8px 15px", cursor:"pointer", fontSize:12, fontWeight:700 }}>Edit</div>
       </div>
 
-      {/* COMMUNITY ACCOUNT */}
-      <div style={{ padding:"0 18px", marginBottom:8 }}>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Community Account</div>
+      <SecHead T={T} mt={0}>Preferences</SecHead>
+      <Toggle icon="moon" c="ink" label={darkMode?"Dark mode":"Light mode"} value={darkMode} onToggle={()=>setDarkMode(d=>!d)}/>
+      <Row icon="coins" c="gr" label="Currency" value={currency} onPress={()=>setSection("currency")}/>
+      <Row icon="target" c="bl" label="Daily goals" value={goals.calories+" kcal"} onPress={()=>setSection("goals")}/>
+      <Row icon="chart" c="vi" label="Growth history" onPress={()=>setSection("history")}/>
+
+      <SecHead T={T}>Notifications</SecHead>
+      <Toggle icon="bell" c="am" label="Daily habit reminder" value={notifs.habits} onToggle={()=>toggleNotif("habits")}/>
+      <Toggle icon="flame" c="or" label="Streak alert" value={notifs.streak} onToggle={()=>toggleNotif("streak")}/>
+      <Toggle icon="wallet" c="gr" label="Finance reminders" value={notifs.finance} onToggle={()=>toggleNotif("finance")}/>
+      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:T.card, border:"1px solid "+T.line, borderRadius:18, marginBottom:9, boxShadow:T.shadow }}>
+        <Chip n="clock" c="bl" T={T} size={36} is={17}/>
+        <div style={{ flex:1, fontSize:13.5, fontWeight:700, color:T.ink }}>Reminder time</div>
+        <input type="time" defaultValue={load(NOTIF_KEY,"09:00")} onChange={e=>{ save(NOTIF_KEY,e.target.value); scheduleNotifications(); }}
+          style={{ background:T.input, border:"none", borderRadius:12, padding:"7px 11px", color:T.ink, fontSize:13.5, fontFamily:FONT, fontWeight:700, outline:"none", colorScheme:T.dark?"dark":"light" }}/>
       </div>
-      <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
+      <div onClick={async()=>{ const granted = await requestNotifPermission(); if(granted) scheduleNotifications(); setNotifTick(t=>t+1); }} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:T.card, border:"1px solid "+T.line, borderRadius:18, marginBottom:9, cursor:"pointer", boxShadow:T.shadow }}>
+        <Chip n="bell" c="gr" T={T} size={36} is={17}/>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:13.5, fontWeight:700, color:tt.gr.fg }}>Enable notifications</div>
+          <div style={{ fontSize:10.5, fontWeight:500, color:T.ink3, marginTop:1 }}>{notifStatus}</div>
+        </div>
+        {typeof Notification!=="undefined" && Notification.permission==="granted" && <Ic n="check" s={17} style={{ color:tt.gr.fg }}/>}
+      </div>
+
+      {/* COMMUNITY ACCOUNT — hidden while Community is "Soon". Remove the (false &&) wrapper to restore. */}
+      {false && (<>
         {token ? (
-          <div onClick={()=>{ localStorage.removeItem("rslv_token"); setToken(null); }} style={{ display:"flex", alignItems:"center", gap:14, padding:"16px 18px", cursor:"pointer" }}>
-            <div style={{ width:34, height:34, borderRadius:10, background:"rgba(255,107,107,0.12)", display:"flex", alignItems:"center", justifyContent:"center", color:"#ff6b6b", flexShrink:0 }}><Icons.Logout/></div>
-            <div style={{ flex:1, fontSize:14.5, fontWeight:600, color:"#ff6b6b", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.01em" }}>Sign Out of Community</div>
-          </div>
+          <Row icon="logout" c="red" danger label="Sign out of Community" onPress={()=>{ localStorage.removeItem("rslv_token"); setToken(null); }}/>
         ) : (
-          <div onClick={()=>{ onModalChange(true); setShowAuth(true); }} style={{ display:"flex", alignItems:"center", gap:14, padding:"16px 18px", cursor:"pointer" }}>
-            <div style={{ width:34, height:34, borderRadius:10, background:"rgba(168,213,194,0.13)", display:"flex", alignItems:"center", justifyContent:"center", color:"#6fae93", flexShrink:0 }}><Icons.Community/></div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:14.5, fontWeight:600, color:"#6fae93", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.01em" }}>Sign In to Community</div>
-              <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>Post wins, join challenges, follow others</div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
-          </div>
+          <Row icon="user" c="gr" label="Sign in to Community" onPress={()=>{ onModalChange(true); setShowAuth(true); }}/>
         )}
-      </div>
+      </>)}
 
-      {/* DATA */}
-      <div style={{ padding:"0 18px", marginBottom:8 }}>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Data</div>
-      </div>
-      <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
-        <Row icon={<Icons.Refresh/>} label="Reset Today's Data" onPress={()=>setShowReset(true)}/>
-        <Row icon={<Icons.TrashLg/>} label="Clear All App Data" danger onPress={()=>setShowClear(true)}/>
-      </div>
+      <SecHead T={T}>Support</SecHead>
+      <Row icon="chat" c="bl" label="Send feedback" onPress={()=>{ onModalChange(true); setShowFeedback(true); }}/>
+      <Row icon="star" c="am" label="Rate Risolvero" onPress={()=>{ onModalChange(true); setShowRate(true); }}/>
+      <Row icon="info" c="gr" label="Help Center" onPress={()=>setSection("help")}/>
+      <Row icon="book" c="ro" label="Privacy Policy" onPress={()=>setSection("privacy")}/>
 
-      {/* SUPPORT */}
-      <div style={{ padding:"0 18px", marginBottom:8 }}>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>Support</div>
-      </div>
-      <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
-        <Row icon={<Icons.Help/>} label="Help Center" onPress={()=>setSection("help")}/>
-        <Row icon={<Icons.Shield/>} label="Privacy Policy" onPress={()=>setSection("privacy")}/>
-        <Row icon={<Icons.Star/>} label="Rate Risolvero" onPress={()=>window.open("https://risolveroapp2.vercel.app","_blank")}/>
-      </div>
+      <SecHead T={T}>Data</SecHead>
+      <Row icon="refresh" c="am" label="Reset today" onPress={()=>setShowReset(true)}/>
+      <Row icon="trash" danger label="Clear all app data" onPress={()=>setShowClear(true)}/>
 
-      {/* ABOUT */}
-      <div style={{ padding:"0 18px", marginBottom:8 }}>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.14em", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", fontFamily:"'Sora',sans-serif" }}>About</div>
-      </div>
-      <div style={{ background:"rgba(255,255,255,0.04)", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", marginBottom:20 }}>
-        <Row icon={<Icons.Phone/>} label="Version" value="1.0.0"/>
-        <Row icon={<Icons.Leaf/>} label="Risolvero" value="Built for growth"/>
-        <Row icon={<Icons.Heart/>} label="Made with" value="Love"/>
-      </div>
+      <div style={{ textAlign:"center", fontSize:11, color:T.ink3, fontWeight:600, marginTop:18 }}>Risolvero · v1.0</div>
 
-      {/* auth modal */}
-      {showAuth && (
-        <AuthScreen
-          onLogin={async (email, password) => {
-            const d = await sbAuth("token?grant_type=password", { email, password });
-            if (d.access_token) {
-              localStorage.setItem("rslv_token", d.access_token);
-              setToken(d.access_token);
-              onModalChange(false);
-              setShowAuth(false);
-              return true;
-            }
-            return d.error_description || "Login failed";
-          }}
-          onSignup={async (email, password, username, fullName) => {
-            const d = await sbAuth("signup", { email, password });
-            const uid = d.id || d.user?.id;
-            const tok = d.access_token || d.session?.access_token;
-            if (uid && tok) {
-              localStorage.setItem("rslv_token", tok);
-              try { await sb("profiles", { method:"POST", body:JSON.stringify({ id:uid, username, full_name:fullName }), headers:{ "apikey":SUPABASE_KEY, "Authorization":`Bearer ${tok}`, "Content-Type":"application/json", "Prefer":"return=representation" } }); } catch {}
-              setToken(tok);
-              onModalChange(false);
-              setShowAuth(false);
-              return true;
-            }
-            return d.error_description || "Signup failed";
-          }}
-          onClose={() => { onModalChange(false); setShowAuth(false); }}
-          onModalChange={onModalChange}
-        />
-      )}
-
-      {/* edit name modal */}
       {editName && (
-        <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-          <div onClick={()=>{ setEditName(false); onModalChange(false); }} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"88vh", display:"flex", flexDirection:"column" }}>
-            <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"24px 22px 8px", flex:1 }}>
-              <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 22px" }}/>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
-                <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Edit Profile</div>
-                <button onClick={()=>{ setEditName(false); onModalChange(false); }} style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)" }}><Icons.Close/></button>
-              </div>
-
-              {/* avatar upload */}
-              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:24 }}>
-                <label style={{ cursor:"pointer", position:"relative" }}>
-                  <input type="file" accept="image/*" onChange={pickAvatar} style={{ display:"none" }}/>
-                  <div style={{ width:92, height:92, borderRadius:28, background: draftAvatar?"transparent":"linear-gradient(135deg,#A8D5C2,#C5B8E8)", overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center", fontSize:34, fontWeight:800, color:"#1a1d2e", fontFamily:"'Sora',sans-serif", border:"2px solid rgba(255,255,255,0.1)" }}>
-                    {uploadingAvatar ? <div style={{ fontSize:12, color:"#fff", fontWeight:600 }}>...</div> : (draftAvatar ? <img src={draftAvatar} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : (draftName?.[0]||"R"))}
-                  </div>
-                  <div style={{ position:"absolute", bottom:-2, right:-2, width:30, height:30, borderRadius:"50%", background:"#A8D5C2", display:"flex", alignItems:"center", justifyContent:"center", border:"3px solid #1a1d2e" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a1d2e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                  </div>
-                </label>
-                <div style={{ fontSize:12, color:"rgba(255,255,255,0.35)", fontFamily:"'Sora',sans-serif", marginTop:10 }}>{uploadingAvatar?"Uploading...":"Tap photo to change"}</div>
-              </div>
-
-              <div style={{ marginBottom:16 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8, letterSpacing:"0.1em", textTransform:"uppercase" }}>Display Name</div>
-                <input value={draftName} onChange={e=>setDraftName(e.target.value)} placeholder="Your name"
-                  style={{ width:"100%", padding:"13px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:14, fontFamily:"'Sora',sans-serif", outline:"none" }}/>
-              </div>
-
-              <div style={{ marginBottom:16 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:8, letterSpacing:"0.1em", textTransform:"uppercase" }}>Bio</div>
-                <textarea value={draftBio} onChange={e=>setDraftBio(e.target.value.slice(0,150))} placeholder="A short line about you..." rows={3}
-                  style={{ width:"100%", padding:"13px 16px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:14, color:"#fff", fontSize:14, fontFamily:"'Sora',sans-serif", outline:"none", resize:"none", lineHeight:1.5 }}/>
-                <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", fontFamily:"'Sora',sans-serif", marginTop:6, textAlign:"right" }}>{draftBio.length}/150</div>
-              </div>
-            </div>
-            <div style={{ padding:"12px 22px 44px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
-              <button onClick={saveName} disabled={uploadingAvatar} style={{ width:"100%", padding:"15px", background:uploadingAvatar?"rgba(255,255,255,0.1)":"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:uploadingAvatar?"rgba(255,255,255,0.3)":"#1a1d2e", cursor:uploadingAvatar?"not-allowed":"pointer" }}>Save Profile</button>
-            </div>
+        <Sheet T={T} onClose={()=>{ setEditName(false); onModalChange(false); }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+            <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT }}>Edit Profile</div>
+            <Chip n="close" c="ink" T={T} size={36} is={16} onClick={()=>{ setEditName(false); onModalChange(false); }}/>
           </div>
-        </div>
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:20 }}>
+            <label style={{ cursor:"pointer", position:"relative" }}>
+              <input type="file" accept="image/*" onChange={pickAvatar} style={{ display:"none" }}/>
+              <div style={{ width:90, height:90, borderRadius:"50%", background: draftAvatar?"transparent":GRAD.or, overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center", fontSize:32, fontWeight:800, color:"#fff", fontFamily:FONT }}>
+                {uploadingAvatar ? <div style={{ fontSize:12, color:"#fff", fontWeight:700 }}>...</div> : (draftAvatar ? <img src={draftAvatar} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : ((draftName&&draftName[0])||"R"))}
+              </div>
+              <div style={{ position:"absolute", bottom:-2, right:-2, width:30, height:30, borderRadius:"50%", background:darkMode?"#fff":PAL.ink, color:darkMode?PAL.ink:"#fff", display:"flex", alignItems:"center", justifyContent:"center", border:"3px solid "+T.sheet }}>
+                <Ic n="cam" s={14}/>
+              </div>
+            </label>
+            <div style={{ fontSize:11.5, color:T.ink3, fontWeight:500, marginTop:9 }}>{uploadingAvatar?"Uploading...":"Tap photo to change"}</div>
+          </div>
+          <Field T={T} label="Display name">
+            <input value={draftName} onChange={e=>setDraftName(e.target.value)} placeholder="Your name" style={inputStyle(T)}/>
+          </Field>
+          <Field T={T} label="Bio">
+            <textarea value={draftBio} onChange={e=>setDraftBio(e.target.value.slice(0,150))} placeholder="A short line about you..." rows={3}
+              style={{ ...inputStyle(T), resize:"none", lineHeight:1.5 }}/>
+            <div style={{ fontSize:10.5, color:T.ink3, fontWeight:500, marginTop:5, textAlign:"right" }}>{draftBio.length}/150</div>
+          </Field>
+          <CTA T={T} disabled={uploadingAvatar} onClick={saveName}>Save Profile</CTA>
+        </Sheet>
       )}
 
-      {/* reset confirm */}
+      {showFeedback && (
+        <Sheet T={T} onClose={()=>{ setShowFeedback(false); onModalChange(false); }}>
+          <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT, marginBottom:4 }}>Send feedback</div>
+          <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, marginBottom:14, lineHeight:1.6 }}>Found a bug? Want a feature? Tell us — it opens in your email app.</div>
+          <Field T={T} label="Your message">
+            <textarea autoFocus value={fbText} onChange={e=>setFbText(e.target.value)} placeholder="Write anything..." rows={5}
+              style={{ ...inputStyle(T), resize:"none", lineHeight:1.55 }}/>
+          </Field>
+          <CTA T={T} disabled={!fbText.trim()} onClick={sendFeedback}>Send via Email</CTA>
+        </Sheet>
+      )}
+
+      {showRate && (
+        <Sheet T={T} onClose={()=>{ setShowRate(false); onModalChange(false); }}>
+          <div style={{ display:"flex", justifyContent:"center", marginBottom:14 }}><Chip n="star" c="am" T={T} size={62} is={30}/></div>
+          <div style={{ fontSize:20, fontWeight:800, color:T.ink, fontFamily:FONT, textAlign:"center", marginBottom:6 }}>Enjoying Risolvero?</div>
+          <div style={{ fontSize:13, color:T.ink2, fontWeight:500, textAlign:"center", lineHeight:1.65, marginBottom:18 }}>Star ratings open when we launch on the Play Store. For now, the best rating you can give is telling a friend.</div>
+          <CTA T={T} onClick={()=>{ setShowRate(false); onModalChange(false); }}>Got it</CTA>
+        </Sheet>
+      )}
+
       {showReset && (
         <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 24px" }}>
-          <div onClick={()=>setShowReset(false)} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.7)" }}/>
-          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:340, background:"#1a1d2e", borderRadius:24, padding:"28px 24px", border:"1px solid rgba(255,255,255,0.1)" }}>
-            <div style={{ fontSize:32, textAlign:"center", marginBottom:12 }}>🔄</div>
-            <div style={{ fontSize:17, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", textAlign:"center", marginBottom:8 }}>Reset Today?</div>
-            <div style={{ fontSize:13, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", textAlign:"center", lineHeight:1.6, marginBottom:22 }}>This clears today's habits, food log and water. Your history stays safe.</div>
+          <div onClick={()=>setShowReset(false)} style={{ position:"absolute", inset:0, background:T.overlay }}/>
+          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:340, background:T.sheet, borderRadius:26, padding:"26px 22px", boxShadow:"0 20px 60px rgba(0,0,0,.3)" }}>
+            <div style={{ display:"flex", justifyContent:"center", marginBottom:12 }}><Chip n="refresh" c="am" T={T} size={52} is={24}/></div>
+            <div style={{ fontSize:17, fontWeight:800, color:T.ink, fontFamily:FONT, textAlign:"center", marginBottom:7 }}>Reset today?</div>
+            <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, fontFamily:FONT, textAlign:"center", lineHeight:1.6, marginBottom:20 }}>This clears today's habits, food log and water. Your history stays safe.</div>
             <div style={{ display:"flex", gap:10 }}>
-              <button onClick={()=>setShowReset(false)} style={{ flex:1, padding:"13px", background:"rgba(255,255,255,0.06)", border:"none", borderRadius:14, fontSize:14, fontWeight:700, color:"rgba(255,255,255,0.5)", fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>Cancel</button>
-              <button onClick={resetToday} style={{ flex:1, padding:"13px", background:"rgba(255,179,71,0.2)", border:"1px solid rgba(255,179,71,0.3)", borderRadius:14, fontSize:14, fontWeight:700, color:"#FFB347", fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>Reset</button>
+              <button onClick={()=>setShowReset(false)} style={{ flex:1, padding:"13px", background:T.chip, border:"none", borderRadius:14, fontSize:13.5, fontWeight:700, color:T.ink2, fontFamily:FONT, cursor:"pointer" }}>Cancel</button>
+              <button onClick={resetToday} style={{ flex:1, padding:"13px", background:tints(T).am.bg, border:"none", borderRadius:14, fontSize:13.5, fontWeight:700, color:tt.am.fg, fontFamily:FONT, cursor:"pointer" }}>Reset</button>
             </div>
           </div>
         </div>
       )}
 
-      {showAuth && <AuthScreen onLogin={async(e,p)=>{ const d=await sbAuth("token?grant_type=password",{email:e,password:p}); if(d.access_token){localStorage.setItem("rslv_token",d.access_token);setToken(d.access_token);onModalChange(false);setShowAuth(false);return true;} return d.error_description||"Failed"; }} onSignup={async(e,p,u,n)=>{ const d=await sbAuth("signup",{email:e,password:p}); if(d.id||d.user?.id){const tok=d.access_token||d.session?.access_token;if(tok){localStorage.setItem("rslv_token",tok);try{await sb("profiles",{method:"POST",body:JSON.stringify({id:d.id||d.user.id,username:u,full_name:n}),headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${tok}`,"Content-Type":"application/json","Prefer":"return=representation"}});}catch{}setToken(tok);onModalChange(false);setShowAuth(false);return true;}} return d.error_description||"Failed"; }} onClose={()=>{ onModalChange(false); setShowAuth(false); }} onModalChange={onModalChange}/> }
+      {showAuth && <div className="legacy"><AuthScreen onLogin={async(e,p)=>{ const d=await sbAuth("token?grant_type=password",{email:e,password:p}); if(d.access_token){localStorage.setItem("rslv_token",d.access_token);setToken(d.access_token);onModalChange(false);setShowAuth(false);return true;} return d.error_description||"Failed"; }} onSignup={async(e,p,u,n)=>{ const d=await sbAuth("signup",{email:e,password:p}); if(d.id||d.user?.id){const tok=d.access_token||d.session?.access_token;if(tok){localStorage.setItem("rslv_token",tok);try{await sb("profiles",{method:"POST",body:JSON.stringify({id:d.id||d.user.id,username:u,full_name:n}),headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${tok}`,"Content-Type":"application/json","Prefer":"return=representation"}});}catch{}setToken(tok);onModalChange(false);setShowAuth(false);return true;}} return d.error_description||"Failed"; }} onClose={()=>{ onModalChange(false); setShowAuth(false); }} onModalChange={onModalChange}/></div> }
+
       {showClear && (
         <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 24px" }}>
-          <div onClick={()=>setShowClear(false)} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.7)" }}/>
-          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:340, background:"#1a1d2e", borderRadius:24, padding:"28px 24px", border:"1px solid rgba(255,255,255,0.1)" }}>
-            <div style={{ fontSize:32, textAlign:"center", marginBottom:12 }}>⚠️</div>
-            <div style={{ fontSize:17, fontWeight:800, color:"#ff6b6b", fontFamily:"'Sora',sans-serif", textAlign:"center", marginBottom:8 }}>Clear Everything?</div>
-            <div style={{ fontSize:13, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", textAlign:"center", lineHeight:1.6, marginBottom:22 }}>This permanently deletes all your habits, history, finance data and settings. Cannot be undone.</div>
+          <div onClick={()=>setShowClear(false)} style={{ position:"absolute", inset:0, background:T.overlay }}/>
+          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:340, background:T.sheet, borderRadius:26, padding:"26px 22px", boxShadow:"0 20px 60px rgba(0,0,0,.3)" }}>
+            <div style={{ display:"flex", justifyContent:"center", marginBottom:12 }}><Chip n="trash" c="red" T={T} size={52} is={24}/></div>
+            <div style={{ fontSize:17, fontWeight:800, color:PAL.red, fontFamily:FONT, textAlign:"center", marginBottom:7 }}>Clear everything?</div>
+            <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, fontFamily:FONT, textAlign:"center", lineHeight:1.6, marginBottom:20 }}>This permanently deletes all your habits, history, finance data and settings. Cannot be undone.</div>
             <div style={{ display:"flex", gap:10 }}>
-              <button onClick={e=>{ e.stopPropagation(); setShowClear(false); }} style={{ flex:1, padding:"13px", background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.15)", borderRadius:14, fontSize:14, fontWeight:700, color:"rgba(255,255,255,0.8)", fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>Cancel</button>
-              <button onClick={e=>{ e.stopPropagation(); clearAll(); }} style={{ flex:1, padding:"13px", background:"rgba(255,107,107,0.2)", border:"1px solid rgba(255,107,107,0.3)", borderRadius:14, fontSize:14, fontWeight:700, color:"#ff6b6b", fontFamily:"'Sora',sans-serif", cursor:"pointer" }}>Clear All</button>
+              <button onClick={e=>{ e.stopPropagation(); setShowClear(false); }} style={{ flex:1, padding:"13px", background:T.chip, border:"none", borderRadius:14, fontSize:13.5, fontWeight:700, color:T.ink, fontFamily:FONT, cursor:"pointer" }}>Cancel</button>
+              <button onClick={e=>{ e.stopPropagation(); clearAll(); }} style={{ flex:1, padding:"13px", background:tints(T).red.bg, border:"none", borderRadius:14, fontSize:13.5, fontWeight:700, color:PAL.red, fontFamily:FONT, cursor:"pointer" }}>Clear All</button>
             </div>
           </div>
         </div>
@@ -3675,128 +3789,105 @@ function OnboardingScreen({ onComplete }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [goals, setGoals] = useState([]);
+  const T = THEME(false);
+  const tt = tints(T);
 
   const GOAL_OPTIONS = [
-    { id:"habits",   emoji:"✅", label:"Build habits",     desc:"Daily routines that stick" },
-    { id:"fitness",  emoji:"💪", label:"Get fit",           desc:"Track food, water & workouts" },
-    { id:"finance",  emoji:"💰", label:"Save money",        desc:"The jar system that works" },
-    { id:"learning", emoji:"📚", label:"Learn something",   desc:"5 words a day, every day" },
+    { id:"habits",   icon:"target", c:"or", label:"Build habits",   desc:"Daily routines that stick" },
+    { id:"fitness",  icon:"fit",    c:"gr", label:"Get fit",         desc:"Track food, water & workouts" },
+    { id:"finance",  icon:"coins",  c:"am", label:"Save money",      desc:"The jar system that works" },
+    { id:"learning", icon:"book",   c:"bl", label:"Learn something", desc:"A few words a day, every day" },
   ];
-
   const toggleGoal = (id) => setGoals(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
 
+  const Primary = ({children,onClick,disabled}) => (
+    <button onClick={onClick} disabled={disabled} style={{ width:"100%", padding:"17px", background:disabled?T.chip:GRAD.or, border:"none", borderRadius:20, fontSize:15.5, fontWeight:800, fontFamily:FONT, color:disabled?T.ink3:"#fff", cursor:disabled?"not-allowed":"pointer", boxShadow:disabled?"none":"0 10px 28px rgba(255,94,31,.3)", transition:"all 0.2s" }}>{children}</button>
+  );
+
   const SCREENS = [
-    // Screen 0 — Welcome
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100vh", padding:"0 28px", textAlign:"center" }}>
-      <div style={{ fontSize:72, marginBottom:24, animation:"cardIn 0.6s ease both" }}>🌱</div>
-      <div style={{ fontSize:32, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-1px", marginBottom:12, lineHeight:1.2, animation:"fadeUp 0.5s ease 0.1s both" }}>
-        Welcome to Risolvero
-      </div>
-      <div style={{ fontSize:16, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", lineHeight:1.7, marginBottom:48, animation:"fadeUp 0.5s ease 0.2s both" }}>
-        The app for people who want to be better — and actually become it.
-      </div>
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100vh", padding:"0 26px", textAlign:"center" }}>
+      <div style={{ marginBottom:22, animation:"cardIn 0.6s ease both" }}><Chip n="leaf" c="gr" T={T} size={84} is={40}/></div>
+      <div style={{ fontSize:30, fontWeight:800, color:T.ink, fontFamily:FONT, letterSpacing:"-0.02em", marginBottom:10, lineHeight:1.15, animation:"fadeUp 0.5s ease 0.1s both" }}>Welcome to<br/><span style={{ color:PAL.or }}>Risolvero</span></div>
+      <div style={{ fontSize:14.5, color:T.ink2, fontFamily:FONT, fontWeight:500, lineHeight:1.7, marginBottom:44, animation:"fadeUp 0.5s ease 0.2s both" }}>The app for people who want to be better — and actually become it.</div>
       <div style={{ width:"100%", animation:"fadeUp 0.5s ease 0.3s both" }}>
-        <button onClick={()=>setStep(1)} style={{ width:"100%", padding:"18px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:20, fontSize:16, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer", marginBottom:12, boxShadow:"0 8px 30px rgba(168,213,194,0.25)" }}>
-          Let's go →
-        </button>
-        <button onClick={()=>onComplete("")} style={{ width:"100%", padding:"14px", background:"none", border:"none", fontSize:13, fontFamily:"'Sora',sans-serif", color:"rgba(255,255,255,0.2)", cursor:"pointer" }}>
-          Skip intro
-        </button>
+        <Primary onClick={()=>setStep(1)}>Let's go</Primary>
+        <button onClick={()=>onComplete("")} style={{ width:"100%", padding:"14px", background:"none", border:"none", fontSize:12.5, fontFamily:FONT, fontWeight:600, color:T.ink3, cursor:"pointer" }}>Skip intro</button>
       </div>
     </div>,
 
-    // Screen 1 — What do you want to improve?
-    <div style={{ padding:"60px 24px 32px", minHeight:"100vh" }}>
-      <div style={{ fontSize:11, color:"rgba(255,255,255,0.3)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:12 }}>Step 1 of 3</div>
-      <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px", marginBottom:6, lineHeight:1.2 }}>What do you want to improve?</div>
-      <div style={{ fontSize:14, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:32 }}>Pick everything that matters to you</div>
-      <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:40 }}>
+    <div style={{ padding:"64px 22px 32px", minHeight:"100vh" }}>
+      <div style={{ fontSize:10.5, color:T.ink3, letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:FONT, fontWeight:700, marginBottom:10 }}>Step 1 of 3</div>
+      <div style={{ fontSize:24, fontWeight:800, color:T.ink, fontFamily:FONT, letterSpacing:"-0.02em", marginBottom:5, lineHeight:1.2 }}>What do you want to improve?</div>
+      <div style={{ fontSize:13, color:T.ink2, fontFamily:FONT, fontWeight:500, marginBottom:26 }}>Pick everything that matters to you</div>
+      <div style={{ display:"flex", flexDirection:"column", gap:11, marginBottom:34 }}>
         {GOAL_OPTIONS.map(g=>{
           const sel = goals.includes(g.id);
           return (
-            <div key={g.id} onClick={()=>toggleGoal(g.id)} style={{ display:"flex", alignItems:"center", gap:16, padding:"18px 20px", borderRadius:20, background:sel?"rgba(168,213,194,0.1)":"rgba(255,255,255,0.04)", border:sel?"1.5px solid rgba(168,213,194,0.35)":"1px solid rgba(255,255,255,0.08)", cursor:"pointer", transition:"all 0.2s" }}>
-              <div style={{ fontSize:32 }}>{g.emoji}</div>
+            <div key={g.id} onClick={()=>toggleGoal(g.id)} style={{ display:"flex", alignItems:"center", gap:14, padding:"15px 16px", borderRadius:20, background:T.card, border:sel?("1.6px solid "+PAL.or):("1px solid "+T.line), cursor:"pointer", transition:"all 0.2s", boxShadow:T.shadow }}>
+              <Chip n={g.icon} c={g.c} T={T} size={44} is={21}/>
               <div style={{ flex:1 }}>
-                <div style={{ fontSize:16, fontWeight:700, color:"#fff", fontFamily:"'Sora',sans-serif" }}>{g.label}</div>
-                <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginTop:2 }}>{g.desc}</div>
+                <div style={{ fontSize:15, fontWeight:700, color:T.ink, fontFamily:FONT }}>{g.label}</div>
+                <div style={{ fontSize:11.5, color:T.ink3, fontFamily:FONT, fontWeight:500, marginTop:2 }}>{g.desc}</div>
               </div>
-              <div style={{ width:24, height:24, borderRadius:"50%", background:sel?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.2s", flexShrink:0 }}>
-                {sel && <Icons.Check/>}
+              <div style={{ width:24, height:24, borderRadius:"50%", background:sel?GRAD.or:T.chip, display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.2s", flexShrink:0 }}>
+                {sel && <Tick color="#fff" size={12}/>}
               </div>
             </div>
           );
         })}
       </div>
-      <button onClick={()=>setStep(2)} disabled={goals.length===0} style={{ width:"100%", padding:"18px", background:goals.length>0?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.06)", border:"none", borderRadius:20, fontSize:16, fontWeight:800, fontFamily:"'Sora',sans-serif", color:goals.length>0?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:goals.length>0?"pointer":"not-allowed", transition:"all 0.2s" }}>
-        Continue →
-      </button>
+      <Primary onClick={()=>setStep(2)} disabled={goals.length===0}>Continue</Primary>
     </div>,
 
-    // Screen 2 — What's your name?
-    <div style={{ padding:"60px 24px 32px", minHeight:"100vh" }}>
-      <div style={{ fontSize:11, color:"rgba(255,255,255,0.3)", letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:"'Sora',sans-serif", marginBottom:12 }}>Step 2 of 3</div>
-      <div style={{ fontSize:26, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-0.5px", marginBottom:6 }}>What's your name?</div>
-      <div style={{ fontSize:14, color:"rgba(255,255,255,0.3)", fontFamily:"'Sora',sans-serif", marginBottom:40 }}>So the app feels personal</div>
-      <input
-        autoFocus
-        value={name}
-        onChange={e=>setName(e.target.value)}
-        onKeyDown={e=>e.key==="Enter"&&name.trim()&&setStep(3)}
-        placeholder="Your first name"
-        style={{ width:"100%", padding:"18px 20px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:18, color:"#fff", fontSize:22, fontFamily:"'Sora',sans-serif", fontWeight:700, outline:"none", marginBottom:40, display:"block" }}
-      />
-      <div style={{ fontSize:13, color:"rgba(255,255,255,0.2)", fontFamily:"'Sora',sans-serif", textAlign:"center", marginBottom:20 }}>
-        {name ? `Nice to meet you, ${name} 👋` : ""}
-      </div>
-      <button onClick={()=>setStep(3)} disabled={!name.trim()} style={{ width:"100%", padding:"18px", background:name.trim()?"linear-gradient(135deg,#A8D5C2,#C5B8E8)":"rgba(255,255,255,0.06)", border:"none", borderRadius:20, fontSize:16, fontWeight:800, fontFamily:"'Sora',sans-serif", color:name.trim()?"#1a1d2e":"rgba(255,255,255,0.2)", cursor:name.trim()?"pointer":"not-allowed", transition:"all 0.2s" }}>
-        Continue →
-      </button>
+    <div style={{ padding:"64px 22px 32px", minHeight:"100vh" }}>
+      <div style={{ fontSize:10.5, color:T.ink3, letterSpacing:"0.14em", textTransform:"uppercase", fontFamily:FONT, fontWeight:700, marginBottom:10 }}>Step 2 of 3</div>
+      <div style={{ fontSize:24, fontWeight:800, color:T.ink, fontFamily:FONT, letterSpacing:"-0.02em", marginBottom:5 }}>What's your name?</div>
+      <div style={{ fontSize:13, color:T.ink2, fontFamily:FONT, fontWeight:500, marginBottom:32 }}>So the app feels personal</div>
+      <input autoFocus value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&name.trim()&&setStep(3)} placeholder="Your first name"
+        style={{ width:"100%", padding:"17px 18px", background:T.card, border:"1px solid "+T.line2, borderRadius:18, color:T.ink, fontSize:21, fontFamily:FONT, fontWeight:800, outline:"none", marginBottom:32, display:"block", boxShadow:T.shadow }}/>
+      <div style={{ fontSize:12.5, color:T.ink2, fontFamily:FONT, fontWeight:500, textAlign:"center", marginBottom:18, minHeight:18 }}>{name ? "Nice to meet you, "+name : ""}</div>
+      <Primary onClick={()=>setStep(3)} disabled={!name.trim()}>Continue</Primary>
     </div>,
 
-    // Screen 3 — Ready!
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100vh", padding:"0 28px", textAlign:"center" }}>
-      <div style={{ fontSize:72, marginBottom:20, animation:"cardIn 0.5s ease both" }}>🚀</div>
-      <div style={{ fontSize:30, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", letterSpacing:"-1px", marginBottom:10, animation:"fadeUp 0.5s ease 0.05s both" }}>
-        {name ? `You're ready, ${name}!` : "You're ready!"}
-      </div>
-      <div style={{ fontSize:15, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", lineHeight:1.7, marginBottom:16, animation:"fadeUp 0.5s ease 0.1s both" }}>
-        Your journey starts today.
-      </div>
-      <div style={{ display:"flex", flexWrap:"wrap", gap:8, justifyContent:"center", marginBottom:40, animation:"fadeUp 0.5s ease 0.15s both" }}>
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100vh", padding:"0 26px", textAlign:"center" }}>
+      <div style={{ marginBottom:18, animation:"cardIn 0.5s ease both" }}><Chip n="flame" c="or" T={T} size={84} is={40}/></div>
+      <div style={{ fontSize:27, fontWeight:800, color:T.ink, fontFamily:FONT, letterSpacing:"-0.02em", marginBottom:8, animation:"fadeUp 0.5s ease 0.05s both" }}>{name ? "You're ready, "+name+"!" : "You're ready!"}</div>
+      <div style={{ fontSize:14, color:T.ink2, fontFamily:FONT, fontWeight:500, lineHeight:1.7, marginBottom:14, animation:"fadeUp 0.5s ease 0.1s both" }}>Your journey starts today.</div>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, justifyContent:"center", marginBottom:36, animation:"fadeUp 0.5s ease 0.15s both" }}>
         {goals.map(g=>{ const opt = GOAL_OPTIONS.find(o=>o.id===g); return opt ? (
-          <div key={g} style={{ padding:"8px 16px", borderRadius:20, background:"rgba(168,213,194,0.1)", border:"1px solid rgba(168,213,194,0.2)", fontSize:13, fontWeight:600, color:"#A8D5C2", fontFamily:"'Sora',sans-serif" }}>
-            {opt.emoji} {opt.label}
+          <div key={g} style={{ display:"flex", alignItems:"center", gap:7, padding:"7px 14px 7px 8px", borderRadius:999, background:T.card, border:"1px solid "+T.line, boxShadow:T.shadow }}>
+            <Chip n={opt.icon} c={opt.c} T={T} size={24} is={12} style={{ borderRadius:"50%" }}/>
+            <span style={{ fontSize:12.5, fontWeight:700, color:T.ink, fontFamily:FONT }}>{opt.label}</span>
           </div>
         ) : null; })}
       </div>
-      <button onClick={()=>onComplete(name)} style={{ width:"100%", padding:"18px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:20, fontSize:16, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer", boxShadow:"0 8px 30px rgba(168,213,194,0.25)", animation:"fadeUp 0.5s ease 0.2s both" }}>
-        Start growing 🌱
-      </button>
+      <div style={{ width:"100%", animation:"fadeUp 0.5s ease 0.2s both" }}>
+        <Primary onClick={()=>onComplete(name)}>Start growing</Primary>
+      </div>
     </div>
   ];
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-        html,body{background:#12141E;height:100%;}
+        html,body{background:#F4F4F6;height:100%;}
         ::-webkit-scrollbar{display:none;}
         @keyframes cardIn{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes tabIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
       `}</style>
-      <div style={{ maxWidth:430, margin:"0 auto", background:"#12141E", minHeight:"100vh", position:"relative", overflow:"hidden" }}>
-        {/* progress dots */}
+      <div style={{ maxWidth:430, margin:"0 auto", background:"#F4F4F6", minHeight:"100vh", position:"relative", overflow:"hidden" }}>
         {step > 0 && (
           <div style={{ position:"fixed", top:20, left:"50%", transform:"translateX(-50%)", display:"flex", gap:6, zIndex:10 }}>
             {[1,2,3].map(i=>(
-              <div key={i} style={{ width: step>=i?24:8, height:8, borderRadius:8, background: step>=i?"#A8D5C2":"rgba(255,255,255,0.15)", transition:"all 0.3s" }}/>
+              <div key={i} style={{ width: step>=i?24:8, height:8, borderRadius:8, background: step>=i?PAL.or:"#E0E0E6", transition:"all 0.3s" }}/>
             ))}
           </div>
         )}
-        {/* back button */}
         {step > 0 && (
-          <button onClick={()=>setStep(s=>s-1)} style={{ position:"fixed", top:14, left:18, background:"rgba(255,255,255,0.06)", border:"none", borderRadius:12, width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:18, zIndex:10 }}>‹</button>
+          <div onClick={()=>setStep(s=>s-1)} style={{ position:"fixed", top:14, left:18, zIndex:10 }}><Chip n="back" c="ink" T={T} size={38} is={17} onClick={()=>{}}/></div>
         )}
         <div key={step} style={{ animation:"tabIn 0.3s ease both" }}>
           {SCREENS[step]}
@@ -3813,6 +3904,9 @@ export default function Risolvero() {
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const [darkMode, setDarkMode] = useState(()=>load("rslv_dark_mode",true));
 
+  // calm-editorial accent (terracotta) for the shared frame
+  const navAccent = PAL.or2;
+
   useEffect(()=>{
     registerSW();
     if(onboarded) scheduleNotifications();
@@ -3820,7 +3914,7 @@ export default function Risolvero() {
 
   useEffect(()=>{
     save("rslv_dark_mode", darkMode);
-    document.body.style.background = darkMode ? "#12141E" : "#FFFFFF";
+    document.body.style.background = darkMode ? "#141519" : "#F4F4F6";
     const rootEl = document.getElementById("rslv-root");
     if(rootEl){
       if(darkMode) rootEl.classList.remove("light");
@@ -3838,20 +3932,20 @@ export default function Risolvero() {
   if(!onboarded) return <OnboardingScreen onComplete={completeOnboarding}/>;
 
   const pages = {
-    home:      <HomePage onNavigate={setTab}/>,
-    fitness:   <FitnessPage onModalChange={setNavHidden}/>,
-    learning:  <LearningPage/>,
-    finance:   <FinancePage onModalChange={setNavHidden}/>,
-    community: <CommunityPage onModalChange={setNavHidden}/>,
+    home:      <HomePage onNavigate={setTab} darkMode={darkMode}/>,
+    fitness:   <FitnessPage onModalChange={setNavHidden} darkMode={darkMode}/>,
+    learning:  <LearningPage darkMode={darkMode}/>,
+    finance:   <FinancePage onModalChange={setNavHidden} darkMode={darkMode}/>,
+    community: <div className="legacy"><CommunityPage onModalChange={setNavHidden}/></div>,
     profile:   <ProfilePage onModalChange={setNavHidden} darkMode={darkMode} setDarkMode={setDarkMode}/>,
   };
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Inter+Tight:wght@400;500;600;700&family=Poppins:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-        html{background:${darkMode?"#12141E":"#FFFFFF"};-webkit-text-size-adjust:100%;}
-        body{background:${darkMode?"#12141E":"#FFFFFF"};min-height:100vh;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:none;}
+        html{background:${darkMode?"#141519":"#F4F4F6"};-webkit-text-size-adjust:100%;}
+        body{background:${darkMode?"#141519":"#F4F4F6"};min-height:100vh;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:none;}
         .modal-open-nav{display:none !important;}
         @media (max-height: 500px){ .bottom-nav{ display:none !important; } }
         ::-webkit-scrollbar{display:none;}
@@ -3868,73 +3962,73 @@ export default function Risolvero() {
            Pure white page · cards separated by soft
            shadow + padding · charcoal ink · vibrant accents
            ============================================ */
-        #rslv-root.light { background:#FFFFFF !important; }
+        #rslv-root.light { background:#F4F4F6 !important; }
 
         /* page-level dark backgrounds -> white */
-        #rslv-root.light [style*="background: rgb(18, 20, 30)"],
-        #rslv-root.light [style*="background:#12141E"],
-        #rslv-root.light [style*="background: #12141E"] { background:#FFFFFF !important; }
+        #rslv-root.light .legacy [style*="background: rgb(18, 20, 30)"],
+        #rslv-root.light .legacy [style*="background:#12141E"],
+        #rslv-root.light .legacy [style*="background: #12141E"] { background:#FFFFFF !important; }
 
         /* solid dark sheets/modals -> white */
-        #rslv-root.light [style*="background: rgb(26, 29, 46)"],
-        #rslv-root.light [style*="background:#1a1d2e"],
-        #rslv-root.light [style*="background: #1a1d2e"] { background:#FFFFFF !important; }
+        #rslv-root.light .legacy [style*="background: rgb(26, 29, 46)"],
+        #rslv-root.light .legacy [style*="background:#1a1d2e"],
+        #rslv-root.light .legacy [style*="background: #1a1d2e"] { background:#FFFFFF !important; }
 
         /* card fills -> white with soft shadow (separation via depth, not color) */
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.03)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.03)"],
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.04)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.04)"],
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.05)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.05)"],
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.06)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.06)"] {
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.03)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.03)"],
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.04)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.04)"],
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.05)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.05)"],
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.06)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.06)"] {
           background:#FFFFFF !important;
           box-shadow:0 1px 3px rgba(27,27,31,0.05), 0 8px 24px rgba(27,27,31,0.06) !important;
         }
         /* stronger fills (buttons, chips) -> light warm grey */
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.08)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.08)"] { background:rgba(27,27,31,0.05) !important; }
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.08)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.08)"] { background:rgba(27,27,31,0.05) !important; }
 
         /* borders -> soft warm hairline */
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.07)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.07)"],
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.1)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.1)"] { border-color:rgba(27,27,31,0.07) !important; }
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.07)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.07)"],
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.1)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.1)"] { border-color:rgba(27,27,31,0.07) !important; }
 
         /* white text -> charcoal, scaled by importance */
-        #rslv-root.light [style*="color: rgb(255, 255, 255)"],
-        #rslv-root.light [style*="color:#fff"],
-        #rslv-root.light [style*="color: #fff"],
-        #rslv-root.light [style*="color:#ffffff"] { color:#1B1B1F !important; }
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.85)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.85)"] { color:rgba(27,27,31,0.9) !important; }
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.8)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.8)"] { color:rgba(27,27,31,0.85) !important; }
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.7)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.7)"] { color:rgba(27,27,31,0.75) !important; }
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.6)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.6)"] { color:rgba(27,27,31,0.68) !important; }
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.5)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.5)"] { color:rgba(27,27,31,0.75) !important; }
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.4)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.4)"] { color:rgba(27,27,31,0.72) !important; }
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.35)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.35)"] { color:rgba(27,27,31,0.7) !important; }
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.3)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.3)"] { color:rgba(27,27,31,0.7) !important; }
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.25)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.25)"] { color:rgba(27,27,31,0.68) !important; }
-        #rslv-root.light [style*="rgba(255, 255, 255, 0.2)"],
-        #rslv-root.light [style*="rgba(255,255,255,0.2)"] { color:rgba(27,27,31,0.65) !important; }
+        #rslv-root.light .legacy [style*="color: rgb(255, 255, 255)"],
+        #rslv-root.light .legacy [style*="color:#fff"],
+        #rslv-root.light .legacy [style*="color: #fff"],
+        #rslv-root.light .legacy [style*="color:#ffffff"] { color:#1B1B1F !important; }
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.85)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.85)"] { color:rgba(27,27,31,0.9) !important; }
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.8)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.8)"] { color:rgba(27,27,31,0.85) !important; }
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.7)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.7)"] { color:rgba(27,27,31,0.75) !important; }
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.6)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.6)"] { color:rgba(27,27,31,0.68) !important; }
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.5)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.5)"] { color:rgba(27,27,31,0.75) !important; }
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.4)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.4)"] { color:rgba(27,27,31,0.72) !important; }
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.35)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.35)"] { color:rgba(27,27,31,0.7) !important; }
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.3)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.3)"] { color:rgba(27,27,31,0.7) !important; }
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.25)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.25)"] { color:rgba(27,27,31,0.68) !important; }
+        #rslv-root.light .legacy [style*="rgba(255, 255, 255, 0.2)"],
+        #rslv-root.light .legacy [style*="rgba(255,255,255,0.2)"] { color:rgba(27,27,31,0.65) !important; }
 
         /* progress-bar / circle tracks: white-on-dark -> visible warm grey */
         #rslv-root.light circle[stroke="rgba(255,255,255,0.12)"] { stroke:rgba(27,27,31,0.1) !important; }
         #rslv-root.light circle[stroke="rgba(255, 255, 255, 0.12)"] { stroke:rgba(27,27,31,0.1) !important; }
 
         /* sticky header fade */
-        #rslv-root.light [style*="linear-gradient(180deg,#12141E"],
-        #rslv-root.light [style*="linear-gradient(180deg, #12141E"] { background:linear-gradient(180deg,#FFFFFF 70%,transparent 100%) !important; }
+        #rslv-root.light .legacy [style*="linear-gradient(180deg,#12141E"],
+        #rslv-root.light .legacy [style*="linear-gradient(180deg, #12141E"] { background:linear-gradient(180deg,#F4F4F6 70%,transparent 100%) !important; }
 
         /* inputs */
         #rslv-root.light input, #rslv-root.light textarea, #rslv-root.light select {
@@ -3946,70 +4040,63 @@ export default function Risolvero() {
 
         /* bottom nav */
         #rslv-root.light .bottom-nav > div { background:rgba(255,255,255,0.98) !important; box-shadow:0 -1px 24px rgba(27,27,31,0.1) !important; border-color:rgba(27,27,31,0.06) !important; }
-        /* inactive nav buttons -> readable dark grey (active stays green via inline) */
-        #rslv-root.light .bottom-nav button[style*="rgba(255, 255, 255, 0.2)"],
-        #rslv-root.light .bottom-nav button[style*="rgba(255,255,255,0.2)"] { color:rgba(27,27,31,0.55) !important; }
-        #rslv-root.light .bottom-nav button[style*="rgba(255, 255, 255, 0.2)"] svg,
-        #rslv-root.light .bottom-nav button[style*="rgba(255,255,255,0.2)"] svg { stroke:rgba(27,27,31,0.5) !important; }
+        /* inactive nav buttons -> readable dark grey (active stays terracotta via inline) */
+        #rslv-root.light .bottom-nav button[style*="rgba(17, 17, 16, 0.35)"] svg { stroke:rgba(27,27,31,0.5) !important; }
 
         /* toggles keep their own styling in light mode (don't convert to white card) */
-        #rslv-root.light .rslv-toggle.off { background:rgba(120,120,130,0.22) !important; border-color:rgba(120,120,130,0.5) !important; box-shadow:none !important; }
-        #rslv-root.light .rslv-toggle.on { box-shadow:none !important; }
-
-        /* hero pastel card + add-habit button keep their gradients in light mode */
-        #rslv-root.light .rslv-hero-card { box-shadow:0 8px 30px rgba(150,130,200,0.14) !important; }
-        #rslv-root.light .rslv-add-habit { box-shadow:0 6px 20px rgba(169,155,216,0.3) !important; }
+        #rslv-root.light .legacy .rslv-toggle.off { background:rgba(120,120,130,0.22) !important; border-color:rgba(120,120,130,0.5) !important; box-shadow:none !important; }
+        #rslv-root.light .legacy .rslv-toggle.on { box-shadow:none !important; }
 
         /* ── readable accent TEXT in light mode ──
            Pale pastel accents are built for dark bg; on white they wash out.
            Deepen them to a saturated, comfortable-to-read version.
            (Only affects text color, not backgrounds/borders/gradients.) */
-        #rslv-root.light [style*="color: rgb(168, 213, 194)"],
-        #rslv-root.light [style*="color:#A8D5C2"],
-        #rslv-root.light [style*="color: #A8D5C2"] { color:#3F8F6E !important; }   /* mint green */
-        #rslv-root.light [style*="color: rgb(200, 223, 240)"],
-        #rslv-root.light [style*="color:#C8DFF0"],
-        #rslv-root.light [style*="color: #C8DFF0"] { color:#3D7BB0 !important; }   /* sky blue */
-        #rslv-root.light [style*="color: rgb(216, 208, 240)"],
-        #rslv-root.light [style*="color:#D8D0F0"],
-        #rslv-root.light [style*="color: #D8D0F0"] { color:#7A6CB8 !important; }   /* lavender */
-        #rslv-root.light [style*="color: rgb(245, 221, 208)"],
-        #rslv-root.light [style*="color:#F5DDD0"],
-        #rslv-root.light [style*="color: #F5DDD0"] { color:#C06B45 !important; }   /* peach */
-        #rslv-root.light [style*="color: rgb(200, 230, 218)"],
-        #rslv-root.light [style*="color:#C8E6DA"],
-        #rslv-root.light [style*="color: #C8E6DA"] { color:#3F8F6E !important; }   /* soft green */
-        #rslv-root.light [style*="color: rgb(240, 232, 208)"],
-        #rslv-root.light [style*="color:#F0E8D0"],
-        #rslv-root.light [style*="color: #F0E8D0"] { color:#A8862F !important; }   /* gold */
-        #rslv-root.light [style*="color: rgb(237, 208, 240)"],
-        #rslv-root.light [style*="color:#EDD0F0"],
-        #rslv-root.light [style*="color: #EDD0F0"] { color:#A053B0 !important; }   /* pink-purple */
-        #rslv-root.light [style*="color: rgb(255, 179, 71)"],
-        #rslv-root.light [style*="color:#FFB347"],
-        #rslv-root.light [style*="color: #FFB347"] { color:#D88A1E !important; }   /* amber */
+        #rslv-root.light .legacy [style*="color: rgb(168, 213, 194)"],
+        #rslv-root.light .legacy [style*="color:#A8D5C2"],
+        #rslv-root.light .legacy [style*="color: #A8D5C2"] { color:#3F8F6E !important; }   /* mint green */
+        #rslv-root.light .legacy [style*="color: rgb(200, 223, 240)"],
+        #rslv-root.light .legacy [style*="color:#C8DFF0"],
+        #rslv-root.light .legacy [style*="color: #C8DFF0"] { color:#3D7BB0 !important; }   /* sky blue */
+        #rslv-root.light .legacy [style*="color: rgb(216, 208, 240)"],
+        #rslv-root.light .legacy [style*="color:#D8D0F0"],
+        #rslv-root.light .legacy [style*="color: #D8D0F0"] { color:#7A6CB8 !important; }   /* lavender */
+        #rslv-root.light .legacy [style*="color: rgb(245, 221, 208)"],
+        #rslv-root.light .legacy [style*="color:#F5DDD0"],
+        #rslv-root.light .legacy [style*="color: #F5DDD0"] { color:#C06B45 !important; }   /* peach */
+        #rslv-root.light .legacy [style*="color: rgb(200, 230, 218)"],
+        #rslv-root.light .legacy [style*="color:#C8E6DA"],
+        #rslv-root.light .legacy [style*="color: #C8E6DA"] { color:#3F8F6E !important; }   /* soft green */
+        #rslv-root.light .legacy [style*="color: rgb(240, 232, 208)"],
+        #rslv-root.light .legacy [style*="color:#F0E8D0"],
+        #rslv-root.light .legacy [style*="color: #F0E8D0"] { color:#A8862F !important; }   /* gold */
+        #rslv-root.light .legacy [style*="color: rgb(237, 208, 240)"],
+        #rslv-root.light .legacy [style*="color:#EDD0F0"],
+        #rslv-root.light .legacy [style*="color: #EDD0F0"] { color:#A053B0 !important; }   /* pink-purple */
+        #rslv-root.light .legacy [style*="color: rgb(255, 179, 71)"],
+        #rslv-root.light .legacy [style*="color:#FFB347"],
+        #rslv-root.light .legacy [style*="color: #FFB347"] { color:#D88A1E !important; }   /* amber */
 
         /* community search bar -> clean inset, not floating white card */
-        #rslv-root.light .rslv-search-bar { background:rgba(27,27,31,0.04) !important; border-color:rgba(27,27,31,0.08) !important; box-shadow:none !important; }
-        #rslv-root.light .rslv-search-bar svg { stroke:rgba(27,27,31,0.35) !important; }
+        #rslv-root.light .legacy .rslv-search-bar { background:rgba(27,27,31,0.04) !important; border-color:rgba(27,27,31,0.08) !important; box-shadow:none !important; }
+        #rslv-root.light .legacy .rslv-search-bar svg { stroke:rgba(27,27,31,0.35) !important; }
         /* community 3-dot button -> clean inset, not floating white card */
-        #rslv-root.light .rslv-menu-btn { background:rgba(27,27,31,0.04) !important; border-color:rgba(27,27,31,0.08) !important; box-shadow:none !important; }
+        #rslv-root.light .legacy .rslv-menu-btn { background:rgba(27,27,31,0.04) !important; border-color:rgba(27,27,31,0.08) !important; box-shadow:none !important; }
 
         /* community 3-dot menu dots -> visible dark in light mode */
-        #rslv-root.light .rslv-menu-dot { background:rgba(27,27,31,0.45) !important; }
+        #rslv-root.light .legacy .rslv-menu-dot { background:rgba(27,27,31,0.45) !important; }
         /* dark dropdown menus -> white card in light mode */
-        #rslv-root.light [style*="background: rgb(30, 34, 53)"],
-        #rslv-root.light [style*="background:#1e2235"] { background:#FFFFFF !important; box-shadow:0 8px 32px rgba(27,27,31,0.15) !important; }
+        #rslv-root.light .legacy [style*="background: rgb(30, 34, 53)"],
+        #rslv-root.light .legacy [style*="background:#1e2235"] { background:#FFFFFF !important; box-shadow:0 8px 32px rgba(27,27,31,0.15) !important; }
       `}</style>
-      <div id="rslv-root" className={darkMode?"":"light"} style={{ maxWidth:430, margin:"0 auto", minHeight:"100vh", background:darkMode?"#12141E":"#FFFFFF", position:"relative", overflowX:"hidden", fontFamily:"'Sora',sans-serif" }}>
+      <div id="rslv-root" className={darkMode?"":"light"} style={{ maxWidth:430, margin:"0 auto", minHeight:"100vh", background:darkMode?"#141519":"#F4F4F6", position:"relative", overflowX:"hidden", fontFamily:FONT }}>
         <div style={{ position:"fixed", top:0, left:"50%", transform:"translateX(-50%)", width:430, height:"100vh", pointerEvents:"none", zIndex:0 }}>
-          <div style={{ position:"absolute", top:-60, left:"20%", width:280, height:280, background:darkMode?"radial-gradient(circle,rgba(168,213,194,0.06) 0%,transparent 65%)":"radial-gradient(circle,rgba(168,213,194,0.15) 0%,transparent 65%)", filter:"blur(50px)" }}/>
-          <div style={{ position:"absolute", top:100, right:"5%", width:200, height:200, background:darkMode?"radial-gradient(circle,rgba(197,184,232,0.05) 0%,transparent 65%)":"radial-gradient(circle,rgba(197,184,232,0.1) 0%,transparent 65%)", filter:"blur(40px)" }}/>
+          <div style={{ position:"absolute", top:-60, left:"20%", width:280, height:280, background:darkMode?"radial-gradient(circle,rgba(255,107,44,0.06) 0%,transparent 65%)":"radial-gradient(circle,rgba(255,107,44,0.08) 0%,transparent 65%)", filter:"blur(50px)" }}/>
+          <div style={{ position:"absolute", top:100, right:"5%", width:200, height:200, background:darkMode?"radial-gradient(circle,rgba(255,107,44,0.04) 0%,transparent 65%)":"radial-gradient(circle,rgba(255,107,44,0.05) 0%,transparent 65%)", filter:"blur(40px)" }}/>
         </div>
-        <div style={{ position:"sticky", top:0, zIndex:10, padding:"52px 18px 12px", background:darkMode?"linear-gradient(180deg,#12141E 60%,transparent 100%)":"linear-gradient(180deg,#FFFFFF 70%,transparent 100%)" }}>
+        <div style={{ position:"sticky", top:0, zIndex:10, padding:"52px 18px 12px", background:darkMode?"linear-gradient(180deg,#141519 60%,transparent 100%)":"linear-gradient(180deg,#F4F4F6 70%,transparent 100%)" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-            <div style={{ fontSize:13, fontWeight:800, letterSpacing:"0.26em", color:darkMode?"rgba(255,255,255,0.85)":"rgba(0,0,0,0.7)", fontFamily:"'Sora',sans-serif" }}>RISOLVERO</div>
-            <div style={{ fontSize:11, color:darkMode?"rgba(255,255,255,0.2)":"rgba(0,0,0,0.3)", fontFamily:"'Sora',sans-serif" }}>{new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"})}</div>
+            <div style={{ fontSize:13, fontWeight:800, letterSpacing:"0.22em", color:darkMode?"rgba(245,243,239,0.85)":"rgba(17,17,16,0.7)", fontFamily:FONT }}>RISOLVERO</div>
+            <div style={{ fontSize:11, color:darkMode?"rgba(245,243,239,0.3)":"rgba(17,17,16,0.35)", fontFamily:FONT }}>{new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"})}</div>
           </div>
         </div>
         <div key={tab} style={{ position:"relative", zIndex:1, paddingBottom:110, animation:"tabIn 0.25s ease both" }}>
@@ -4019,16 +4106,16 @@ export default function Risolvero() {
         {showNotifPrompt && typeof Notification !== "undefined" && Notification.permission === "default" && (
           <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"flex-end", justifyContent:"center", padding:"0 0 40px" }}>
             <div onClick={()=>setShowNotifPrompt(false)} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.5)" }}/>
-            <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:28, padding:"28px 24px", margin:"0 16px", border:"1px solid rgba(255,255,255,0.1)", animation:"sheetUp 0.3s ease both" }}>
-              <div style={{ fontSize:40, textAlign:"center", marginBottom:14 }}>🔔</div>
-              <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", textAlign:"center", marginBottom:8 }}>Stay on track</div>
-              <div style={{ fontSize:14, color:"rgba(255,255,255,0.4)", fontFamily:"'Sora',sans-serif", textAlign:"center", lineHeight:1.6, marginBottom:24 }}>
+            <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:darkMode?"#1A1A17":"#FFFFFF", borderRadius:28, padding:"28px 24px", margin:"0 16px", border:`1px solid ${darkMode?"rgba(245,243,239,0.1)":"rgba(17,17,16,0.1)"}`, animation:"sheetUp 0.3s ease both" }}>
+              <div style={{ color:navAccent, display:"flex", justifyContent:"center", marginBottom:14 }}><Icons.Bell/></div>
+              <div style={{ fontSize:20, fontWeight:700, color:darkMode?"#F5F3EF":"#111110", fontFamily:FONT, textAlign:"center", marginBottom:8, letterSpacing:"-0.02em" }}>Stay on track</div>
+              <div style={{ fontSize:14, color:darkMode?"#A8A49B":"#6E6B63", fontFamily:FONT, textAlign:"center", lineHeight:1.6, marginBottom:24 }}>
                 Get reminders for your habits, streak alerts and subscription renewals.
               </div>
-              <button onClick={async()=>{ await requestNotifPermission(); scheduleNotifications(); setShowNotifPrompt(false); }} style={{ width:"100%", padding:"16px", background:"linear-gradient(135deg,#A8D5C2,#C5B8E8)", border:"none", borderRadius:16, fontSize:15, fontWeight:800, fontFamily:"'Sora',sans-serif", color:"#1a1d2e", cursor:"pointer", marginBottom:10 }}>
+              <button onClick={async()=>{ await requestNotifPermission(); scheduleNotifications(); setShowNotifPrompt(false); }} style={{ width:"100%", padding:"16px", background:darkMode?"#F5F3EF":"#111110", border:"none", borderRadius:16, fontSize:15, fontWeight:600, fontFamily:FONT, color:darkMode?"#121110":"#F2F1ED", cursor:"pointer", marginBottom:10, letterSpacing:"-0.01em" }}>
                 Enable Notifications
               </button>
-              <button onClick={()=>setShowNotifPrompt(false)} style={{ width:"100%", padding:"12px", background:"none", border:"none", fontSize:13, fontFamily:"'Sora',sans-serif", color:"rgba(255,255,255,0.25)", cursor:"pointer" }}>
+              <button onClick={()=>setShowNotifPrompt(false)} style={{ width:"100%", padding:"12px", background:"none", border:"none", fontSize:13, fontFamily:FONT, color:darkMode?"#6E6A62":"#9A988F", cursor:"pointer" }}>
                 Not now
               </button>
             </div>
@@ -4036,15 +4123,15 @@ export default function Risolvero() {
         )}
 
         {!navHidden && (
-        <div className="bottom-nav" style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, padding:"0 16px 26px", zIndex:20, paddingBottom:"max(26px, env(safe-area-inset-bottom))" }}>
-          <div style={{ background:"rgba(18,20,30,0.96)", backdropFilter:"blur(30px)", WebkitBackdropFilter:"blur(30px)", borderRadius:28, border:"1px solid rgba(255,255,255,0.07)", padding:"10px 4px", display:"flex", justifyContent:"space-around", boxShadow:"0 8px 40px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.05)" }}>
-            {TABS.map(({id,label,Icon})=>{
+        <div className="bottom-nav" style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, padding:"0 16px", zIndex:20, paddingBottom:"max(14px, env(safe-area-inset-bottom))" }}>
+          <div style={{ background:darkMode?"#1E1F25":"#17181C", border:darkMode?"1px solid #2A2B33":"none", borderRadius:24, height:64, display:"flex", justifyContent:"space-around", alignItems:"center", boxShadow:darkMode?"0 14px 34px rgba(0,0,0,.5)":"0 14px 30px rgba(23,24,28,.3)" }}>
+            {TABS.map(({id,label})=>{
               const active=tab===id;
+              const NI={home:"home",fitness:"fit",learning:"book",finance:"wallet",profile:"user"};
               return (
-                <button key={id} onClick={()=>setTab(id)} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4, padding:"6px 2px", background:"none", border:"none", cursor:"pointer", color:active?"#A8D5C2":"rgba(255,255,255,0.2)", transition:"all 0.2s", position:"relative" }}>
-                  {active&&<div style={{ position:"absolute", top:-10, left:"50%", transform:"translateX(-50%)", width:22, height:3, borderRadius:2, background:"linear-gradient(90deg,#A8D5C2,#C5B8E8)", boxShadow:"0 0 8px rgba(168,213,194,0.5)" }}/>}
-                  <Icon active={active}/>
-                  <span style={{ fontSize:10, fontWeight:active?700:500, fontFamily:"'Sora',sans-serif" }}>{label}</span>
+                <button key={id} onClick={()=>setTab(id)} style={{ flex:1, height:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:3, background:"none", border:"none", cursor:"pointer", color:active?PAL.or2:"rgba(255,255,255,.5)", transition:"color .2s" }}>
+                  <Ic n={NI[id]||"target"} s={23}/>
+                  <span style={{ fontSize:9.5, fontWeight:active?700:500, fontFamily:FONT }}>{label}</span>
                 </button>
               );
             })}
