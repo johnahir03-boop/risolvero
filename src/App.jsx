@@ -345,9 +345,9 @@ const Sheet = ({ T, onClose, children }) => {
     };
   }, []);
   return (
-    <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
+    <div style={{ position:"fixed", inset:0, zIndex:300, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:T.overlay, backdropFilter:"blur(3px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:T.sheet, borderRadius:"30px 30px 0 0", padding:"18px 20px 40px", animation:"sheetUp 0.3s ease both", maxHeight:"88dvh", display:"flex", flexDirection:"column", boxShadow:T.dark?"none":"0 -8px 40px rgba(23,24,28,.12)" }}>
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:T.sheet, borderRadius:"30px 30px 0 0", padding:"18px 20px calc(40px + env(safe-area-inset-bottom))", animation:"sheetUp 0.3s ease both", maxHeight:"88dvh", display:"flex", flexDirection:"column", boxShadow:T.dark?"none":"0 -8px 40px rgba(23,24,28,.12)" }}>
         <div style={{ width:38, height:4, borderRadius:3, background:T.line2, margin:"0 auto 16px", flexShrink:0 }}/>
         <div style={{ flex:1, overflowY:"auto", WebkitOverflowScrolling:"touch", minHeight:0, overscrollBehavior:"contain" }}>{children}</div>
       </div>
@@ -4324,9 +4324,9 @@ function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false, T }) {
 
   const tt=tints(T);
   return (
-    <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
+    <div style={{ position:"fixed", inset:0, zIndex:300, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:T.overlay, backdropFilter:"blur(3px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:T.sheet, borderRadius:"30px 30px 0 0", padding:"18px 20px 40px", animation:"sheetUp 0.3s ease both", maxHeight:"88dvh", display:"flex", flexDirection:"column", boxShadow:T.dark?"none":"0 -8px 40px rgba(23,24,28,.12)" }}>
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:T.sheet, borderRadius:"30px 30px 0 0", padding:"18px 20px calc(40px + env(safe-area-inset-bottom))", animation:"sheetUp 0.3s ease both", maxHeight:"88dvh", display:"flex", flexDirection:"column", boxShadow:T.dark?"none":"0 -8px 40px rgba(23,24,28,.12)" }}>
         <div style={{ width:38, height:4, borderRadius:3, background:T.line2, margin:"0 auto 16px", flexShrink:0 }}/>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
           <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT }}>Add Food</div>
