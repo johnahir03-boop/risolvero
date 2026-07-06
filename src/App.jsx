@@ -336,9 +336,9 @@ const CountUp = ({ value, dur=600 }) => {
 const Sheet = ({ T, onClose, children }) => (
   <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
     <div onClick={onClose} style={{ position:"absolute", inset:0, background:T.overlay, backdropFilter:"blur(3px)" }}/>
-    <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:T.sheet, borderRadius:"30px 30px 0 0", padding:"18px 20px 40px", animation:"sheetUp 0.3s ease both", maxHeight:"90vh", display:"flex", flexDirection:"column", boxShadow:T.dark?"none":"0 -8px 40px rgba(23,24,28,.12)" }}>
+    <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:T.sheet, borderRadius:"30px 30px 0 0", padding:"18px 20px 40px", animation:"sheetUp 0.3s ease both", maxHeight:"88dvh", display:"flex", flexDirection:"column", boxShadow:T.dark?"none":"0 -8px 40px rgba(23,24,28,.12)" }}>
       <div style={{ width:38, height:4, borderRadius:3, background:T.line2, margin:"0 auto 16px", flexShrink:0 }}/>
-      <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", minHeight:0 }}>{children}</div>
+      <div style={{ flex:1, overflowY:"auto", WebkitOverflowScrolling:"touch", minHeight:0, overscrollBehavior:"contain" }}>{children}</div>
     </div>
   </div>
 );
@@ -3909,7 +3909,7 @@ function CreatePostModal({ user, token, onPost, onClose }) {
   return (
     <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85dvh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
         <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 20px" }}/>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
           <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Share Your Win 🏆</div>
@@ -3968,7 +3968,7 @@ function CreateChallengeModal({ user, token, onCreated, onClose }) {
   return (
     <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 44px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"85dvh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
         <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 20px" }}/>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
           <div style={{ fontSize:18, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif" }}>Create Challenge ⚡</div>
@@ -4038,7 +4038,7 @@ function CommentsModal({ post, user, token, onClose }) {
   return (
     <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 32px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"80vh", display:"flex", flexDirection:"column" }}>
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:"#1a1d2e", borderRadius:"28px 28px 0 0", padding:"24px 22px 32px", animation:"sheetUp 0.3s ease both", border:"1px solid rgba(255,255,255,0.08)", maxHeight:"80dvh", display:"flex", flexDirection:"column" }}>
         <div style={{ width:36, height:4, borderRadius:2, background:"rgba(255,255,255,0.15)", margin:"0 auto 20px" }}/>
         <div style={{ fontSize:16, fontWeight:800, color:"#fff", fontFamily:"'Sora',sans-serif", marginBottom:16 }}>Comments 💬</div>
         <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
@@ -4304,7 +4304,7 @@ function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false, T }) {
   return (
     <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:T.overlay, backdropFilter:"blur(3px)" }}/>
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:T.sheet, borderRadius:"30px 30px 0 0", padding:"18px 20px 40px", animation:"sheetUp 0.3s ease both", maxHeight:"90vh", display:"flex", flexDirection:"column", boxShadow:T.dark?"none":"0 -8px 40px rgba(23,24,28,.12)" }}>
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:T.sheet, borderRadius:"30px 30px 0 0", padding:"18px 20px 40px", animation:"sheetUp 0.3s ease both", maxHeight:"88dvh", display:"flex", flexDirection:"column", boxShadow:T.dark?"none":"0 -8px 40px rgba(23,24,28,.12)" }}>
         <div style={{ width:38, height:4, borderRadius:3, background:T.line2, margin:"0 auto 16px", flexShrink:0 }}/>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
           <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT }}>Add Food</div>
@@ -5008,7 +5008,7 @@ function OnboardingScreen({ onComplete }) {
 
   const SCREENS = [
     <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100vh", padding:"0 26px", textAlign:"center" }}>
-      <div style={{ marginBottom:22, animation:"cardIn 0.6s ease both" }}><Chip n="leaf" c="gr" T={T} size={84} is={40}/></div>
+      <div style={{ marginBottom:22, animation:"cardIn 0.6s ease both" }}><Chip n="leaf" c="or" T={T} size={84} is={40}/></div>
       <div style={{ fontSize:30, fontWeight:800, color:T.ink, fontFamily:FONT, letterSpacing:"-0.02em", marginBottom:10, lineHeight:1.15, animation:"fadeUp 0.5s ease 0.1s both" }}>Welcome to<br/><span style={{ color:PAL.or }}>Risolvero</span></div>
       <div style={{ fontSize:14.5, color:T.ink2, fontFamily:FONT, fontWeight:500, lineHeight:1.7, marginBottom:44, animation:"fadeUp 0.5s ease 0.2s both" }}>The app for people who want to be better — and actually become it.</div>
       <div style={{ width:"100%", animation:"fadeUp 0.5s ease 0.3s both" }}>
