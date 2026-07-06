@@ -443,7 +443,7 @@ function HabitCard({ habit, idx, done, pts, onToggle, onDelete, delay, T }) {
   );
 }
 
-function HomePage({ onNavigate=()=>{}, darkMode=true }) {
+function HomePage({ onNavigate=()=>{}, onModalChange=()=>{}, darkMode=true }) {
   const T=THEME(darkMode);
   const hr=new Date().getHours();
   const greeting=hr<5?"Good night":hr<12?"Good morning":hr<17?"Good afternoon":hr<21?"Good evening":"Good night";
@@ -498,10 +498,10 @@ function HomePage({ onNavigate=()=>{}, darkMode=true }) {
       </div>
 
       <SecHead T={T} right={
-        <div onClick={()=>setShowAdd(true)} style={{ width:30, height:30, borderRadius:"50%", background:darkMode?"#fff":PAL.ink, color:darkMode?PAL.ink:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><Ic n="plus" s={14} sw={2.6}/></div>
+        <div onClick={()=>{ onModalChange(true); setShowAdd(true); }} style={{ width:30, height:30, borderRadius:"50%", background:darkMode?"#fff":PAL.ink, color:darkMode?PAL.ink:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><Ic n="plus" s={14} sw={2.6}/></div>
       }>Today's habits</SecHead>
       {habits.length===0?(
-        <div onClick={()=>setShowAdd(true)} style={{ padding:"34px 22px", textAlign:"center", background:T.card, borderRadius:24, border:"1px dashed "+T.dashed, cursor:"pointer" }}>
+        <div onClick={()=>{ onModalChange(true); setShowAdd(true); }} style={{ padding:"34px 22px", textAlign:"center", background:T.card, borderRadius:24, border:"1px dashed "+T.dashed, cursor:"pointer" }}>
           <div style={{ fontSize:17, fontWeight:800, color:T.ink, marginBottom:6 }}>Add your first habit</div>
           <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, lineHeight:1.6 }}>Small steps, every day. Tap to begin.</div>
         </div>
@@ -532,7 +532,7 @@ function HomePage({ onNavigate=()=>{}, darkMode=true }) {
       ):(
         <div style={{ display:"flex", flexWrap:"wrap", gap:9 }}>
           {visibleActions.map(a=>(
-            <div key={a.id} onClick={()=>{ if(a.id==="habit") setShowAdd(true); else onNavigate(a.tab); }} style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 15px 8px 8px", borderRadius:999, background:T.card, border:"1px solid "+T.line, cursor:"pointer", boxShadow:T.shadow }}>
+            <div key={a.id} onClick={()=>{ if(a.id==="habit"){ onModalChange(true); setShowAdd(true); } else onNavigate(a.tab); }} style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 15px 8px 8px", borderRadius:999, background:T.card, border:"1px solid "+T.line, cursor:"pointer", boxShadow:T.shadow }}>
               <Chip n={a.icon} c={a.c} T={T} size={30} is={15} style={{ borderRadius:"50%" }}/>
               <span style={{ fontSize:12.5, fontWeight:600, color:T.ink, fontFamily:FONT, whiteSpace:"nowrap" }}>{a.label}</span>
             </div>
@@ -552,7 +552,7 @@ function HomePage({ onNavigate=()=>{}, darkMode=true }) {
         <div style={{ width:52, height:52, borderRadius:"50%", background:GRAD.or, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", flexShrink:0 }}><Ic n="flame" s={22}/></div>
       </div>
 
-      {showAdd&&<AddHabitModal onAdd={addHabit} onClose={()=>setShowAdd(false)} T={T}/>}
+      {showAdd&&<AddHabitModal onAdd={(h)=>{ addHabit(h); onModalChange(false); }} onClose={()=>{ onModalChange(false); setShowAdd(false); }} T={T}/>}
     </div>
   );
 }
@@ -5156,7 +5156,7 @@ export default function Risolvero() {
   if(!onboarded) return <OnboardingScreen onComplete={completeOnboarding}/>;
 
   const pages = {
-    home:      <HomePage onNavigate={setTab} darkMode={darkMode}/>,
+    home:      <HomePage onNavigate={setTab} onModalChange={setNavHidden} darkMode={darkMode}/>,
     fitness:   <FitnessPage onModalChange={setNavHidden} darkMode={darkMode}/>,
     learning:  <LearningPage darkMode={darkMode}/>,
     finance:   <FinancePage onModalChange={setNavHidden} darkMode={darkMode}/>,
