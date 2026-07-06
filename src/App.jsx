@@ -304,12 +304,34 @@ const Ring = ({ pct=0, size=126, stroke=9, T, knob=true, over=false, children })
       <svg width={size} height={size} viewBox="0 0 126 126" style={{ transform:"rotate(-90deg)" }}>
         <circle cx="63" cy="63" r={R} fill="none" stroke={T.track} strokeWidth="4" strokeDasharray="1.5 7" strokeLinecap="round"/>
         <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={PAL.or2}/><stop offset="1" stopColor={PAL.or3}/></linearGradient></defs>
-        <circle cx="63" cy="63" r={R} fill="none" stroke={over?PAL.red:"url(#ringGrad)"} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={(C*p/100)+" "+C}/>
-        {knob && p>0 && <g transform={"rotate("+(p*3.6)+" 63 63)"}><circle cx="63" cy="8" r="6.5" fill={T.dark?"#fff":PAL.ink}/><circle cx="63" cy="8" r="2.4" fill={T.dark?PAL.ink:"#fff"}/></g>}
+        <circle cx="63" cy="63" r={R} fill="none" stroke={over?PAL.red:"url(#ringGrad)"} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={(C*p/100)+" "+C} style={{ transition:"stroke-dasharray .6s cubic-bezier(.22,1,.36,1)" }}/>
       </svg>
       <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>{children}</div>
     </div>
   );
+};
+function useCountUp(target, dur=600) {
+  const [val,setVal]=useState(target);
+  const ref=useRef(target);
+  useEffect(()=>{
+    const from=ref.current, to=target, start=performance.now();
+    if(from===to){ return; }
+    let raf;
+    const tick=(now)=>{
+      const t=Math.min(1,(now-start)/dur);
+      const eased=1-Math.pow(1-t,3);
+      const cur=from+(to-from)*eased;
+      setVal(cur);
+      if(t<1){ raf=requestAnimationFrame(tick); } else { ref.current=to; setVal(to); }
+    };
+    raf=requestAnimationFrame(tick);
+    return ()=>cancelAnimationFrame(raf);
+  },[target,dur]);
+  return val;
+}
+const CountUp = ({ value, dur=600 }) => {
+  const v=useCountUp(value,dur);
+  return <>{Math.round(v)}</>;
 };
 const Sheet = ({ T, onClose, children }) => (
   <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
@@ -427,7 +449,7 @@ function HomePage({ onNavigate=()=>{}, darkMode=true }) {
   const score=habits.length===0?0:doneCount===habits.length?100:doneCount*pts;
   const addHabit=({name,icon})=>{ setHabits(p=>[...p,{id:Date.now().toString(),name,icon}]); };
   const deleteHabit=id=>{ setHabits(p=>p.filter(h=>h.id!==id)); setDone(p=>{const n={...p};delete n[id];return n;}); };
-  const toggle=id=>{ setDone(p=>{ const next={...p,[id]:!p[id]}; const allDone=habits.length>0&&habits.every(h=>next[h.id]); if(allDone){ save("rslv_last_complete_date",TODAY()); setStreak(s=>{const ns=s+1;save("rslv_streak",ns);return ns;}); } return next; }); };
+  const toggle=id=>{ setDone(p=>{ const next={...p,[id]:!p[id]}; const allDone=habits.length>0&&habits.every(h=>next[h.id]); if(allDone && load("rslv_last_complete_date","")!==TODAY()){ save("rslv_last_complete_date",TODAY()); setStreak(s=>{const ns=s+1;save("rslv_streak",ns);return ns;}); } return next; }); };
   const leftCount=habits.length-doneCount;
   const subline=habits.length===0?"A fresh day. Add your first habit.":doneCount===0?"A fresh day. Pick your first habit.":doneCount===habits.length?"Perfect day. You showed up.":doneCount+" of "+habits.length+" habits done. Keep going.";
   const hint=habits.length===0?"Your growth starts with one habit.":doneCount===habits.length?"Every habit done. Strong work.":"Finish "+leftCount+" more habit"+(leftCount===1?"":"s")+" to reach 100.";
@@ -448,13 +470,12 @@ function HomePage({ onNavigate=()=>{}, darkMode=true }) {
   const visibleActions=ALL_ACTIONS.filter(a=>activeActions.includes(a.id));
   return (
     <div style={{ padding:"0 18px 32px", fontFamily:FONT }}>
-      <div style={{ display:"inline-block", fontSize:10.5, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:T.ink3, background:T.card, border:"1px solid "+T.line, borderRadius:999, padding:"7px 14px", marginBottom:14, boxShadow:T.shadow }}>{new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}</div>
-      <div style={{ fontSize:30, fontWeight:800, letterSpacing:"-0.02em", lineHeight:1.08, color:T.ink }}>{greeting},<br/><span style={{ color:PAL.or }}>{displayName||"friend"}</span></div>
+      <div style={{ fontSize:25, fontWeight:800, letterSpacing:"-0.02em", lineHeight:1.15, color:T.ink }}>{greeting}, <span style={{ color:PAL.or }}>{displayName||"friend"}</span></div>
       <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, marginTop:6 }}>{subline}</div>
 
-      <div style={{ background:T.card, borderRadius:26, padding:"18px 20px", margin:"18px 0 4px", display:"flex", alignItems:"center", gap:16, border:"1px solid "+T.line, boxShadow:T.shadow, animation:"fadeUp .4s ease both" }}>
+      <div style={{ background:T.card, borderRadius:26, padding:"18px 20px", margin:"14px 0 4px", display:"flex", alignItems:"center", gap:16, border:"1px solid "+T.line, boxShadow:T.shadow, animation:"fadeUp .4s ease both" }}>
         <Ring pct={score} size={118} T={T}>
-          <div style={{ fontSize:32, fontWeight:800, letterSpacing:"-0.03em", lineHeight:1, color:T.ink, fontFamily:FONT }}>{score}</div>
+          <div style={{ fontSize:32, fontWeight:800, letterSpacing:"-0.03em", lineHeight:1, color:T.ink, fontFamily:FONT }}><CountUp value={score}/></div>
           <div style={{ fontSize:10, fontWeight:600, color:T.ink3, marginTop:3, fontFamily:FONT }}>of 100</div>
         </Ring>
         <div>
@@ -1650,9 +1671,177 @@ const WORDS = {
     {w:"Langsam",    t:"Slow",        p:"LAHNG-zahm",     e:"🐢"}, {w:"Glücklich",  t:"Happy",       p:"GLOOK-likh",     e:"😊"},
     {w:"Traurig",    t:"Sad",         p:"TROW-rikh",      e:"😢"}, {w:"Müde",       t:"Tired",       p:"MOO-deh",        e:"😴"},
     {w:"Hunger",     t:"Hungry",      p:"HOONG-er",       e:"🤤"}, {w:"Durst",      t:"Thirsty",     p:"doorst",         e:"😮"},
-    {w:"Familie",    t:"Family",      p:"fah-MEE-lyeh",   e:"👨‍👩‍👧"},{w:"Mutter",     t:"Mother",      p:"MOO-ter",        e:"👩"},
+    {w:"Familie",    t:"Family",      p:"fah-MEE-lyeh",   e:"👨‍👩‍👧"}, {w:"Mutter",     t:"Mother",      p:"MOO-ter",        e:"👩"},
     {w:"Vater",      t:"Father",      p:"FAH-ter",        e:"👨"}, {w:"Buch",       t:"Book",        p:"bookh",          e:"📚"},
     {w:"Stadt",      t:"City",        p:"shtaht",         e:"🏙"}, {w:"Strand",     t:"Beach",       p:"shtrahnd",       e:"🏖"},
+    {w:"Sein",t:"To be",p:"zine",e:"🧍"}, {w:"Haben",t:"To have",p:"HAH-ben",e:"🤲"},
+    {w:"Machen",t:"To do/make",p:"MAH-khen",e:"🔨"}, {w:"Sagen",t:"To say",p:"ZAH-gen",e:"🗣"},
+    {w:"Können",t:"To be able",p:"KUR-nen",e:"💪"}, {w:"Wollen",t:"To want",p:"VOL-len",e:"🙌"},
+    {w:"Wissen",t:"To know",p:"VIS-sen",e:"🧠"}, {w:"Müssen",t:"To have to",p:"MUES-sen",e:"📋"},
+    {w:"Sehen",t:"To see",p:"ZEH-en",e:"👀"}, {w:"Gehen",t:"To go/walk",p:"GEH-en",e:"🚶"},
+    {w:"Kommen",t:"To come",p:"KOM-men",e:"👋"}, {w:"Geben",t:"To give",p:"GEH-ben",e:"🎁"},
+    {w:"Sprechen",t:"To speak",p:"SHPREH-khen",e:"💬"}, {w:"Finden",t:"To find",p:"FIN-den",e:"🔍"},
+    {w:"Fühlen",t:"To feel",p:"FUE-len",e:"💗"}, {w:"Nehmen",t:"To take",p:"NEH-men",e:"✊"},
+    {w:"Schauen",t:"To look",p:"SHOW-en",e:"👁"}, {w:"Stellen",t:"To put",p:"SHTEL-len",e:"📥"},
+    {w:"Denken",t:"To think",p:"DEN-ken",e:"💭"}, {w:"Glauben",t:"To believe",p:"GLOW-ben",e:"🙏"},
+    {w:"Tragen",t:"To carry/wear",p:"TRAH-gen",e:"🎒"}, {w:"Leben",t:"To live",p:"LEH-ben",e:"🌱"},
+    {w:"Verstehen",t:"To understand",p:"fer-SHTEH-en",e:"💡"}, {w:"Ankommen",t:"To arrive",p:"AN-kom-men",e:"🏁"},
+    {w:"Kennen",t:"To know (people)",p:"KEN-nen",e:"🤝"}, {w:"Erinnern",t:"To remember",p:"er-IN-nern",e:"🧾"},
+    {w:"Anrufen",t:"To call",p:"AN-roo-fen",e:"📞"}, {w:"Warten",t:"To wait",p:"VAR-ten",e:"⏳"},
+    {w:"Beenden",t:"To finish",p:"beh-EN-den",e:"🏁"}, {w:"Trinken",t:"To drink",p:"TRIN-ken",e:"🥤"},
+    {w:"Schlafen",t:"To sleep",p:"SHLAH-fen",e:"😴"}, {w:"Öffnen",t:"To open",p:"URF-nen",e:"🔓"},
+    {w:"Schließen",t:"To close",p:"SHLEE-sen",e:"🔒"}, {w:"Kaufen",t:"To buy",p:"KOW-fen",e:"🛒"},
+    {w:"Bezahlen",t:"To pay",p:"beh-TSAH-len",e:"💳"}, {w:"Lesen",t:"To read",p:"LEH-zen",e:"📖"},
+    {w:"Schreiben",t:"To write",p:"SHRY-ben",e:"✍️"}, {w:"Hören",t:"To hear/listen",p:"HUR-ren",e:"🎧"},
+    {w:"Spielen",t:"To play",p:"SHPEE-len",e:"🎮"}, {w:"Rennen",t:"To run",p:"REN-nen",e:"🏃"},
+    {w:"Helfen",t:"To help",p:"HEL-fen",e:"🆘"}, {w:"Lieben",t:"To love",p:"LEE-ben",e:"❤️"},
+    {w:"Arbeiten",t:"To work",p:"AR-by-ten",e:"💼"}, {w:"Lernen",t:"To learn",p:"LER-nen",e:"🎓"},
+    {w:"Lehren",t:"To teach",p:"LEH-ren",e:"👩‍🏫"}, {w:"Anfangen",t:"To begin",p:"AN-fang-en",e:"▶️"},
+    {w:"Suchen",t:"To search",p:"ZOO-khen",e:"🔎"}, {w:"Benutzen",t:"To use",p:"beh-NOOT-sen",e:"🛠"},
+    {w:"Fragen",t:"To ask",p:"FRAH-gen",e:"❓"}, {w:"Antworten",t:"To answer",p:"ANT-vor-ten",e:"💬"},
+    {w:"Ausgehen",t:"To go out",p:"OWS-geh-en",e:"🚪"}, {w:"Eintreten",t:"To enter",p:"INE-treh-ten",e:"➡️"},
+    {w:"Verlieren",t:"To lose",p:"fer-LEE-ren",e:"🫥"}, {w:"Gewinnen",t:"To win",p:"geh-VIN-nen",e:"🏆"},
+    {w:"Versuchen",t:"To try",p:"fer-ZOO-khen",e:"🎯"}, {w:"Ändern",t:"To change",p:"EN-dern",e:"🔄"},
+    {w:"Brauchen",t:"To need",p:"BROW-khen",e:"🙏"}, {w:"Bleiben",t:"To stay",p:"BLY-ben",e:"🏠"},
+    {w:"Fahren",t:"To drive/ride",p:"FAH-ren",e:"🚗"}, {w:"Treffen",t:"To meet",p:"TREF-fen",e:"🤝"},
+    {w:"Ich",t:"I",p:"ikh",e:"🙋"}, {w:"Du",t:"You",p:"doo",e:"👉"},
+    {w:"Er",t:"He",p:"air",e:"👨"}, {w:"Sie",t:"She/they",p:"zee",e:"👩"},
+    {w:"Wir",t:"We",p:"veer",e:"👥"}, {w:"Ihr",t:"You (plural)",p:"eer",e:"👫"},
+    {w:"Dies",t:"This",p:"dees",e:"👇"}, {w:"Das",t:"That/the",p:"dahs",e:"👉"},
+    {w:"Alles",t:"Everything",p:"AH-les",e:"🌐"}, {w:"Nichts",t:"Nothing",p:"nikhts",e:"🚫"},
+    {w:"Etwas",t:"Something",p:"ET-vas",e:"❔"}, {w:"Jemand",t:"Someone",p:"YEH-mant",e:"👤"},
+    {w:"Niemand",t:"Nobody",p:"NEE-mant",e:"🙅"}, {w:"Viel",t:"A lot",p:"feel",e:"📈"},
+    {w:"Wenig",t:"Little/few",p:"VEH-nikh",e:"🤏"}, {w:"Zu viel",t:"Too much",p:"tsoo FEEL",e:"🛑"},
+    {w:"Mehr",t:"More",p:"mair",e:"➕"}, {w:"Weniger",t:"Less",p:"VEH-nee-ger",e:"➖"},
+    {w:"Auch",t:"Also",p:"owkh",e:"➕"}, {w:"Immer",t:"Always",p:"IM-mer",e:"♾️"},
+    {w:"Nie",t:"Never",p:"nee",e:"🚫"}, {w:"Schon",t:"Already",p:"shohn",e:"✔️"},
+    {w:"Noch",t:"Still/yet",p:"nokh",e:"🔁"}, {w:"Jetzt",t:"Now",p:"yetst",e:"⏱"},
+    {w:"Später",t:"Later",p:"SHPEH-ter",e:"⏭"}, {w:"Vorher",t:"Before",p:"FOR-hair",e:"⏮"},
+    {w:"Hier",t:"Here",p:"heer",e:"📍"}, {w:"Dort",t:"There",p:"dort",e:"🗺"},
+    {w:"Wo",t:"Where",p:"voh",e:"🧭"}, {w:"Wann",t:"When",p:"vahn",e:"📅"},
+    {w:"Warum",t:"Why",p:"vah-ROOM",e:"❓"}, {w:"Wie",t:"How",p:"vee",e:"🤔"},
+    {w:"Wer",t:"Who",p:"vair",e:"👤"}, {w:"Was",t:"What",p:"vahs",e:"❔"},
+    {w:"Welche",t:"Which",p:"VEL-khe",e:"🔀"}, {w:"Wie viel",t:"How much",p:"vee FEEL",e:"⚖️"},
+    {w:"Eins",t:"One",p:"ines",e:"1️⃣"}, {w:"Zwei",t:"Two",p:"tsvy",e:"2️⃣"},
+    {w:"Drei",t:"Three",p:"dry",e:"3️⃣"}, {w:"Vier",t:"Four",p:"feer",e:"4️⃣"},
+    {w:"Fünf",t:"Five",p:"fuenf",e:"5️⃣"}, {w:"Sechs",t:"Six",p:"zeks",e:"6️⃣"},
+    {w:"Sieben",t:"Seven",p:"ZEE-ben",e:"7️⃣"}, {w:"Acht",t:"Eight",p:"ahkht",e:"8️⃣"},
+    {w:"Neun",t:"Nine",p:"noyn",e:"9️⃣"}, {w:"Zehn",t:"Ten",p:"tsehn",e:"🔟"},
+    {w:"Elf",t:"Eleven",p:"elf",e:"🔢"}, {w:"Zwölf",t:"Twelve",p:"tsvurlf",e:"🔢"},
+    {w:"Zwanzig",t:"Twenty",p:"TSVAN-tsikh",e:"🔢"}, {w:"Dreißig",t:"Thirty",p:"DRY-sikh",e:"🔢"},
+    {w:"Vierzig",t:"Forty",p:"FEER-tsikh",e:"🔢"}, {w:"Fünfzig",t:"Fifty",p:"FUENF-tsikh",e:"🔢"},
+    {w:"Hundert",t:"Hundred",p:"HOON-dert",e:"💯"}, {w:"Tausend",t:"Thousand",p:"TOW-zent",e:"🔢"},
+    {w:"Erste",t:"First",p:"ER-steh",e:"🥇"}, {w:"Zweite",t:"Second",p:"TSVY-teh",e:"🥈"},
+    {w:"Letzte",t:"Last",p:"LETS-teh",e:"🔚"}, {w:"Montag",t:"Monday",p:"MOHN-tahk",e:"📅"},
+    {w:"Dienstag",t:"Tuesday",p:"DEENS-tahk",e:"📅"}, {w:"Mittwoch",t:"Wednesday",p:"MIT-vokh",e:"📅"},
+    {w:"Donnerstag",t:"Thursday",p:"DON-ners-tahk",e:"📅"}, {w:"Freitag",t:"Friday",p:"FRY-tahk",e:"📅"},
+    {w:"Samstag",t:"Saturday",p:"ZAMS-tahk",e:"📅"}, {w:"Sonntag",t:"Sunday",p:"ZON-tahk",e:"📅"},
+    {w:"Heute",t:"Today",p:"HOY-teh",e:"📆"}, {w:"Morgen",t:"Tomorrow/morning",p:"MOR-gen",e:"🌅"},
+    {w:"Gestern",t:"Yesterday",p:"GES-tern",e:"🌇"}, {w:"Woche",t:"Week",p:"VO-kheh",e:"🗓"},
+    {w:"Monat",t:"Month",p:"MOH-naht",e:"🗓"}, {w:"Jahr",t:"Year",p:"yahr",e:"🎆"},
+    {w:"Tag",t:"Day",p:"tahk",e:"☀️"}, {w:"Nacht",t:"Night",p:"nahkht",e:"🌙"},
+    {w:"Abend",t:"Evening",p:"AH-bent",e:"🌆"}, {w:"Stunde",t:"Hour",p:"SHTOON-deh",e:"🕐"},
+    {w:"Minute",t:"Minute",p:"mee-NOO-teh",e:"⏱"}, {w:"Januar",t:"January",p:"YAH-noo-ar",e:"❄️"},
+    {w:"Februar",t:"February",p:"FEH-broo-ar",e:"💘"}, {w:"März",t:"March",p:"mairts",e:"🌸"},
+    {w:"April",t:"April",p:"ah-PRIL",e:"🌷"}, {w:"Mai",t:"May",p:"my",e:"🌼"},
+    {w:"Juni",t:"June",p:"YOO-nee",e:"☀️"}, {w:"Juli",t:"July",p:"YOO-lee",e:"🏖"},
+    {w:"August",t:"August",p:"ow-GOOST",e:"🌞"}, {w:"September",t:"September",p:"zep-TEM-ber",e:"🍂"},
+    {w:"Oktober",t:"October",p:"ok-TOH-ber",e:"🎃"}, {w:"November",t:"November",p:"noh-VEM-ber",e:"🌧"},
+    {w:"Dezember",t:"December",p:"deh-TSEM-ber",e:"🎄"}, {w:"Rot",t:"Red",p:"roht",e:"🔴"},
+    {w:"Blau",t:"Blue",p:"blow",e:"🔵"}, {w:"Grün",t:"Green",p:"gruen",e:"🟢"},
+    {w:"Gelb",t:"Yellow",p:"gelp",e:"🟡"}, {w:"Schwarz",t:"Black",p:"shvarts",e:"⚫"},
+    {w:"Weiß",t:"White",p:"vice",e:"⚪"}, {w:"Grau",t:"Grey",p:"grow",e:"🩶"},
+    {w:"Braun",t:"Brown",p:"brown",e:"🟤"}, {w:"Rosa",t:"Pink",p:"ROH-zah",e:"🌸"},
+    {w:"Orange",t:"Orange",p:"oh-RAHN-zheh",e:"🟠"}, {w:"Lila",t:"Purple",p:"LEE-lah",e:"🟣"},
+    {w:"Sohn",t:"Son",p:"zohn",e:"👦"}, {w:"Tochter",t:"Daughter",p:"TOKH-ter",e:"👧"},
+    {w:"Bruder",t:"Brother",p:"BROO-der",e:"👬"}, {w:"Schwester",t:"Sister",p:"SHVES-ter",e:"👭"},
+    {w:"Großvater",t:"Grandfather",p:"GROHS-fah-ter",e:"👴"}, {w:"Großmutter",t:"Grandmother",p:"GROHS-moo-ter",e:"👵"},
+    {w:"Onkel",t:"Uncle",p:"ON-kel",e:"👨"}, {w:"Tante",t:"Aunt",p:"TAHN-teh",e:"👩"},
+    {w:"Mann",t:"Man/husband",p:"mahn",e:"👨"}, {w:"Frau",t:"Woman/wife",p:"frow",e:"👩"},
+    {w:"Kind",t:"Child",p:"kint",e:"👶"}, {w:"Junge",t:"Boy",p:"YOONG-eh",e:"🧑"},
+    {w:"Mädchen",t:"Girl",p:"MED-khen",e:"👧"}, {w:"Leute",t:"People",p:"LOY-teh",e:"👥"},
+    {w:"Person",t:"Person",p:"per-ZOHN",e:"👤"}, {w:"Baby",t:"Baby",p:"BEH-bee",e:"👶"},
+    {w:"Kopf",t:"Head",p:"kopf",e:"🗣"}, {w:"Auge",t:"Eye",p:"OW-geh",e:"👁"},
+    {w:"Hand",t:"Hand",p:"hahnt",e:"✋"}, {w:"Fuß",t:"Foot",p:"foos",e:"🦶"},
+    {w:"Herz",t:"Heart",p:"herts",e:"❤️"}, {w:"Mund",t:"Mouth",p:"moont",e:"👄"},
+    {w:"Nase",t:"Nose",p:"NAH-zeh",e:"👃"}, {w:"Ohr",t:"Ear",p:"or",e:"👂"},
+    {w:"Arm",t:"Arm",p:"arm",e:"💪"}, {w:"Bein",t:"Leg",p:"bine",e:"🦵"},
+    {w:"Haare",t:"Hair",p:"HAH-reh",e:"💇"}, {w:"Gesicht",t:"Face",p:"geh-ZIKHT",e:"🙂"},
+    {w:"Brot",t:"Bread",p:"broht",e:"🍞"}, {w:"Milch",t:"Milk",p:"milkh",e:"🥛"},
+    {w:"Wein",t:"Wine",p:"vine",e:"🍷"}, {w:"Bier",t:"Beer",p:"beer",e:"🍺"},
+    {w:"Kaffee",t:"Coffee",p:"kah-FEH",e:"☕"}, {w:"Tee",t:"Tea",p:"teh",e:"🍵"},
+    {w:"Fleisch",t:"Meat",p:"flysh",e:"🥩"}, {w:"Fisch",t:"Fish",p:"fish",e:"🐟"},
+    {w:"Hähnchen",t:"Chicken",p:"HEN-khen",e:"🍗"}, {w:"Reis",t:"Rice",p:"rice",e:"🍚"},
+    {w:"Nudeln",t:"Pasta/noodles",p:"NOO-deln",e:"🍝"}, {w:"Käse",t:"Cheese",p:"KEH-zeh",e:"🧀"},
+    {w:"Ei",t:"Egg",p:"eye",e:"🥚"}, {w:"Obst",t:"Fruit",p:"ohpst",e:"🍎"},
+    {w:"Apfel",t:"Apple",p:"AHP-fel",e:"🍏"}, {w:"Banane",t:"Banana",p:"bah-NAH-neh",e:"🍌"},
+    {w:"Gemüse",t:"Vegetables",p:"geh-MUE-zeh",e:"🥦"}, {w:"Tomate",t:"Tomato",p:"toh-MAH-teh",e:"🍅"},
+    {w:"Kartoffel",t:"Potato",p:"kar-TOF-fel",e:"🥔"}, {w:"Salat",t:"Salad",p:"zah-LAHT",e:"🥗"},
+    {w:"Zucker",t:"Sugar",p:"TSOO-ker",e:"🍬"}, {w:"Salz",t:"Salt",p:"zalts",e:"🧂"},
+    {w:"Öl",t:"Oil",p:"url",e:"🫒"}, {w:"Butter",t:"Butter",p:"BOO-ter",e:"🧈"},
+    {w:"Kuchen",t:"Cake",p:"KOO-khen",e:"🍰"}, {w:"Eis",t:"Ice cream",p:"ice",e:"🍨"},
+    {w:"Frühstück",t:"Breakfast",p:"FRUE-shtuek",e:"🥐"}, {w:"Mittagessen",t:"Lunch",p:"MIT-tahk-es-sen",e:"🍽"},
+    {w:"Abendessen",t:"Dinner",p:"AH-bent-es-sen",e:"🌙"}, {w:"Restaurant",t:"Restaurant",p:"res-toh-RAHN",e:"🍴"},
+    {w:"Tisch",t:"Table",p:"tish",e:"🪑"}, {w:"Tür",t:"Door",p:"tuer",e:"🚪"},
+    {w:"Fenster",t:"Window",p:"FEN-ster",e:"🪟"}, {w:"Zimmer",t:"Room",p:"TSIM-mer",e:"🛏"},
+    {w:"Küche",t:"Kitchen",p:"KUE-kheh",e:"🍳"}, {w:"Bad",t:"Bathroom",p:"baht",e:"🛁"},
+    {w:"Bett",t:"Bed",p:"bet",e:"🛌"}, {w:"Stuhl",t:"Chair",p:"shtool",e:"🪑"},
+    {w:"Schlüssel",t:"Key",p:"SHLUES-sel",e:"🔑"}, {w:"Licht",t:"Light",p:"likht",e:"💡"},
+    {w:"Straße",t:"Street",p:"SHTRAH-seh",e:"🛣"}, {w:"Geschäft",t:"Shop",p:"geh-SHEFT",e:"🏪"},
+    {w:"Markt",t:"Market",p:"markt",e:"🛍"}, {w:"Schule",t:"School",p:"SHOO-leh",e:"🏫"},
+    {w:"Krankenhaus",t:"Hospital",p:"KRAHN-ken-hows",e:"🏥"}, {w:"Kirche",t:"Church",p:"KEER-kheh",e:"⛪"},
+    {w:"Bank",t:"Bank/bench",p:"bahnk",e:"🏦"}, {w:"Büro",t:"Office",p:"bue-ROH",e:"🏢"},
+    {w:"Bahnhof",t:"Train station",p:"BAHN-hohf",e:"🚉"}, {w:"Flughafen",t:"Airport",p:"FLOOK-hah-fen",e:"✈️"},
+    {w:"Hotel",t:"Hotel",p:"hoh-TEL",e:"🏨"}, {w:"Auto",t:"Car",p:"OW-toh",e:"🚗"},
+    {w:"Zug",t:"Train",p:"tsook",e:"🚆"}, {w:"Bus",t:"Bus",p:"boos",e:"🚌"},
+    {w:"Flugzeug",t:"Airplane",p:"FLOOK-tsoyk",e:"🛩"}, {w:"Fahrrad",t:"Bicycle",p:"FAHR-raht",e:"🚲"},
+    {w:"Fahrkarte",t:"Ticket",p:"FAHR-kar-teh",e:"🎫"}, {w:"Neu",t:"New",p:"noy",e:"✨"},
+    {w:"Alt",t:"Old",p:"ahlt",e:"🏚"}, {w:"Jung",t:"Young",p:"yoong",e:"🧒"},
+    {w:"Schön",t:"Beautiful",p:"shurn",e:"😍"}, {w:"Hässlich",t:"Ugly",p:"HES-likh",e:"🫣"},
+    {w:"Heiß",t:"Hot",p:"hice",e:"🔥"}, {w:"Kalt",t:"Cold",p:"kahlt",e:"🧊"},
+    {w:"Hoch",t:"High/tall",p:"hohkh",e:"📏"}, {w:"Niedrig",t:"Low",p:"NEE-drikh",e:"📉"},
+    {w:"Lang",t:"Long",p:"lahng",e:"📏"}, {w:"Kurz",t:"Short",p:"koorts",e:"✂️"},
+    {w:"Stark",t:"Strong",p:"shtark",e:"💪"}, {w:"Schwach",t:"Weak",p:"shvahkh",e:"🪶"},
+    {w:"Einfach",t:"Easy/simple",p:"INE-fahkh",e:"🟢"}, {w:"Schwierig",t:"Difficult",p:"SHVEE-rikh",e:"🔴"},
+    {w:"Wichtig",t:"Important",p:"VIKH-tikh",e:"⭐"}, {w:"Richtig",t:"Right/correct",p:"RIKH-tikh",e:"✅"},
+    {w:"Falsch",t:"Wrong/false",p:"fahlsh",e:"❌"}, {w:"Wahr",t:"True",p:"vahr",e:"✔️"},
+    {w:"Voll",t:"Full",p:"fol",e:"🈵"}, {w:"Leer",t:"Empty",p:"lair",e:"🈳"},
+    {w:"Offen",t:"Open",p:"OF-fen",e:"🔓"}, {w:"Geschlossen",t:"Closed",p:"geh-SHLOS-sen",e:"🔒"},
+    {w:"Sauber",t:"Clean",p:"ZOW-ber",e:"🧼"}, {w:"Schmutzig",t:"Dirty",p:"SHMOOT-sikh",e:"🧹"},
+    {w:"Reich",t:"Rich",p:"rykh",e:"💎"}, {w:"Arm (adj.)",t:"Poor",p:"arm",e:"🪙"},
+    {w:"Frei",t:"Free",p:"fry",e:"🕊"}, {w:"Beschäftigt",t:"Busy",p:"beh-SHEF-tikht",e:"📵"},
+    {w:"Fertig",t:"Ready/done",p:"FER-tikh",e:"🚦"}, {w:"Sicher",t:"Safe/sure",p:"ZIKH-er",e:"🛡"},
+    {w:"Gleich",t:"Same/soon",p:"glykh",e:"🟰"}, {w:"Anders",t:"Different",p:"AHN-ders",e:"🔀"},
+    {w:"Teuer",t:"Expensive",p:"TOY-er",e:"💸"}, {w:"Billig",t:"Cheap",p:"BIL-likh",e:"🏷"},
+    {w:"Gesund",t:"Healthy",p:"geh-ZOONT",e:"💚"}, {w:"Krank",t:"Sick",p:"krahnk",e:"🤒"},
+    {w:"Sonne",t:"Sun",p:"ZON-neh",e:"☀️"}, {w:"Mond",t:"Moon",p:"mohnt",e:"🌙"},
+    {w:"Stern",t:"Star",p:"shtern",e:"⭐"}, {w:"Himmel",t:"Sky",p:"HIM-mel",e:"🌤"},
+    {w:"Meer",t:"Sea",p:"mair",e:"🌊"}, {w:"Berg",t:"Mountain",p:"bairk",e:"⛰"},
+    {w:"Fluss",t:"River",p:"floos",e:"🏞"}, {w:"Baum",t:"Tree",p:"bowm",e:"🌳"},
+    {w:"Blume",t:"Flower",p:"BLOO-meh",e:"🌸"}, {w:"Regen",t:"Rain",p:"REH-gen",e:"🌧"},
+    {w:"Schnee",t:"Snow",p:"shneh",e:"❄️"}, {w:"Wind",t:"Wind",p:"vint",e:"💨"},
+    {w:"Feuer",t:"Fire",p:"FOY-er",e:"🔥"}, {w:"Erde",t:"Earth",p:"ER-deh",e:"🌍"},
+    {w:"Luft",t:"Air",p:"looft",e:"🌬"}, {w:"Ding",t:"Thing",p:"ding",e:"📦"},
+    {w:"Welt",t:"World",p:"velt",e:"🌎"}, {w:"Land",t:"Country",p:"lahnt",e:"🗺"},
+    {w:"Ort",t:"Place",p:"ort",e:"📍"}, {w:"Teil",t:"Part",p:"tile",e:"🧩"},
+    {w:"Mal",t:"Time (occasion)",p:"mahl",e:"🔁"}, {w:"Name",t:"Name",p:"NAH-meh",e:"🏷"},
+    {w:"Wort",t:"Word",p:"vort",e:"🔤"}, {w:"Frage",t:"Question",p:"FRAH-geh",e:"❓"},
+    {w:"Antwort",t:"Answer",p:"ANT-vort",e:"💬"}, {w:"Problem",t:"Problem",p:"proh-BLEHM",e:"⚠️"},
+    {w:"Idee",t:"Idea",p:"ee-DEH",e:"💡"}, {w:"Geschichte",t:"Story/history",p:"geh-SHIKH-teh",e:"📜"},
+    {w:"Musik",t:"Music",p:"moo-ZEEK",e:"🎵"}, {w:"Film",t:"Movie",p:"film",e:"🎬"},
+    {w:"Foto",t:"Photo",p:"FOH-toh",e:"📷"}, {w:"Telefon",t:"Telephone",p:"TEH-leh-fohn",e:"📱"},
+    {w:"Spiel",t:"Game",p:"shpeel",e:"🎲"}, {w:"Sport",t:"Sport",p:"shport",e:"⚽"},
+    {w:"Fußball",t:"Football",p:"FOOS-bahl",e:"⚽"}, {w:"Guten Morgen",t:"Good morning",p:"GOO-ten MOR-gen",e:"🌅"},
+    {w:"Guten Abend",t:"Good evening",p:"GOO-ten AH-bent",e:"🌆"}, {w:"Gute Nacht",t:"Good night",p:"GOO-teh NAHKHT",e:"🌙"},
+    {w:"Auf Wiedersehen",t:"Goodbye",p:"owf VEE-der-zeh-en",e:"👋"}, {w:"Tschüss",t:"Bye",p:"chues",e:"👋"},
+    {w:"Entschuldigung",t:"Sorry/excuse me",p:"ent-SHOOL-dee-goong",e:"🙇"}, {w:"Bitte schön",t:"You're welcome",p:"BIT-teh shurn",e:"🤲"},
+    {w:"In Ordnung",t:"Okay/alright",p:"in ORT-noong",e:"👌"}, {w:"Ich weiß nicht",t:"I don't know",p:"ikh vice NIKHT",e:"🤷"},
+    {w:"Ich verstehe nicht",t:"I don't understand",p:"ikh fer-SHTEH-eh nikht",e:"😕"}, {w:"Wie viel kostet das?",t:"How much is it?",p:"vee feel KOS-tet dahs",e:"💶"},
+    {w:"Wo ist...?",t:"Where is...?",p:"voh IST",e:"🧭"}, {w:"Wie spät ist es?",t:"What time is it?",p:"vee SHPEHT ist es",e:"🕐"},
+    {w:"Ich heiße",t:"My name is",p:"ikh HY-seh",e:"🪪"}, {w:"Freut mich",t:"Nice to meet you",p:"froyt MIKH",e:"🤝"},
+    {w:"Hilfe!",t:"Help!",p:"HIL-feh",e:"🆘"}, {w:"Prost!",t:"Cheers!",p:"prohst",e:"🥂"},
+    {w:"Herzlichen Glückwunsch",t:"Congratulations",p:"HERTS-likh-en GLUEK-voonsh",e:"🎉"}, {w:"Willkommen",t:"Welcome",p:"vil-KOM-men",e:"🎊"},
+    {w:"Los geht's!",t:"Let's go!",p:"lohs GEHTS",e:"🚀"}
   ],
   pt: [
     {w:"Olá",        t:"Hello",       p:"oh-LAH",         e:"🙋"}, {w:"Obrigado",   t:"Thank you",   p:"oh-bree-GAH-doh",e:"🙏"},
@@ -1667,9 +1856,179 @@ const WORDS = {
     {w:"Lento",      t:"Slow",        p:"LEN-toh",        e:"🐢"}, {w:"Feliz",      t:"Happy",       p:"feh-LEES",       e:"😊"},
     {w:"Triste",     t:"Sad",         p:"TREES-teh",      e:"😢"}, {w:"Cansado",    t:"Tired",       p:"kahn-SAH-doh",   e:"😴"},
     {w:"Fome",       t:"Hungry",      p:"FOH-meh",        e:"🤤"}, {w:"Sede",       t:"Thirsty",     p:"SEH-deh",        e:"😮"},
-    {w:"Família",    t:"Family",      p:"fah-MEE-lyah",   e:"👨‍👩‍👧"},{w:"Mãe",        t:"Mother",      p:"mah-EE",         e:"👩"},
+    {w:"Família",    t:"Family",      p:"fah-MEE-lyah",   e:"👨‍👩‍👧"}, {w:"Mãe",        t:"Mother",      p:"mah-EE",         e:"👩"},
     {w:"Pai",        t:"Father",      p:"pie",            e:"👨"}, {w:"Livro",      t:"Book",        p:"LEE-vroh",       e:"📚"},
     {w:"Cidade",     t:"City",        p:"see-DAH-deh",    e:"🏙"}, {w:"Praia",      t:"Beach",       p:"PRY-ah",         e:"🏖"},
+    {w:"Ser",t:"To be (permanent)",p:"sehr",e:"🧍"}, {w:"Estar",t:"To be (state)",p:"es-TAR",e:"📍"},
+    {w:"Ter",t:"To have",p:"tehr",e:"🤲"}, {w:"Fazer",t:"To do/make",p:"fah-ZEHR",e:"🔨"},
+    {w:"Dizer",t:"To say",p:"jee-ZEHR",e:"🗣"}, {w:"Poder",t:"To be able",p:"poh-DEHR",e:"💪"},
+    {w:"Querer",t:"To want",p:"keh-REHR",e:"🙌"}, {w:"Saber",t:"To know",p:"sah-BEHR",e:"🧠"},
+    {w:"Dever",t:"To have to",p:"deh-VEHR",e:"📋"}, {w:"Ver",t:"To see",p:"vehr",e:"👀"},
+    {w:"Ir",t:"To go",p:"eer",e:"🚶"}, {w:"Vir",t:"To come",p:"veer",e:"👋"},
+    {w:"Dar",t:"To give",p:"dar",e:"🎁"}, {w:"Falar",t:"To speak",p:"fah-LAR",e:"💬"},
+    {w:"Encontrar",t:"To find/meet",p:"en-kon-TRAR",e:"🔍"}, {w:"Sentir",t:"To feel",p:"sen-CHEER",e:"💗"},
+    {w:"Tomar",t:"To take/drink",p:"toh-MAR",e:"✊"}, {w:"Olhar",t:"To look at",p:"oh-LYAR",e:"👁"},
+    {w:"Colocar",t:"To put",p:"koh-loh-KAR",e:"📥"}, {w:"Pensar",t:"To think",p:"pen-SAR",e:"💭"},
+    {w:"Achar",t:"To think/find",p:"ah-SHAR",e:"💡"}, {w:"Levar",t:"To carry/take",p:"leh-VAR",e:"🎒"},
+    {w:"Viver",t:"To live",p:"vee-VEHR",e:"🌱"}, {w:"Voltar",t:"To return",p:"vol-TAR",e:"🔙"},
+    {w:"Entender",t:"To understand",p:"en-ten-DEHR",e:"💡"}, {w:"Chegar",t:"To arrive",p:"sheh-GAR",e:"🏁"},
+    {w:"Conhecer",t:"To know (people)",p:"koh-nyeh-SEHR",e:"🤝"}, {w:"Lembrar",t:"To remember",p:"lem-BRAR",e:"🧾"},
+    {w:"Chamar",t:"To call",p:"shah-MAR",e:"📞"}, {w:"Esperar",t:"To wait/hope",p:"es-peh-RAR",e:"⏳"},
+    {w:"Terminar",t:"To finish",p:"ter-mee-NAR",e:"🏁"}, {w:"Comer",t:"To eat",p:"koh-MEHR",e:"🍽"},
+    {w:"Beber",t:"To drink",p:"beh-BEHR",e:"🥤"}, {w:"Dormir",t:"To sleep",p:"dor-MEER",e:"😴"},
+    {w:"Abrir",t:"To open",p:"ah-BREER",e:"🔓"}, {w:"Fechar",t:"To close",p:"feh-SHAR",e:"🔒"},
+    {w:"Comprar",t:"To buy",p:"kom-PRAR",e:"🛒"}, {w:"Pagar",t:"To pay",p:"pah-GAR",e:"💳"},
+    {w:"Ler",t:"To read",p:"lehr",e:"📖"}, {w:"Escrever",t:"To write",p:"es-kreh-VEHR",e:"✍️"},
+    {w:"Ouvir",t:"To listen/hear",p:"oh-VEER",e:"🎧"}, {w:"Jogar",t:"To play",p:"zhoh-GAR",e:"🎮"},
+    {w:"Correr",t:"To run",p:"koh-HEHR",e:"🏃"}, {w:"Andar",t:"To walk",p:"an-DAR",e:"🚶"},
+    {w:"Ajudar",t:"To help",p:"ah-zhoo-DAR",e:"🆘"}, {w:"Amar",t:"To love",p:"ah-MAR",e:"❤️"},
+    {w:"Trabalhar",t:"To work",p:"trah-bah-LYAR",e:"💼"}, {w:"Estudar",t:"To study",p:"es-too-DAR",e:"📚"},
+    {w:"Aprender",t:"To learn",p:"ah-pren-DEHR",e:"🎓"}, {w:"Ensinar",t:"To teach",p:"en-see-NAR",e:"👩‍🏫"},
+    {w:"Começar",t:"To begin",p:"koh-meh-SAR",e:"▶️"}, {w:"Procurar",t:"To search",p:"proh-koo-RAR",e:"🔎"},
+    {w:"Usar",t:"To use",p:"oo-ZAR",e:"🛠"}, {w:"Perguntar",t:"To ask",p:"per-goon-TAR",e:"❓"},
+    {w:"Responder",t:"To answer",p:"hes-pon-DEHR",e:"💬"}, {w:"Sair",t:"To go out",p:"sah-EER",e:"🚪"},
+    {w:"Entrar",t:"To enter",p:"en-TRAR",e:"➡️"}, {w:"Perder",t:"To lose",p:"per-DEHR",e:"🫥"},
+    {w:"Ganhar",t:"To win/earn",p:"gah-NYAR",e:"🏆"}, {w:"Tentar",t:"To try",p:"ten-TAR",e:"🎯"},
+    {w:"Mudar",t:"To change",p:"moo-DAR",e:"🔄"}, {w:"Eu",t:"I",p:"eh-oo",e:"🙋"},
+    {w:"Você",t:"You",p:"voh-SEH",e:"👉"}, {w:"Ele",t:"He",p:"EH-lee",e:"👨"},
+    {w:"Ela",t:"She",p:"EH-lah",e:"👩"}, {w:"Nós",t:"We",p:"nohs",e:"👥"},
+    {w:"Eles",t:"They",p:"EH-lees",e:"👪"}, {w:"Isto",t:"This",p:"EES-too",e:"👇"},
+    {w:"Isso",t:"That",p:"EE-soo",e:"👉"}, {w:"Tudo",t:"Everything",p:"TOO-doo",e:"🌐"},
+    {w:"Nada",t:"Nothing",p:"NAH-dah",e:"🚫"}, {w:"Algo",t:"Something",p:"AHL-goo",e:"❔"},
+    {w:"Alguém",t:"Someone",p:"ahl-GEM",e:"👤"}, {w:"Ninguém",t:"Nobody",p:"neen-GEM",e:"🙅"},
+    {w:"Muito",t:"A lot/very",p:"MOO-ee-too",e:"📈"}, {w:"Pouco",t:"Little/few",p:"POH-koo",e:"🤏"},
+    {w:"Demais",t:"Too much",p:"jee-MICE",e:"🛑"}, {w:"Mais",t:"More",p:"mice",e:"➕"},
+    {w:"Menos",t:"Less",p:"MEH-noos",e:"➖"}, {w:"Também",t:"Also",p:"tam-BEM",e:"➕"},
+    {w:"Sempre",t:"Always",p:"SEM-pree",e:"♾️"}, {w:"Nunca",t:"Never",p:"NOON-kah",e:"🚫"},
+    {w:"Já",t:"Already",p:"zhah",e:"✔️"}, {w:"Ainda",t:"Still/yet",p:"ah-EEN-dah",e:"🔁"},
+    {w:"Agora",t:"Now",p:"ah-GOH-rah",e:"⏱"}, {w:"Depois",t:"After/later",p:"deh-POYS",e:"⏭"},
+    {w:"Antes",t:"Before",p:"AHN-chees",e:"⏮"}, {w:"Aqui",t:"Here",p:"ah-KEE",e:"📍"},
+    {w:"Ali",t:"There",p:"ah-LEE",e:"🗺"}, {w:"Onde",t:"Where",p:"ON-jee",e:"🧭"},
+    {w:"Quando",t:"When",p:"KWAN-doo",e:"📅"}, {w:"Por quê",t:"Why",p:"poor KEH",e:"❓"},
+    {w:"Como",t:"How",p:"KOH-moo",e:"🤔"}, {w:"Quem",t:"Who",p:"kem",e:"👤"},
+    {w:"O que",t:"What",p:"oo KEH",e:"❔"}, {w:"Qual",t:"Which",p:"kwahl",e:"🔀"},
+    {w:"Quanto",t:"How much",p:"KWAN-too",e:"⚖️"}, {w:"Um",t:"One",p:"oom",e:"1️⃣"},
+    {w:"Dois",t:"Two",p:"doys",e:"2️⃣"}, {w:"Três",t:"Three",p:"trehs",e:"3️⃣"},
+    {w:"Quatro",t:"Four",p:"KWAH-troo",e:"4️⃣"}, {w:"Cinco",t:"Five",p:"SEEN-koo",e:"5️⃣"},
+    {w:"Seis",t:"Six",p:"says",e:"6️⃣"}, {w:"Sete",t:"Seven",p:"SEH-chee",e:"7️⃣"},
+    {w:"Oito",t:"Eight",p:"OY-too",e:"8️⃣"}, {w:"Nove",t:"Nine",p:"NOH-vee",e:"9️⃣"},
+    {w:"Dez",t:"Ten",p:"dehz",e:"🔟"}, {w:"Onze",t:"Eleven",p:"ON-zee",e:"🔢"},
+    {w:"Doze",t:"Twelve",p:"DOH-zee",e:"🔢"}, {w:"Vinte",t:"Twenty",p:"VEEN-chee",e:"🔢"},
+    {w:"Trinta",t:"Thirty",p:"TREEN-tah",e:"🔢"}, {w:"Quarenta",t:"Forty",p:"kwah-REN-tah",e:"🔢"},
+    {w:"Cinquenta",t:"Fifty",p:"seen-KWEN-tah",e:"🔢"}, {w:"Cem",t:"Hundred",p:"sem",e:"💯"},
+    {w:"Mil",t:"Thousand",p:"meel",e:"🔢"}, {w:"Primeiro",t:"First",p:"pree-MAY-roo",e:"🥇"},
+    {w:"Segundo",t:"Second",p:"seh-GOON-doo",e:"🥈"}, {w:"Último",t:"Last",p:"OOL-chee-moo",e:"🔚"},
+    {w:"Segunda-feira",t:"Monday",p:"seh-GOON-dah FAY-rah",e:"📅"}, {w:"Terça-feira",t:"Tuesday",p:"TEHR-sah FAY-rah",e:"📅"},
+    {w:"Quarta-feira",t:"Wednesday",p:"KWAR-tah FAY-rah",e:"📅"}, {w:"Quinta-feira",t:"Thursday",p:"KEEN-tah FAY-rah",e:"📅"},
+    {w:"Sexta-feira",t:"Friday",p:"SES-tah FAY-rah",e:"📅"}, {w:"Sábado",t:"Saturday",p:"SAH-bah-doo",e:"📅"},
+    {w:"Domingo",t:"Sunday",p:"doh-MEEN-goo",e:"📅"}, {w:"Hoje",t:"Today",p:"OH-zhee",e:"📆"},
+    {w:"Amanhã",t:"Tomorrow",p:"ah-mah-NYAH",e:"🌅"}, {w:"Ontem",t:"Yesterday",p:"ON-tem",e:"🌇"},
+    {w:"Semana",t:"Week",p:"seh-MAH-nah",e:"🗓"}, {w:"Mês",t:"Month",p:"mehs",e:"🗓"},
+    {w:"Ano",t:"Year",p:"AH-noo",e:"🎆"}, {w:"Dia",t:"Day",p:"JEE-ah",e:"☀️"},
+    {w:"Noite",t:"Night",p:"NOY-chee",e:"🌙"}, {w:"Manhã",t:"Morning",p:"mah-NYAH",e:"🌄"},
+    {w:"Tarde",t:"Afternoon",p:"TAR-jee",e:"🌆"}, {w:"Hora",t:"Hour",p:"OH-rah",e:"🕐"},
+    {w:"Minuto",t:"Minute",p:"mee-NOO-too",e:"⏱"}, {w:"Janeiro",t:"January",p:"zhah-NAY-roo",e:"❄️"},
+    {w:"Fevereiro",t:"February",p:"feh-veh-RAY-roo",e:"💘"}, {w:"Março",t:"March",p:"MAR-soo",e:"🌸"},
+    {w:"Abril",t:"April",p:"ah-BREEL",e:"🌷"}, {w:"Maio",t:"May",p:"MY-oo",e:"🌼"},
+    {w:"Junho",t:"June",p:"ZHOO-nyoo",e:"☀️"}, {w:"Julho",t:"July",p:"ZHOO-lyoo",e:"🏖"},
+    {w:"Agosto",t:"August",p:"ah-GOS-too",e:"🌞"}, {w:"Setembro",t:"September",p:"seh-TEM-broo",e:"🍂"},
+    {w:"Outubro",t:"October",p:"oh-TOO-broo",e:"🎃"}, {w:"Novembro",t:"November",p:"noh-VEM-broo",e:"🌧"},
+    {w:"Dezembro",t:"December",p:"deh-ZEM-broo",e:"🎄"}, {w:"Vermelho",t:"Red",p:"ver-MEH-lyoo",e:"🔴"},
+    {w:"Azul",t:"Blue",p:"ah-ZOOL",e:"🔵"}, {w:"Verde",t:"Green",p:"VEHR-jee",e:"🟢"},
+    {w:"Amarelo",t:"Yellow",p:"ah-mah-REH-loo",e:"🟡"}, {w:"Preto",t:"Black",p:"PREH-too",e:"⚫"},
+    {w:"Branco",t:"White",p:"BRAHN-koo",e:"⚪"}, {w:"Cinza",t:"Grey",p:"SEEN-zah",e:"🩶"},
+    {w:"Marrom",t:"Brown",p:"mah-HOHM",e:"🟤"}, {w:"Rosa",t:"Pink",p:"HOH-zah",e:"🌸"},
+    {w:"Laranja",t:"Orange",p:"lah-RAHN-zhah",e:"🟠"}, {w:"Roxo",t:"Purple",p:"HOH-shoo",e:"🟣"},
+    {w:"Filho",t:"Son",p:"FEE-lyoo",e:"👦"}, {w:"Filha",t:"Daughter",p:"FEE-lyah",e:"👧"},
+    {w:"Irmão",t:"Brother",p:"eer-MOWN",e:"👬"}, {w:"Irmã",t:"Sister",p:"eer-MAH",e:"👭"},
+    {w:"Avô",t:"Grandfather",p:"ah-VOH",e:"👴"}, {w:"Avó",t:"Grandmother",p:"ah-VAW",e:"👵"},
+    {w:"Tio",t:"Uncle",p:"CHEE-oo",e:"👨"}, {w:"Tia",t:"Aunt",p:"CHEE-ah",e:"👩"},
+    {w:"Marido",t:"Husband",p:"mah-REE-doo",e:"🤵"}, {w:"Mulher",t:"Woman/wife",p:"moo-LYEHR",e:"👩"},
+    {w:"Criança",t:"Child",p:"kree-AHN-sah",e:"👶"}, {w:"Menino",t:"Boy",p:"meh-NEE-noo",e:"🧑"},
+    {w:"Menina",t:"Girl",p:"meh-NEE-nah",e:"👧"}, {w:"Homem",t:"Man",p:"OH-mem",e:"👨"},
+    {w:"Gente",t:"People",p:"ZHEN-chee",e:"👥"}, {w:"Pessoa",t:"Person",p:"peh-SOH-ah",e:"👤"},
+    {w:"Cabeça",t:"Head",p:"kah-BEH-sah",e:"🗣"}, {w:"Olho",t:"Eye",p:"OH-lyoo",e:"👁"},
+    {w:"Mão",t:"Hand",p:"mown",e:"✋"}, {w:"Pé",t:"Foot",p:"peh",e:"🦶"},
+    {w:"Coração",t:"Heart",p:"koh-rah-SOWN",e:"❤️"}, {w:"Boca",t:"Mouth",p:"BOH-kah",e:"👄"},
+    {w:"Nariz",t:"Nose",p:"nah-REES",e:"👃"}, {w:"Orelha",t:"Ear",p:"oh-REH-lyah",e:"👂"},
+    {w:"Braço",t:"Arm",p:"BRAH-soo",e:"💪"}, {w:"Perna",t:"Leg",p:"PEHR-nah",e:"🦵"},
+    {w:"Cabelo",t:"Hair",p:"kah-BEH-loo",e:"💇"}, {w:"Rosto",t:"Face",p:"HOS-too",e:"🙂"},
+    {w:"Pão",t:"Bread",p:"pown",e:"🍞"}, {w:"Leite",t:"Milk",p:"LAY-chee",e:"🥛"},
+    {w:"Vinho",t:"Wine",p:"VEE-nyoo",e:"🍷"}, {w:"Cerveja",t:"Beer",p:"ser-VEH-zhah",e:"🍺"},
+    {w:"Café",t:"Coffee",p:"kah-FEH",e:"☕"}, {w:"Chá",t:"Tea",p:"shah",e:"🍵"},
+    {w:"Carne",t:"Meat",p:"KAR-nee",e:"🥩"}, {w:"Peixe",t:"Fish",p:"PAY-shee",e:"🐟"},
+    {w:"Frango",t:"Chicken",p:"FRAHN-goo",e:"🍗"}, {w:"Arroz",t:"Rice",p:"ah-HOHS",e:"🍚"},
+    {w:"Macarrão",t:"Pasta",p:"mah-kah-HOWN",e:"🍝"}, {w:"Queijo",t:"Cheese",p:"KAY-zhoo",e:"🧀"},
+    {w:"Ovo",t:"Egg",p:"OH-voo",e:"🥚"}, {w:"Fruta",t:"Fruit",p:"FROO-tah",e:"🍎"},
+    {w:"Maçã",t:"Apple",p:"mah-SAH",e:"🍏"}, {w:"Banana",t:"Banana",p:"bah-NAH-nah",e:"🍌"},
+    {w:"Legumes",t:"Vegetables",p:"leh-GOO-mees",e:"🥦"}, {w:"Tomate",t:"Tomato",p:"toh-MAH-chee",e:"🍅"},
+    {w:"Batata",t:"Potato",p:"bah-TAH-tah",e:"🥔"}, {w:"Salada",t:"Salad",p:"sah-LAH-dah",e:"🥗"},
+    {w:"Açúcar",t:"Sugar",p:"ah-SOO-kar",e:"🍬"}, {w:"Sal",t:"Salt",p:"sahl",e:"🧂"},
+    {w:"Óleo",t:"Oil",p:"AW-leh-oo",e:"🫒"}, {w:"Manteiga",t:"Butter",p:"man-TAY-gah",e:"🧈"},
+    {w:"Bolo",t:"Cake",p:"BOH-loo",e:"🍰"}, {w:"Sorvete",t:"Ice cream",p:"sor-VEH-chee",e:"🍨"},
+    {w:"Café da manhã",t:"Breakfast",p:"kah-FEH dah mah-NYAH",e:"🥐"}, {w:"Almoço",t:"Lunch",p:"ahl-MOH-soo",e:"🍽"},
+    {w:"Jantar",t:"Dinner",p:"zhan-TAR",e:"🌙"}, {w:"Restaurante",t:"Restaurant",p:"hes-tow-RAHN-chee",e:"🍴"},
+    {w:"Mesa",t:"Table",p:"MEH-zah",e:"🪑"}, {w:"Porta",t:"Door",p:"POR-tah",e:"🚪"},
+    {w:"Janela",t:"Window",p:"zhah-NEH-lah",e:"🪟"}, {w:"Quarto",t:"Bedroom",p:"KWAR-too",e:"🛏"},
+    {w:"Cozinha",t:"Kitchen",p:"koh-ZEE-nyah",e:"🍳"}, {w:"Banheiro",t:"Bathroom",p:"bah-NYAY-roo",e:"🛁"},
+    {w:"Cama",t:"Bed",p:"KAH-mah",e:"🛌"}, {w:"Cadeira",t:"Chair",p:"kah-DAY-rah",e:"🪑"},
+    {w:"Chave",t:"Key",p:"SHAH-vee",e:"🔑"}, {w:"Luz",t:"Light",p:"loos",e:"💡"},
+    {w:"Rua",t:"Street",p:"HOO-ah",e:"🛣"}, {w:"Loja",t:"Shop",p:"LOH-zhah",e:"🏪"},
+    {w:"Mercado",t:"Market",p:"mer-KAH-doo",e:"🛍"}, {w:"Escola",t:"School",p:"es-KOH-lah",e:"🏫"},
+    {w:"Hospital",t:"Hospital",p:"os-pee-TAHL",e:"🏥"}, {w:"Igreja",t:"Church",p:"ee-GREH-zhah",e:"⛪"},
+    {w:"Banco",t:"Bank",p:"BAHN-koo",e:"🏦"}, {w:"Escritório",t:"Office",p:"es-kree-TAW-ree-oo",e:"🏢"},
+    {w:"Estação",t:"Station",p:"es-tah-SOWN",e:"🚉"}, {w:"Aeroporto",t:"Airport",p:"ah-eh-roh-POR-too",e:"✈️"},
+    {w:"Hotel",t:"Hotel",p:"oh-TEL",e:"🏨"}, {w:"Carro",t:"Car",p:"KAH-hoo",e:"🚗"},
+    {w:"Trem",t:"Train",p:"trem",e:"🚆"}, {w:"Ônibus",t:"Bus",p:"OH-nee-boos",e:"🚌"},
+    {w:"Avião",t:"Airplane",p:"ah-vee-OWN",e:"🛩"}, {w:"Bicicleta",t:"Bicycle",p:"bee-see-KLEH-tah",e:"🚲"},
+    {w:"Passagem",t:"Ticket",p:"pah-SAH-zhem",e:"🎫"}, {w:"Novo",t:"New",p:"NOH-voo",e:"✨"},
+    {w:"Velho",t:"Old",p:"VEH-lyoo",e:"🏚"}, {w:"Jovem",t:"Young",p:"ZHOH-vem",e:"🧒"},
+    {w:"Bonito",t:"Pretty",p:"boh-NEE-too",e:"😍"}, {w:"Feio",t:"Ugly",p:"FAY-oo",e:"🫣"},
+    {w:"Quente",t:"Hot",p:"KEN-chee",e:"🔥"}, {w:"Frio",t:"Cold",p:"FREE-oo",e:"🧊"},
+    {w:"Alto",t:"Tall/high",p:"AHL-too",e:"📏"}, {w:"Baixo",t:"Short/low",p:"BY-shoo",e:"📉"},
+    {w:"Longo",t:"Long",p:"LON-goo",e:"📏"}, {w:"Curto",t:"Short (length)",p:"KOOR-too",e:"✂️"},
+    {w:"Forte",t:"Strong",p:"FOR-chee",e:"💪"}, {w:"Fraco",t:"Weak",p:"FRAH-koo",e:"🪶"},
+    {w:"Fácil",t:"Easy",p:"FAH-seel",e:"🟢"}, {w:"Difícil",t:"Difficult",p:"jee-FEE-seel",e:"🔴"},
+    {w:"Importante",t:"Important",p:"eem-por-TAHN-chee",e:"⭐"}, {w:"Certo",t:"Right/correct",p:"SEHR-too",e:"✅"},
+    {w:"Errado",t:"Wrong",p:"eh-HAH-doo",e:"❌"}, {w:"Verdadeiro",t:"True",p:"ver-dah-DAY-roo",e:"✔️"},
+    {w:"Falso",t:"False",p:"FAHL-soo",e:"✖️"}, {w:"Cheio",t:"Full",p:"SHAY-oo",e:"🈵"},
+    {w:"Vazio",t:"Empty",p:"vah-ZEE-oo",e:"🈳"}, {w:"Aberto",t:"Open",p:"ah-BEHR-too",e:"🔓"},
+    {w:"Fechado",t:"Closed",p:"feh-SHAH-doo",e:"🔒"}, {w:"Limpo",t:"Clean",p:"LEEM-poo",e:"🧼"},
+    {w:"Sujo",t:"Dirty",p:"SOO-zhoo",e:"🧹"}, {w:"Rico",t:"Rich",p:"HEE-koo",e:"💎"},
+    {w:"Pobre",t:"Poor",p:"POH-bree",e:"🪙"}, {w:"Livre",t:"Free",p:"LEE-vree",e:"🕊"},
+    {w:"Ocupado",t:"Busy",p:"oh-koo-PAH-doo",e:"📵"}, {w:"Pronto",t:"Ready",p:"PRON-too",e:"🚦"},
+    {w:"Seguro",t:"Safe/sure",p:"seh-GOO-roo",e:"🛡"}, {w:"Mesmo",t:"Same",p:"MEHS-moo",e:"🟰"},
+    {w:"Diferente",t:"Different",p:"jee-feh-REN-chee",e:"🔀"}, {w:"Caro",t:"Expensive",p:"KAH-roo",e:"💸"},
+    {w:"Barato",t:"Cheap",p:"bah-RAH-too",e:"🏷"}, {w:"Saudável",t:"Healthy",p:"sow-DAH-vel",e:"🥦"},
+    {w:"Doente",t:"Sick",p:"doh-EN-chee",e:"🤒"}, {w:"Sol",t:"Sun",p:"sohl",e:"☀️"},
+    {w:"Lua",t:"Moon",p:"LOO-ah",e:"🌙"}, {w:"Estrela",t:"Star",p:"es-TREH-lah",e:"⭐"},
+    {w:"Céu",t:"Sky",p:"seh-oo",e:"🌤"}, {w:"Mar",t:"Sea",p:"mar",e:"🌊"},
+    {w:"Montanha",t:"Mountain",p:"mon-TAH-nyah",e:"⛰"}, {w:"Rio",t:"River",p:"HEE-oo",e:"🏞"},
+    {w:"Árvore",t:"Tree",p:"AR-voh-ree",e:"🌳"}, {w:"Flor",t:"Flower",p:"flor",e:"🌸"},
+    {w:"Chuva",t:"Rain",p:"SHOO-vah",e:"🌧"}, {w:"Neve",t:"Snow",p:"NEH-vee",e:"❄️"},
+    {w:"Vento",t:"Wind",p:"VEN-too",e:"💨"}, {w:"Fogo",t:"Fire",p:"FOH-goo",e:"🔥"},
+    {w:"Terra",t:"Earth",p:"TEH-hah",e:"🌍"}, {w:"Ar",t:"Air",p:"ar",e:"🌬"},
+    {w:"Coisa",t:"Thing",p:"KOY-zah",e:"📦"}, {w:"Vida",t:"Life",p:"VEE-dah",e:"🌱"},
+    {w:"Mundo",t:"World",p:"MOON-doo",e:"🌎"}, {w:"País",t:"Country",p:"pah-EES",e:"🗺"},
+    {w:"Lugar",t:"Place",p:"loo-GAR",e:"📍"}, {w:"Parte",t:"Part",p:"PAR-chee",e:"🧩"},
+    {w:"Vez",t:"Time (occasion)",p:"vehs",e:"🔁"}, {w:"Nome",t:"Name",p:"NOH-mee",e:"🏷"},
+    {w:"Palavra",t:"Word",p:"pah-LAH-vrah",e:"🔤"}, {w:"Pergunta",t:"Question",p:"per-GOON-tah",e:"❓"},
+    {w:"Resposta",t:"Answer",p:"hes-POS-tah",e:"💬"}, {w:"Problema",t:"Problem",p:"proh-BLEH-mah",e:"⚠️"},
+    {w:"Ideia",t:"Idea",p:"ee-DEH-yah",e:"💡"}, {w:"História",t:"Story/history",p:"ees-TAW-ree-ah",e:"📜"},
+    {w:"Música",t:"Music",p:"MOO-zee-kah",e:"🎵"}, {w:"Filme",t:"Movie",p:"FEEL-mee",e:"🎬"},
+    {w:"Foto",t:"Photo",p:"FOH-too",e:"📷"}, {w:"Telefone",t:"Telephone",p:"teh-leh-FOH-nee",e:"📱"},
+    {w:"Jogo",t:"Game",p:"ZHOH-goo",e:"🎲"}, {w:"Esporte",t:"Sport",p:"es-POR-chee",e:"⚽"},
+    {w:"Futebol",t:"Football",p:"foo-chee-BOHL",e:"⚽"}, {w:"Bom dia",t:"Good morning",p:"bom JEE-ah",e:"🌅"},
+    {w:"Boa tarde",t:"Good afternoon",p:"BOH-ah TAR-jee",e:"🌆"}, {w:"Boa noite",t:"Good night",p:"BOH-ah NOY-chee",e:"🌙"},
+    {w:"Tchau",t:"Bye",p:"chow",e:"👋"}, {w:"Até logo",t:"See you later",p:"ah-TEH LOH-goo",e:"👋"},
+    {w:"Desculpa",t:"Sorry",p:"des-KOOL-pah",e:"🙇"}, {w:"De nada",t:"You're welcome",p:"jee NAH-dah",e:"🤲"},
+    {w:"Tudo bem",t:"All good/okay",p:"TOO-doo bem",e:"👌"}, {w:"Não sei",t:"I don't know",p:"nown say",e:"🤷"},
+    {w:"Não entendo",t:"I don't understand",p:"nown en-TEN-doo",e:"😕"}, {w:"Quanto custa?",t:"How much is it?",p:"KWAN-too KOOS-tah",e:"💶"},
+    {w:"Onde fica?",t:"Where is it?",p:"ON-jee FEE-kah",e:"🧭"}, {w:"Que horas são?",t:"What time is it?",p:"keh OH-rahs sown",e:"🕐"},
+    {w:"Meu nome é",t:"My name is",p:"meh-oo NOH-mee eh",e:"🪪"}, {w:"Prazer",t:"Nice to meet you",p:"prah-ZEHR",e:"🤝"},
+    {w:"Socorro!",t:"Help!",p:"soh-KOH-hoo",e:"🆘"}, {w:"Saúde!",t:"Cheers/bless you",p:"sah-OO-jee",e:"🥂"},
+    {w:"Parabéns",t:"Congratulations",p:"pah-rah-BENS",e:"🎉"}, {w:"Bem-vindo",t:"Welcome",p:"bem VEEN-doo",e:"🎊"},
+    {w:"Vamos!",t:"Let's go!",p:"VAH-moos",e:"🚀"}
   ],
   ar: [
     {w:"مرحبا",      t:"Hello",       p:"mar-HA-ban",     e:"🙋"}, {w:"شكراً",      t:"Thank you",   p:"SHUK-ran",       e:"🙏"},
@@ -1684,9 +2043,175 @@ const WORDS = {
     {w:"بطيء",       t:"Slow",        p:"ba-TEE",         e:"🐢"}, {w:"سعيد",       t:"Happy",       p:"sa-EED",         e:"😊"},
     {w:"حزين",       t:"Sad",         p:"ha-ZEEN",        e:"😢"}, {w:"متعب",       t:"Tired",       p:"mut-AB",         e:"😴"},
     {w:"جائع",       t:"Hungry",      p:"JAH-e",          e:"🤤"}, {w:"عطشان",      t:"Thirsty",     p:"at-SHAN",        e:"😮"},
-    {w:"عائلة",      t:"Family",      p:"AH-ee-lah",      e:"👨‍👩‍👧"},{w:"أم",         t:"Mother",      p:"um",             e:"👩"},
+    {w:"عائلة",      t:"Family",      p:"AH-ee-lah",      e:"👨‍👩‍👧"}, {w:"أم",         t:"Mother",      p:"um",             e:"👩"},
     {w:"أب",         t:"Father",      p:"ab",             e:"👨"}, {w:"كتاب",       t:"Book",        p:"ki-TAB",         e:"📚"},
     {w:"مدينة",      t:"City",        p:"ma-DEE-nah",     e:"🏙"}, {w:"شاطئ",       t:"Beach",       p:"SHA-ti",         e:"🏖"},
+    {w:"كان",t:"To be",p:"kaana",e:"🧍"}, {w:"أراد",t:"To want",p:"araada",e:"🙌"},
+    {w:"استطاع",t:"To be able",p:"istataa'a",e:"💪"}, {w:"قال",t:"To say",p:"qaala",e:"🗣"},
+    {w:"تكلم",t:"To speak",p:"takallama",e:"💬"}, {w:"عرف",t:"To know",p:"'arafa",e:"🧠"},
+    {w:"فعل",t:"To do",p:"fa'ala",e:"🔨"}, {w:"رأى",t:"To see",p:"ra'aa",e:"👀"},
+    {w:"ذهب",t:"To go",p:"dhahaba",e:"🚶"}, {w:"جاء",t:"To come",p:"jaa'a",e:"👋"},
+    {w:"أعطى",t:"To give",p:"a'taa",e:"🎁"}, {w:"فكر",t:"To think",p:"fakkara",e:"💭"},
+    {w:"اشتغل",t:"To work",p:"ishtaghala",e:"💼"}, {w:"عاش",t:"To live",p:"'aasha",e:"🌱"},
+    {w:"أحب",t:"To love",p:"ahabba",e:"❤️"}, {w:"فهم",t:"To understand",p:"fahima",e:"💡"},
+    {w:"وجد",t:"To find",p:"wajada",e:"🔍"}, {w:"أخذ",t:"To take",p:"akhadha",e:"✊"},
+    {w:"نظر",t:"To look",p:"nazhara",e:"👁"}, {w:"وضع",t:"To put",p:"wada'a",e:"📥"},
+    {w:"صدق",t:"To believe",p:"saddaqa",e:"🙏"}, {w:"أحضر",t:"To bring",p:"ahdara",e:"🎒"},
+    {w:"رجع",t:"To return",p:"raja'a",e:"🔙"}, {w:"تذكر",t:"To remember",p:"tadhakkara",e:"🧾"},
+    {w:"اتصل",t:"To call",p:"ittasala",e:"📞"}, {w:"انتظر",t:"To wait",p:"intazhara",e:"⏳"},
+    {w:"أنهى",t:"To finish",p:"anhaa",e:"🏁"}, {w:"أكل",t:"To eat",p:"akala",e:"🍽"},
+    {w:"شرب",t:"To drink",p:"shariba",e:"🥤"}, {w:"نام",t:"To sleep",p:"naama",e:"😴"},
+    {w:"فتح",t:"To open",p:"fataha",e:"🔓"}, {w:"أغلق",t:"To close",p:"aghlaqa",e:"🔒"},
+    {w:"اشترى",t:"To buy",p:"ishtaraa",e:"🛒"}, {w:"دفع",t:"To pay",p:"dafa'a",e:"💳"},
+    {w:"قرأ",t:"To read",p:"qara'a",e:"📖"}, {w:"كتب",t:"To write",p:"kataba",e:"✍️"},
+    {w:"سمع",t:"To hear/listen",p:"sami'a",e:"🎧"}, {w:"لعب",t:"To play",p:"la'iba",e:"🎮"},
+    {w:"ركض",t:"To run",p:"rakada",e:"🏃"}, {w:"مشى",t:"To walk",p:"mashaa",e:"🚶"},
+    {w:"ساعد",t:"To help",p:"saa'ada",e:"🆘"}, {w:"درس",t:"To study",p:"darasa",e:"📚"},
+    {w:"تعلم",t:"To learn",p:"ta'allama",e:"🎓"}, {w:"علّم",t:"To teach",p:"'allama",e:"👩‍🏫"},
+    {w:"بدأ",t:"To begin",p:"bada'a",e:"▶️"}, {w:"بحث",t:"To search",p:"bahatha",e:"🔎"},
+    {w:"استخدم",t:"To use",p:"istakhdama",e:"🛠"}, {w:"سأل",t:"To ask",p:"sa'ala",e:"❓"},
+    {w:"أجاب",t:"To answer",p:"ajaaba",e:"💬"}, {w:"خرج",t:"To go out",p:"kharaja",e:"🚪"},
+    {w:"دخل",t:"To enter",p:"dakhala",e:"➡️"}, {w:"خسر",t:"To lose",p:"khasira",e:"🫥"},
+    {w:"ربح",t:"To win",p:"rabiha",e:"🏆"}, {w:"حاول",t:"To try",p:"haawala",e:"🎯"},
+    {w:"غيّر",t:"To change",p:"ghayyara",e:"🔄"}, {w:"أحس",t:"To feel",p:"ahassa",e:"💗"},
+    {w:"جلس",t:"To sit",p:"jalasa",e:"🪑"}, {w:"وقف",t:"To stand",p:"waqafa",e:"🧍"},
+    {w:"أنا",t:"I",p:"ana",e:"🙋"}, {w:"أنتَ",t:"You",p:"anta",e:"👉"},
+    {w:"هو",t:"He",p:"huwa",e:"👨"}, {w:"هي",t:"She",p:"hiya",e:"👩"},
+    {w:"نحن",t:"We",p:"nahnu",e:"👥"}, {w:"أنتم",t:"You (plural)",p:"antum",e:"👫"},
+    {w:"هم",t:"They",p:"hum",e:"👪"}, {w:"هذا",t:"This",p:"haadhaa",e:"👇"},
+    {w:"ذلك",t:"That",p:"dhaalika",e:"👉"}, {w:"كل",t:"All/every",p:"kull",e:"🌐"},
+    {w:"لا شيء",t:"Nothing",p:"laa shay'",e:"🚫"}, {w:"شيء",t:"Thing/something",p:"shay'",e:"📦"},
+    {w:"أحد",t:"Someone",p:"ahad",e:"👤"}, {w:"لا أحد",t:"Nobody",p:"laa ahad",e:"🙅"},
+    {w:"كثير",t:"A lot",p:"kathiir",e:"📈"}, {w:"قليل",t:"Little/few",p:"qaliil",e:"🤏"},
+    {w:"جداً",t:"Very",p:"jiddan",e:"📈"}, {w:"أكثر",t:"More",p:"akthar",e:"➕"},
+    {w:"أقل",t:"Less",p:"aqall",e:"➖"}, {w:"أيضاً",t:"Also",p:"aydan",e:"➕"},
+    {w:"دائماً",t:"Always",p:"daa'iman",e:"♾️"}, {w:"أبداً",t:"Never",p:"abadan",e:"🚫"},
+    {w:"الآن",t:"Now",p:"al-aan",e:"⏱"}, {w:"بعد",t:"After",p:"ba'd",e:"⏭"},
+    {w:"قبل",t:"Before",p:"qabl",e:"⏮"}, {w:"هنا",t:"Here",p:"hunaa",e:"📍"},
+    {w:"هناك",t:"There",p:"hunaak",e:"🗺"}, {w:"أين",t:"Where",p:"ayna",e:"🧭"},
+    {w:"متى",t:"When",p:"mataa",e:"📅"}, {w:"لماذا",t:"Why",p:"limaadhaa",e:"❓"},
+    {w:"كيف",t:"How",p:"kayfa",e:"🤔"}, {w:"من",t:"Who",p:"man",e:"👤"},
+    {w:"ماذا",t:"What",p:"maadhaa",e:"❔"}, {w:"أي",t:"Which",p:"ayy",e:"🔀"},
+    {w:"كم",t:"How much",p:"kam",e:"⚖️"}, {w:"واحد",t:"One",p:"waahid",e:"1️⃣"},
+    {w:"اثنان",t:"Two",p:"ithnaan",e:"2️⃣"}, {w:"ثلاثة",t:"Three",p:"thalaatha",e:"3️⃣"},
+    {w:"أربعة",t:"Four",p:"arba'a",e:"4️⃣"}, {w:"خمسة",t:"Five",p:"khamsa",e:"5️⃣"},
+    {w:"ستة",t:"Six",p:"sitta",e:"6️⃣"}, {w:"سبعة",t:"Seven",p:"sab'a",e:"7️⃣"},
+    {w:"ثمانية",t:"Eight",p:"thamaaniya",e:"8️⃣"}, {w:"تسعة",t:"Nine",p:"tis'a",e:"9️⃣"},
+    {w:"عشرة",t:"Ten",p:"'ashara",e:"🔟"}, {w:"أحد عشر",t:"Eleven",p:"ahada 'ashar",e:"🔢"},
+    {w:"اثنا عشر",t:"Twelve",p:"ithnaa 'ashar",e:"🔢"}, {w:"عشرون",t:"Twenty",p:"'ishruun",e:"🔢"},
+    {w:"ثلاثون",t:"Thirty",p:"thalaathuun",e:"🔢"}, {w:"أربعون",t:"Forty",p:"arba'uun",e:"🔢"},
+    {w:"خمسون",t:"Fifty",p:"khamsuun",e:"🔢"}, {w:"مئة",t:"Hundred",p:"mi'a",e:"💯"},
+    {w:"ألف",t:"Thousand",p:"alf",e:"🔢"}, {w:"أول",t:"First",p:"awwal",e:"🥇"},
+    {w:"ثاني",t:"Second",p:"thaani",e:"🥈"}, {w:"أخير",t:"Last",p:"akhiir",e:"🔚"},
+    {w:"الاثنين",t:"Monday",p:"al-ithnayn",e:"📅"}, {w:"الثلاثاء",t:"Tuesday",p:"ath-thulaathaa'",e:"📅"},
+    {w:"الأربعاء",t:"Wednesday",p:"al-arbi'aa'",e:"📅"}, {w:"الخميس",t:"Thursday",p:"al-khamiis",e:"📅"},
+    {w:"الجمعة",t:"Friday",p:"al-jum'a",e:"📅"}, {w:"السبت",t:"Saturday",p:"as-sabt",e:"📅"},
+    {w:"الأحد",t:"Sunday",p:"al-ahad",e:"📅"}, {w:"اليوم",t:"Today",p:"al-yawm",e:"📆"},
+    {w:"غداً",t:"Tomorrow",p:"ghadan",e:"🌅"}, {w:"أمس",t:"Yesterday",p:"ams",e:"🌇"},
+    {w:"أسبوع",t:"Week",p:"usbuu'",e:"🗓"}, {w:"شهر",t:"Month",p:"shahr",e:"🗓"},
+    {w:"سنة",t:"Year",p:"sana",e:"🎆"}, {w:"يوم",t:"Day",p:"yawm",e:"☀️"},
+    {w:"ليلة",t:"Night",p:"layla",e:"🌙"}, {w:"صباح",t:"Morning",p:"sabaah",e:"🌄"},
+    {w:"مساء",t:"Evening",p:"masaa'",e:"🌆"}, {w:"ساعة",t:"Hour/watch",p:"saa'a",e:"🕐"},
+    {w:"دقيقة",t:"Minute",p:"daqiiqa",e:"⏱"}, {w:"يناير",t:"January",p:"yanaayir",e:"❄️"},
+    {w:"فبراير",t:"February",p:"fibraayir",e:"💘"}, {w:"مارس",t:"March",p:"maaris",e:"🌸"},
+    {w:"أبريل",t:"April",p:"abriil",e:"🌷"}, {w:"مايو",t:"May",p:"maayuu",e:"🌼"},
+    {w:"يونيو",t:"June",p:"yuunyuu",e:"☀️"}, {w:"يوليو",t:"July",p:"yuulyuu",e:"🏖"},
+    {w:"أغسطس",t:"August",p:"aghustus",e:"🌞"}, {w:"سبتمبر",t:"September",p:"sibtambir",e:"🍂"},
+    {w:"أكتوبر",t:"October",p:"uktuubir",e:"🎃"}, {w:"نوفمبر",t:"November",p:"nuufambir",e:"🌧"},
+    {w:"ديسمبر",t:"December",p:"diisambir",e:"🎄"}, {w:"أحمر",t:"Red",p:"ahmar",e:"🔴"},
+    {w:"أزرق",t:"Blue",p:"azraq",e:"🔵"}, {w:"أخضر",t:"Green",p:"akhdar",e:"🟢"},
+    {w:"أصفر",t:"Yellow",p:"asfar",e:"🟡"}, {w:"أسود",t:"Black",p:"aswad",e:"⚫"},
+    {w:"أبيض",t:"White",p:"abyad",e:"⚪"}, {w:"رمادي",t:"Grey",p:"ramaadii",e:"🩶"},
+    {w:"بني",t:"Brown",p:"bunnii",e:"🟤"}, {w:"وردي",t:"Pink",p:"wardii",e:"🌸"},
+    {w:"برتقالي",t:"Orange",p:"burtuqaalii",e:"🟠"}, {w:"بنفسجي",t:"Purple",p:"banafsajii",e:"🟣"},
+    {w:"ابن",t:"Son",p:"ibn",e:"👦"}, {w:"ابنة",t:"Daughter",p:"ibna",e:"👧"},
+    {w:"أخ",t:"Brother",p:"akh",e:"👬"}, {w:"أخت",t:"Sister",p:"ukht",e:"👭"},
+    {w:"جد",t:"Grandfather",p:"jadd",e:"👴"}, {w:"جدة",t:"Grandmother",p:"jadda",e:"👵"},
+    {w:"عم",t:"Uncle",p:"'amm",e:"👨"}, {w:"عمة",t:"Aunt",p:"'amma",e:"👩"},
+    {w:"زوج",t:"Husband",p:"zawj",e:"🤵"}, {w:"زوجة",t:"Wife",p:"zawja",e:"👰"},
+    {w:"طفل",t:"Child",p:"tifl",e:"👶"}, {w:"ولد",t:"Boy",p:"walad",e:"🧑"},
+    {w:"بنت",t:"Girl",p:"bint",e:"👧"}, {w:"رجل",t:"Man",p:"rajul",e:"👨"},
+    {w:"امرأة",t:"Woman",p:"imra'a",e:"👩"}, {w:"ناس",t:"People",p:"naas",e:"👥"},
+    {w:"شخص",t:"Person",p:"shakhs",e:"👤"}, {w:"رأس",t:"Head",p:"ra's",e:"🗣"},
+    {w:"عين",t:"Eye",p:"'ayn",e:"👁"}, {w:"يد",t:"Hand",p:"yad",e:"✋"},
+    {w:"قدم",t:"Foot",p:"qadam",e:"🦶"}, {w:"قلب",t:"Heart",p:"qalb",e:"❤️"},
+    {w:"فم",t:"Mouth",p:"fam",e:"👄"}, {w:"أنف",t:"Nose",p:"anf",e:"👃"},
+    {w:"أذن",t:"Ear",p:"udhun",e:"👂"}, {w:"ذراع",t:"Arm",p:"dhiraa'",e:"💪"},
+    {w:"ساق",t:"Leg",p:"saaq",e:"🦵"}, {w:"شعر",t:"Hair",p:"sha'r",e:"💇"},
+    {w:"وجه",t:"Face",p:"wajh",e:"🙂"}, {w:"خبز",t:"Bread",p:"khubz",e:"🍞"},
+    {w:"حليب",t:"Milk",p:"haliib",e:"🥛"}, {w:"قهوة",t:"Coffee",p:"qahwa",e:"☕"},
+    {w:"شاي",t:"Tea",p:"shaay",e:"🍵"}, {w:"عصير",t:"Juice",p:"'asiir",e:"🧃"},
+    {w:"لحم",t:"Meat",p:"lahm",e:"🥩"}, {w:"سمك",t:"Fish",p:"samak",e:"🐟"},
+    {w:"دجاج",t:"Chicken",p:"dajaaj",e:"🍗"}, {w:"أرز",t:"Rice",p:"aruzz",e:"🍚"},
+    {w:"معكرونة",t:"Pasta",p:"ma'karuuna",e:"🍝"}, {w:"جبن",t:"Cheese",p:"jubn",e:"🧀"},
+    {w:"بيضة",t:"Egg",p:"bayda",e:"🥚"}, {w:"فاكهة",t:"Fruit",p:"faakiha",e:"🍎"},
+    {w:"تفاحة",t:"Apple",p:"tuffaaha",e:"🍏"}, {w:"موز",t:"Banana",p:"mawz",e:"🍌"},
+    {w:"خضار",t:"Vegetables",p:"khudaar",e:"🥦"}, {w:"طماطم",t:"Tomato",p:"tamaatim",e:"🍅"},
+    {w:"بطاطس",t:"Potato",p:"bataatis",e:"🥔"}, {w:"سلطة",t:"Salad",p:"salata",e:"🥗"},
+    {w:"سكر",t:"Sugar",p:"sukkar",e:"🍬"}, {w:"ملح",t:"Salt",p:"milh",e:"🧂"},
+    {w:"زيت",t:"Oil",p:"zayt",e:"🫒"}, {w:"زبدة",t:"Butter",p:"zubda",e:"🧈"},
+    {w:"كعكة",t:"Cake",p:"ka'ka",e:"🍰"}, {w:"مثلجات",t:"Ice cream",p:"muthallajaat",e:"🍨"},
+    {w:"شوربة",t:"Soup",p:"shorba",e:"🍲"}, {w:"فطور",t:"Breakfast",p:"futuur",e:"🥐"},
+    {w:"غداء",t:"Lunch",p:"ghadaa'",e:"🍽"}, {w:"عشاء",t:"Dinner",p:"'ashaa'",e:"🌙"},
+    {w:"مطعم",t:"Restaurant",p:"mat'am",e:"🍴"}, {w:"طاولة",t:"Table",p:"taawila",e:"🪑"},
+    {w:"باب",t:"Door",p:"baab",e:"🚪"}, {w:"نافذة",t:"Window",p:"naafidha",e:"🪟"},
+    {w:"غرفة",t:"Room",p:"ghurfa",e:"🛏"}, {w:"مطبخ",t:"Kitchen",p:"matbakh",e:"🍳"},
+    {w:"حمام",t:"Bathroom",p:"hammaam",e:"🛁"}, {w:"سرير",t:"Bed",p:"sariir",e:"🛌"},
+    {w:"كرسي",t:"Chair",p:"kursii",e:"🪑"}, {w:"مفتاح",t:"Key",p:"miftaah",e:"🔑"},
+    {w:"ضوء",t:"Light",p:"daw'",e:"💡"}, {w:"شارع",t:"Street",p:"shaari'",e:"🛣"},
+    {w:"متجر",t:"Shop",p:"matjar",e:"🏪"}, {w:"سوق",t:"Market",p:"suuq",e:"🛍"},
+    {w:"مدرسة",t:"School",p:"madrasa",e:"🏫"}, {w:"مستشفى",t:"Hospital",p:"mustashfaa",e:"🏥"},
+    {w:"مسجد",t:"Mosque",p:"masjid",e:"🕌"}, {w:"بنك",t:"Bank",p:"bank",e:"🏦"},
+    {w:"مكتب",t:"Office/desk",p:"maktab",e:"🏢"}, {w:"محطة",t:"Station",p:"mahatta",e:"🚉"},
+    {w:"مطار",t:"Airport",p:"mataar",e:"✈️"}, {w:"فندق",t:"Hotel",p:"funduq",e:"🏨"},
+    {w:"سيارة",t:"Car",p:"sayyaara",e:"🚗"}, {w:"قطار",t:"Train",p:"qitaar",e:"🚆"},
+    {w:"حافلة",t:"Bus",p:"haafila",e:"🚌"}, {w:"طائرة",t:"Airplane",p:"taa'ira",e:"🛩"},
+    {w:"دراجة",t:"Bicycle",p:"darraaja",e:"🚲"}, {w:"تذكرة",t:"Ticket",p:"tadhkara",e:"🎫"},
+    {w:"جديد",t:"New",p:"jadiid",e:"✨"}, {w:"قديم",t:"Old",p:"qadiim",e:"🏚"},
+    {w:"شاب",t:"Young",p:"shaabb",e:"🧒"}, {w:"جميل",t:"Beautiful",p:"jamiil",e:"😍"},
+    {w:"قبيح",t:"Ugly",p:"qabiih",e:"🫣"}, {w:"حار",t:"Hot",p:"haarr",e:"🔥"},
+    {w:"بارد",t:"Cold",p:"baarid",e:"🧊"}, {w:"طويل",t:"Tall/long",p:"tawiil",e:"📏"},
+    {w:"قصير",t:"Short",p:"qasiir",e:"✂️"}, {w:"قوي",t:"Strong",p:"qawiyy",e:"💪"},
+    {w:"ضعيف",t:"Weak",p:"da'iif",e:"🪶"}, {w:"سهل",t:"Easy",p:"sahl",e:"🟢"},
+    {w:"صعب",t:"Difficult",p:"sa'b",e:"🔴"}, {w:"مهم",t:"Important",p:"muhimm",e:"⭐"},
+    {w:"صحيح",t:"Correct",p:"sahiih",e:"✅"}, {w:"خاطئ",t:"Wrong",p:"khaati'",e:"❌"},
+    {w:"حقيقي",t:"True/real",p:"haqiiqii",e:"✔️"}, {w:"ممتلئ",t:"Full",p:"mumtali'",e:"🈵"},
+    {w:"فارغ",t:"Empty",p:"faarigh",e:"🈳"}, {w:"مفتوح",t:"Open",p:"maftuuh",e:"🔓"},
+    {w:"مغلق",t:"Closed",p:"mughlaq",e:"🔒"}, {w:"نظيف",t:"Clean",p:"nazhiif",e:"🧼"},
+    {w:"وسخ",t:"Dirty",p:"wasikh",e:"🧹"}, {w:"غني",t:"Rich",p:"ghanii",e:"💎"},
+    {w:"فقير",t:"Poor",p:"faqiir",e:"🪙"}, {w:"حر",t:"Free",p:"hurr",e:"🕊"},
+    {w:"مشغول",t:"Busy",p:"mashghuul",e:"📵"}, {w:"جاهز",t:"Ready",p:"jaahiz",e:"🚦"},
+    {w:"آمن",t:"Safe",p:"aamin",e:"🛡"}, {w:"متشابه",t:"Similar/same",p:"mutashaabih",e:"🟰"},
+    {w:"مختلف",t:"Different",p:"mukhtalif",e:"🔀"}, {w:"غالي",t:"Expensive",p:"ghaalii",e:"💸"},
+    {w:"رخيص",t:"Cheap",p:"rakhiis",e:"🏷"}, {w:"صحي",t:"Healthy",p:"sihhii",e:"🥦"},
+    {w:"مريض",t:"Sick",p:"mariid",e:"🤒"}, {w:"شمس",t:"Sun",p:"shams",e:"☀️"},
+    {w:"قمر",t:"Moon",p:"qamar",e:"🌙"}, {w:"نجمة",t:"Star",p:"najma",e:"⭐"},
+    {w:"سماء",t:"Sky",p:"samaa'",e:"🌤"}, {w:"بحر",t:"Sea",p:"bahr",e:"🌊"},
+    {w:"جبل",t:"Mountain",p:"jabal",e:"⛰"}, {w:"نهر",t:"River",p:"nahr",e:"🏞"},
+    {w:"شجرة",t:"Tree",p:"shajara",e:"🌳"}, {w:"زهرة",t:"Flower",p:"zahra",e:"🌸"},
+    {w:"مطر",t:"Rain",p:"matar",e:"🌧"}, {w:"ثلج",t:"Snow",p:"thalj",e:"❄️"},
+    {w:"ريح",t:"Wind",p:"riih",e:"💨"}, {w:"نار",t:"Fire",p:"naar",e:"🔥"},
+    {w:"أرض",t:"Earth/land",p:"ard",e:"🌍"}, {w:"هواء",t:"Air",p:"hawaa'",e:"🌬"},
+    {w:"حياة",t:"Life",p:"hayaa",e:"🌱"}, {w:"عالم",t:"World",p:"'aalam",e:"🌎"},
+    {w:"بلد",t:"Country",p:"balad",e:"🗺"}, {w:"مكان",t:"Place",p:"makaan",e:"📍"},
+    {w:"جزء",t:"Part",p:"juz'",e:"🧩"}, {w:"مرة",t:"Time (occasion)",p:"marra",e:"🔁"},
+    {w:"اسم",t:"Name",p:"ism",e:"🏷"}, {w:"كلمة",t:"Word",p:"kalima",e:"🔤"},
+    {w:"سؤال",t:"Question",p:"su'aal",e:"❓"}, {w:"جواب",t:"Answer",p:"jawaab",e:"💬"},
+    {w:"مشكلة",t:"Problem",p:"mushkila",e:"⚠️"}, {w:"فكرة",t:"Idea",p:"fikra",e:"💡"},
+    {w:"قصة",t:"Story",p:"qissa",e:"📜"}, {w:"موسيقى",t:"Music",p:"muusiiqaa",e:"🎵"},
+    {w:"فيلم",t:"Movie",p:"film",e:"🎬"}, {w:"صورة",t:"Photo/picture",p:"suura",e:"📷"},
+    {w:"هاتف",t:"Telephone",p:"haatif",e:"📱"}, {w:"لعبة",t:"Game",p:"lu'ba",e:"🎲"},
+    {w:"رياضة",t:"Sport",p:"riyaada",e:"⚽"}, {w:"كرة القدم",t:"Football",p:"kurat al-qadam",e:"⚽"},
+    {w:"صباح الخير",t:"Good morning",p:"sabaah al-khayr",e:"🌅"}, {w:"مساء الخير",t:"Good evening",p:"masaa' al-khayr",e:"🌆"},
+    {w:"تصبح على خير",t:"Good night",p:"tusbih 'alaa khayr",e:"🌙"}, {w:"مع السلامة",t:"Goodbye",p:"ma'a as-salaama",e:"👋"},
+    {w:"إلى اللقاء",t:"See you later",p:"ilaa al-liqaa'",e:"👋"}, {w:"آسف",t:"Sorry",p:"aasif",e:"🙇"},
+    {w:"عفواً",t:"You're welcome",p:"'afwan",e:"🤲"}, {w:"حسناً",t:"Okay",p:"hasanan",e:"👌"},
+    {w:"لا أعرف",t:"I don't know",p:"laa a'rif",e:"🤷"}, {w:"لا أفهم",t:"I don't understand",p:"laa afham",e:"😕"},
+    {w:"بكم هذا؟",t:"How much is this?",p:"bikam haadhaa",e:"💶"}, {w:"كم الساعة؟",t:"What time is it?",p:"kam as-saa'a",e:"🕐"},
+    {w:"اسمي",t:"My name is",p:"ismii",e:"🪪"}, {w:"تشرفنا",t:"Nice to meet you",p:"tasharrafnaa",e:"🤝"},
+    {w:"النجدة!",t:"Help!",p:"an-najda",e:"🆘"}, {w:"في صحتك",t:"Cheers",p:"fii sihhatik",e:"🥂"},
+    {w:"مبروك",t:"Congratulations",p:"mabruuk",e:"🎉"}, {w:"أهلاً وسهلاً",t:"Welcome",p:"ahlan wa sahlan",e:"🎊"},
+    {w:"هيا بنا",t:"Let's go",p:"hayyaa binaa",e:"🚀"}, {w:"إن شاء الله",t:"God willing",p:"in shaa' allah",e:"🤲"}
   ],
   ja: [
     {w:"こんにちは",  t:"Hello",       p:"kon-ni-CHI-wa",  e:"🙋"}, {w:"ありがとう",  t:"Thank you",   p:"a-ri-GA-to",     e:"🙏"},
@@ -1701,9 +2226,147 @@ const WORDS = {
     {w:"おそい",     t:"Slow",        p:"o-SO-i",         e:"🐢"}, {w:"うれしい",   t:"Happy",       p:"u-re-SHI-i",     e:"😊"},
     {w:"かなしい",   t:"Sad",         p:"ka-na-SHI-i",    e:"😢"}, {w:"つかれた",   t:"Tired",       p:"tsu-ka-RE-ta",   e:"😴"},
     {w:"おなかがすいた",t:"Hungry",   p:"o-na-ka-su-I-ta",e:"🤤"}, {w:"のどがかわいた",t:"Thirsty",  p:"no-do-ka-wa-I-ta",e:"😮"},
-    {w:"かぞく",     t:"Family",      p:"ka-ZO-ku",       e:"👨‍👩‍👧"},{w:"おかあさん", t:"Mother",      p:"o-KA-san",       e:"👩"},
+    {w:"かぞく",     t:"Family",      p:"ka-ZO-ku",       e:"👨‍👩‍👧"}, {w:"おかあさん", t:"Mother",      p:"o-KA-san",       e:"👩"},
     {w:"おとうさん", t:"Father",      p:"o-TO-san",       e:"👨"}, {w:"ほん",       t:"Book",        p:"hon",            e:"📚"},
     {w:"まち",       t:"City",        p:"ma-chi",         e:"🏙"}, {w:"うみ",       t:"Beach",       p:"u-mi",           e:"🏖"},
+    {w:"する",t:"To do",p:"suru",e:"🔨"}, {w:"いる",t:"To be (living)",p:"iru",e:"🧍"},
+    {w:"ある",t:"To be (things)",p:"aru",e:"📦"}, {w:"なる",t:"To become",p:"naru",e:"🔄"},
+    {w:"言う",t:"To say",p:"iu",e:"🗣"}, {w:"話す",t:"To speak",p:"hanasu",e:"💬"},
+    {w:"知る",t:"To know",p:"shiru",e:"🧠"}, {w:"分かる",t:"To understand",p:"wakaru",e:"💡"},
+    {w:"見る",t:"To see",p:"miru",e:"👀"}, {w:"聞く",t:"To listen/ask",p:"kiku",e:"🎧"},
+    {w:"行く",t:"To go",p:"iku",e:"🚶"}, {w:"来る",t:"To come",p:"kuru",e:"👋"},
+    {w:"帰る",t:"To return",p:"kaeru",e:"🔙"}, {w:"食べる",t:"To eat",p:"taberu",e:"🍽"},
+    {w:"飲む",t:"To drink",p:"nomu",e:"🥤"}, {w:"寝る",t:"To sleep",p:"neru",e:"😴"},
+    {w:"起きる",t:"To wake up",p:"okiru",e:"⏰"}, {w:"買う",t:"To buy",p:"kau",e:"🛒"},
+    {w:"払う",t:"To pay",p:"harau",e:"💳"}, {w:"読む",t:"To read",p:"yomu",e:"📖"},
+    {w:"書く",t:"To write",p:"kaku",e:"✍️"}, {w:"遊ぶ",t:"To play",p:"asobu",e:"🎮"},
+    {w:"走る",t:"To run",p:"hashiru",e:"🏃"}, {w:"歩く",t:"To walk",p:"aruku",e:"🚶"},
+    {w:"待つ",t:"To wait",p:"matsu",e:"⏳"}, {w:"思う",t:"To think",p:"omou",e:"💭"},
+    {w:"考える",t:"To consider",p:"kangaeru",e:"🧠"}, {w:"作る",t:"To make",p:"tsukuru",e:"🔨"},
+    {w:"使う",t:"To use",p:"tsukau",e:"🛠"}, {w:"取る",t:"To take",p:"toru",e:"✊"},
+    {w:"持つ",t:"To hold/have",p:"motsu",e:"🤲"}, {w:"あげる",t:"To give",p:"ageru",e:"🎁"},
+    {w:"もらう",t:"To receive",p:"morau",e:"📥"}, {w:"会う",t:"To meet",p:"au",e:"🤝"},
+    {w:"働く",t:"To work",p:"hataraku",e:"💼"}, {w:"住む",t:"To live/reside",p:"sumu",e:"🏠"},
+    {w:"助ける",t:"To help",p:"tasukeru",e:"🆘"}, {w:"手伝う",t:"To assist",p:"tetsudau",e:"🤝"},
+    {w:"習う",t:"To learn",p:"narau",e:"🎓"}, {w:"教える",t:"To teach",p:"oshieru",e:"👩‍🏫"},
+    {w:"始める",t:"To begin",p:"hajimeru",e:"▶️"}, {w:"終わる",t:"To end",p:"owaru",e:"🏁"},
+    {w:"探す",t:"To search",p:"sagasu",e:"🔎"}, {w:"見つける",t:"To find",p:"mitsukeru",e:"🔍"},
+    {w:"開ける",t:"To open",p:"akeru",e:"🔓"}, {w:"閉める",t:"To close",p:"shimeru",e:"🔒"},
+    {w:"入る",t:"To enter",p:"hairu",e:"➡️"}, {w:"出る",t:"To exit",p:"deru",e:"🚪"},
+    {w:"座る",t:"To sit",p:"suwaru",e:"🪑"}, {w:"立つ",t:"To stand",p:"tatsu",e:"🧍"},
+    {w:"感じる",t:"To feel",p:"kanjiru",e:"💗"}, {w:"愛する",t:"To love",p:"aisuru",e:"❤️"},
+    {w:"私",t:"I",p:"watashi",e:"🙋"}, {w:"あなた",t:"You",p:"anata",e:"👉"},
+    {w:"彼",t:"He",p:"kare",e:"👨"}, {w:"彼女",t:"She",p:"kanojo",e:"👩"},
+    {w:"私たち",t:"We",p:"watashitachi",e:"👥"}, {w:"これ",t:"This",p:"kore",e:"👇"},
+    {w:"それ",t:"That",p:"sore",e:"👉"}, {w:"ここ",t:"Here",p:"koko",e:"📍"},
+    {w:"そこ",t:"There",p:"soko",e:"🗺"}, {w:"全部",t:"Everything",p:"zenbu",e:"🌐"},
+    {w:"何も",t:"Nothing",p:"nanimo",e:"🚫"}, {w:"誰か",t:"Someone",p:"dareka",e:"👤"},
+    {w:"たくさん",t:"A lot",p:"takusan",e:"📈"}, {w:"少し",t:"A little",p:"sukoshi",e:"🤏"},
+    {w:"とても",t:"Very",p:"totemo",e:"📈"}, {w:"もっと",t:"More",p:"motto",e:"➕"},
+    {w:"も",t:"Also",p:"mo",e:"➕"}, {w:"いつも",t:"Always",p:"itsumo",e:"♾️"},
+    {w:"今",t:"Now",p:"ima",e:"⏱"}, {w:"後で",t:"Later",p:"atode",e:"⏭"},
+    {w:"前に",t:"Before",p:"maeni",e:"⏮"}, {w:"どこ",t:"Where",p:"doko",e:"🧭"},
+    {w:"いつ",t:"When",p:"itsu",e:"📅"}, {w:"どうして",t:"Why",p:"doushite",e:"❓"},
+    {w:"どう",t:"How",p:"dou",e:"🤔"}, {w:"誰",t:"Who",p:"dare",e:"👤"},
+    {w:"何",t:"What",p:"nani",e:"❔"}, {w:"どれ",t:"Which",p:"dore",e:"🔀"},
+    {w:"いくら",t:"How much",p:"ikura",e:"⚖️"}, {w:"一",t:"One",p:"ichi",e:"1️⃣"},
+    {w:"二",t:"Two",p:"ni",e:"2️⃣"}, {w:"三",t:"Three",p:"san",e:"3️⃣"},
+    {w:"四",t:"Four",p:"yon",e:"4️⃣"}, {w:"五",t:"Five",p:"go",e:"5️⃣"},
+    {w:"六",t:"Six",p:"roku",e:"6️⃣"}, {w:"七",t:"Seven",p:"nana",e:"7️⃣"},
+    {w:"八",t:"Eight",p:"hachi",e:"8️⃣"}, {w:"九",t:"Nine",p:"kyuu",e:"9️⃣"},
+    {w:"十",t:"Ten",p:"juu",e:"🔟"}, {w:"百",t:"Hundred",p:"hyaku",e:"💯"},
+    {w:"千",t:"Thousand",p:"sen",e:"🔢"}, {w:"最初",t:"First",p:"saisho",e:"🥇"},
+    {w:"最後",t:"Last",p:"saigo",e:"🔚"}, {w:"月曜日",t:"Monday",p:"getsuyoubi",e:"📅"},
+    {w:"火曜日",t:"Tuesday",p:"kayoubi",e:"📅"}, {w:"水曜日",t:"Wednesday",p:"suiyoubi",e:"📅"},
+    {w:"木曜日",t:"Thursday",p:"mokuyoubi",e:"📅"}, {w:"金曜日",t:"Friday",p:"kinyoubi",e:"📅"},
+    {w:"土曜日",t:"Saturday",p:"doyoubi",e:"📅"}, {w:"日曜日",t:"Sunday",p:"nichiyoubi",e:"📅"},
+    {w:"今日",t:"Today",p:"kyou",e:"📆"}, {w:"明日",t:"Tomorrow",p:"ashita",e:"🌅"},
+    {w:"昨日",t:"Yesterday",p:"kinou",e:"🌇"}, {w:"週",t:"Week",p:"shuu",e:"🗓"},
+    {w:"月",t:"Month/moon",p:"tsuki",e:"🌙"}, {w:"年",t:"Year",p:"toshi",e:"🎆"},
+    {w:"日",t:"Day/sun",p:"hi",e:"☀️"}, {w:"夜",t:"Night",p:"yoru",e:"🌙"},
+    {w:"朝",t:"Morning",p:"asa",e:"🌄"}, {w:"夕方",t:"Evening",p:"yuugata",e:"🌆"},
+    {w:"時間",t:"Time/hour",p:"jikan",e:"🕐"}, {w:"分",t:"Minute",p:"fun",e:"⏱"},
+    {w:"赤",t:"Red",p:"aka",e:"🔴"}, {w:"青",t:"Blue",p:"ao",e:"🔵"},
+    {w:"緑",t:"Green",p:"midori",e:"🟢"}, {w:"黄色",t:"Yellow",p:"kiiro",e:"🟡"},
+    {w:"黒",t:"Black",p:"kuro",e:"⚫"}, {w:"白",t:"White",p:"shiro",e:"⚪"},
+    {w:"茶色",t:"Brown",p:"chairo",e:"🟤"}, {w:"ピンク",t:"Pink",p:"pinku",e:"🌸"},
+    {w:"紫",t:"Purple",p:"murasaki",e:"🟣"}, {w:"息子",t:"Son",p:"musuko",e:"👦"},
+    {w:"娘",t:"Daughter",p:"musume",e:"👧"}, {w:"兄",t:"Older brother",p:"ani",e:"👬"},
+    {w:"姉",t:"Older sister",p:"ane",e:"👭"}, {w:"弟",t:"Younger brother",p:"otouto",e:"👦"},
+    {w:"妹",t:"Younger sister",p:"imouto",e:"👧"}, {w:"祖父",t:"Grandfather",p:"sofu",e:"👴"},
+    {w:"祖母",t:"Grandmother",p:"sobo",e:"👵"}, {w:"夫",t:"Husband",p:"otto",e:"🤵"},
+    {w:"妻",t:"Wife",p:"tsuma",e:"👰"}, {w:"子供",t:"Child",p:"kodomo",e:"👶"},
+    {w:"男",t:"Man",p:"otoko",e:"👨"}, {w:"女",t:"Woman",p:"onna",e:"👩"},
+    {w:"人",t:"Person",p:"hito",e:"👤"}, {w:"頭",t:"Head",p:"atama",e:"🗣"},
+    {w:"目",t:"Eye",p:"me",e:"👁"}, {w:"手",t:"Hand",p:"te",e:"✋"},
+    {w:"足",t:"Foot/leg",p:"ashi",e:"🦶"}, {w:"心",t:"Heart/mind",p:"kokoro",e:"❤️"},
+    {w:"口",t:"Mouth",p:"kuchi",e:"👄"}, {w:"鼻",t:"Nose",p:"hana",e:"👃"},
+    {w:"耳",t:"Ear",p:"mimi",e:"👂"}, {w:"髪",t:"Hair",p:"kami",e:"💇"},
+    {w:"顔",t:"Face",p:"kao",e:"🙂"}, {w:"パン",t:"Bread",p:"pan",e:"🍞"},
+    {w:"牛乳",t:"Milk",p:"gyuunyuu",e:"🥛"}, {w:"お茶",t:"Tea",p:"ocha",e:"🍵"},
+    {w:"コーヒー",t:"Coffee",p:"koohii",e:"☕"}, {w:"肉",t:"Meat",p:"niku",e:"🥩"},
+    {w:"魚",t:"Fish",p:"sakana",e:"🐟"}, {w:"鶏肉",t:"Chicken",p:"toriniku",e:"🍗"},
+    {w:"ご飯",t:"Rice/meal",p:"gohan",e:"🍚"}, {w:"麺",t:"Noodles",p:"men",e:"🍜"},
+    {w:"チーズ",t:"Cheese",p:"chiizu",e:"🧀"}, {w:"卵",t:"Egg",p:"tamago",e:"🥚"},
+    {w:"果物",t:"Fruit",p:"kudamono",e:"🍎"}, {w:"りんご",t:"Apple",p:"ringo",e:"🍏"},
+    {w:"バナナ",t:"Banana",p:"banana",e:"🍌"}, {w:"野菜",t:"Vegetables",p:"yasai",e:"🥦"},
+    {w:"トマト",t:"Tomato",p:"tomato",e:"🍅"}, {w:"サラダ",t:"Salad",p:"sarada",e:"🥗"},
+    {w:"砂糖",t:"Sugar",p:"satou",e:"🍬"}, {w:"塩",t:"Salt",p:"shio",e:"🧂"},
+    {w:"卵焼き",t:"Omelette",p:"tamagoyaki",e:"🍳"}, {w:"ケーキ",t:"Cake",p:"keeki",e:"🍰"},
+    {w:"アイス",t:"Ice cream",p:"aisu",e:"🍨"}, {w:"スープ",t:"Soup",p:"suupu",e:"🍲"},
+    {w:"朝ごはん",t:"Breakfast",p:"asagohan",e:"🥐"}, {w:"昼ごはん",t:"Lunch",p:"hirugohan",e:"🍽"},
+    {w:"晩ごはん",t:"Dinner",p:"bangohan",e:"🌙"}, {w:"レストラン",t:"Restaurant",p:"resutoran",e:"🍴"},
+    {w:"テーブル",t:"Table",p:"teeburu",e:"🪑"}, {w:"ドア",t:"Door",p:"doa",e:"🚪"},
+    {w:"窓",t:"Window",p:"mado",e:"🪟"}, {w:"部屋",t:"Room",p:"heya",e:"🛏"},
+    {w:"台所",t:"Kitchen",p:"daidokoro",e:"🍳"}, {w:"風呂",t:"Bath",p:"furo",e:"🛁"},
+    {w:"ベッド",t:"Bed",p:"beddo",e:"🛌"}, {w:"椅子",t:"Chair",p:"isu",e:"🪑"},
+    {w:"鍵",t:"Key",p:"kagi",e:"🔑"}, {w:"電気",t:"Light/electricity",p:"denki",e:"💡"},
+    {w:"道",t:"Road/way",p:"michi",e:"🛣"}, {w:"店",t:"Shop",p:"mise",e:"🏪"},
+    {w:"市場",t:"Market",p:"ichiba",e:"🛍"}, {w:"学校",t:"School",p:"gakkou",e:"🏫"},
+    {w:"病院",t:"Hospital",p:"byouin",e:"🏥"}, {w:"銀行",t:"Bank",p:"ginkou",e:"🏦"},
+    {w:"会社",t:"Company",p:"kaisha",e:"🏢"}, {w:"駅",t:"Station",p:"eki",e:"🚉"},
+    {w:"空港",t:"Airport",p:"kuukou",e:"✈️"}, {w:"ホテル",t:"Hotel",p:"hoteru",e:"🏨"},
+    {w:"車",t:"Car",p:"kuruma",e:"🚗"}, {w:"電車",t:"Train",p:"densha",e:"🚆"},
+    {w:"バス",t:"Bus",p:"basu",e:"🚌"}, {w:"飛行機",t:"Airplane",p:"hikouki",e:"🛩"},
+    {w:"自転車",t:"Bicycle",p:"jitensha",e:"🚲"}, {w:"切符",t:"Ticket",p:"kippu",e:"🎫"},
+    {w:"新しい",t:"New",p:"atarashii",e:"✨"}, {w:"古い",t:"Old",p:"furui",e:"🏚"},
+    {w:"若い",t:"Young",p:"wakai",e:"🧒"}, {w:"きれい",t:"Beautiful/clean",p:"kirei",e:"😍"},
+    {w:"暑い",t:"Hot (weather)",p:"atsui",e:"🔥"}, {w:"寒い",t:"Cold (weather)",p:"samui",e:"🧊"},
+    {w:"高い",t:"Tall/expensive",p:"takai",e:"📏"}, {w:"低い",t:"Low",p:"hikui",e:"📉"},
+    {w:"長い",t:"Long",p:"nagai",e:"📏"}, {w:"短い",t:"Short",p:"mijikai",e:"✂️"},
+    {w:"強い",t:"Strong",p:"tsuyoi",e:"💪"}, {w:"弱い",t:"Weak",p:"yowai",e:"🪶"},
+    {w:"難しい",t:"Difficult",p:"muzukashii",e:"🔴"}, {w:"易しい",t:"Easy",p:"yasashii",e:"🟢"},
+    {w:"大切",t:"Important",p:"taisetsu",e:"⭐"}, {w:"正しい",t:"Correct",p:"tadashii",e:"✅"},
+    {w:"本当",t:"True/real",p:"hontou",e:"✔️"}, {w:"同じ",t:"Same",p:"onaji",e:"🟰"},
+    {w:"違う",t:"Different",p:"chigau",e:"🔀"}, {w:"安い",t:"Cheap",p:"yasui",e:"🏷"},
+    {w:"元気",t:"Healthy/energetic",p:"genki",e:"🥦"}, {w:"病気",t:"Sick/illness",p:"byouki",e:"🤒"},
+    {w:"きたない",t:"Dirty",p:"kitanai",e:"🧹"}, {w:"忙しい",t:"Busy",p:"isogashii",e:"📵"},
+    {w:"面白い",t:"Interesting/funny",p:"omoshiroi",e:"😄"}, {w:"楽しい",t:"Fun",p:"tanoshii",e:"🎉"},
+    {w:"太陽",t:"Sun",p:"taiyou",e:"☀️"}, {w:"星",t:"Star",p:"hoshi",e:"⭐"},
+    {w:"空",t:"Sky",p:"sora",e:"🌤"}, {w:"海",t:"Sea/ocean",p:"kaiyou",e:"🌊"},
+    {w:"山",t:"Mountain",p:"yama",e:"⛰"}, {w:"川",t:"River",p:"kawa",e:"🏞"},
+    {w:"木",t:"Tree",p:"ki",e:"🌳"}, {w:"花",t:"Flower",p:"hana",e:"🌸"},
+    {w:"雨",t:"Rain",p:"ame",e:"🌧"}, {w:"雪",t:"Snow",p:"yuki",e:"❄️"},
+    {w:"風",t:"Wind",p:"kaze",e:"💨"}, {w:"火",t:"Fire",p:"kaji",e:"🔥"},
+    {w:"天気",t:"Weather",p:"tenki",e:"🌦"}, {w:"物",t:"Thing",p:"mono",e:"📦"},
+    {w:"生活",t:"Life/living",p:"seikatsu",e:"🌱"}, {w:"世界",t:"World",p:"sekai",e:"🌎"},
+    {w:"国",t:"Country",p:"kuni",e:"🗺"}, {w:"所",t:"Place",p:"tokoro",e:"📍"},
+    {w:"名前",t:"Name",p:"namae",e:"🏷"}, {w:"言葉",t:"Word/language",p:"kotoba",e:"🔤"},
+    {w:"質問",t:"Question",p:"shitsumon",e:"❓"}, {w:"答え",t:"Answer",p:"kotae",e:"💬"},
+    {w:"問題",t:"Problem",p:"mondai",e:"⚠️"}, {w:"考え",t:"Idea",p:"kangae",e:"💡"},
+    {w:"話",t:"Story/talk",p:"hanashi",e:"📜"}, {w:"音楽",t:"Music",p:"ongaku",e:"🎵"},
+    {w:"映画",t:"Movie",p:"eiga",e:"🎬"}, {w:"写真",t:"Photo",p:"shashin",e:"📷"},
+    {w:"電話",t:"Telephone",p:"denwa",e:"📱"}, {w:"ゲーム",t:"Game",p:"geemu",e:"🎲"},
+    {w:"スポーツ",t:"Sport",p:"supootsu",e:"⚽"}, {w:"サッカー",t:"Soccer",p:"sakkaa",e:"⚽"},
+    {w:"おはよう",t:"Good morning",p:"ohayou",e:"🌅"}, {w:"こんばんは",t:"Good evening",p:"konbanwa",e:"🌆"},
+    {w:"おやすみ",t:"Good night",p:"oyasumi",e:"🌙"}, {w:"さようなら",t:"Goodbye",p:"sayounara",e:"👋"},
+    {w:"またね",t:"See you",p:"matane",e:"👋"}, {w:"ごめんなさい",t:"Sorry",p:"gomennasai",e:"🙇"},
+    {w:"どういたしまして",t:"You're welcome",p:"douitashimashite",e:"🤲"}, {w:"大丈夫",t:"It's okay",p:"daijoubu",e:"👌"},
+    {w:"分かりません",t:"I don't understand",p:"wakarimasen",e:"😕"}, {w:"いくらですか",t:"How much is it?",p:"ikura desu ka",e:"💶"},
+    {w:"すみません",t:"Excuse me",p:"sumimasen",e:"🙇"}, {w:"はじめまして",t:"Nice to meet you",p:"hajimemashite",e:"🤝"},
+    {w:"助けて",t:"Help!",p:"tasukete",e:"🆘"}, {w:"乾杯",t:"Cheers",p:"kanpai",e:"🥂"},
+    {w:"おめでとう",t:"Congratulations",p:"omedetou",e:"🎉"}, {w:"ようこそ",t:"Welcome",p:"youkoso",e:"🎊"},
+    {w:"行きましょう",t:"Let's go",p:"ikimashou",e:"🚀"}, {w:"いただきます",t:"Thanks for the meal",p:"itadakimasu",e:"🍽"}
   ],
   zh: [
     {w:"你好",       t:"Hello",       p:"nǐ hǎo",         e:"🙋"}, {w:"谢谢",       t:"Thank you",   p:"xiè xiè",        e:"🙏"},
@@ -1718,9 +2381,149 @@ const WORDS = {
     {w:"慢",         t:"Slow",        p:"màn",            e:"🐢"}, {w:"快乐",       t:"Happy",       p:"kuài lè",        e:"😊"},
     {w:"悲伤",       t:"Sad",         p:"bēi shāng",      e:"😢"}, {w:"累",         t:"Tired",       p:"lèi",            e:"😴"},
     {w:"饿",         t:"Hungry",      p:"è",              e:"🤤"}, {w:"渴",         t:"Thirsty",     p:"kě",             e:"😮"},
-    {w:"家人",       t:"Family",      p:"jiā rén",        e:"👨‍👩‍👧"},{w:"妈妈",       t:"Mother",      p:"māmā",           e:"👩"},
+    {w:"家人",       t:"Family",      p:"jiā rén",        e:"👨‍👩‍👧"}, {w:"妈妈",       t:"Mother",      p:"māmā",           e:"👩"},
     {w:"爸爸",       t:"Father",      p:"bàba",           e:"👨"}, {w:"书",         t:"Book",        p:"shū",            e:"📚"},
     {w:"城市",       t:"City",        p:"chéng shì",      e:"🏙"}, {w:"海滩",       t:"Beach",       p:"hǎi tān",        e:"🏖"},
+    {w:"我",t:"I/me",p:"wǒ",e:"🙋"}, {w:"你",t:"You",p:"nǐ",e:"👉"},
+    {w:"他",t:"He",p:"tā",e:"👨"}, {w:"她",t:"She",p:"tā",e:"👩"},
+    {w:"我们",t:"We",p:"wǒmen",e:"👥"}, {w:"他们",t:"They",p:"tāmen",e:"👪"},
+    {w:"这",t:"This",p:"zhè",e:"👇"}, {w:"那",t:"That",p:"nà",e:"👉"},
+    {w:"这里",t:"Here",p:"zhèlǐ",e:"📍"}, {w:"那里",t:"There",p:"nàlǐ",e:"🗺"},
+    {w:"什么",t:"What",p:"shénme",e:"❔"}, {w:"谁",t:"Who",p:"shéi",e:"👤"},
+    {w:"哪里",t:"Where",p:"nǎlǐ",e:"🧭"}, {w:"什么时候",t:"When",p:"shénme shíhou",e:"📅"},
+    {w:"为什么",t:"Why",p:"wèishénme",e:"❓"}, {w:"怎么",t:"How",p:"zěnme",e:"🤔"},
+    {w:"哪个",t:"Which",p:"nǎge",e:"🔀"}, {w:"多少",t:"How much/many",p:"duōshǎo",e:"⚖️"},
+    {w:"有",t:"To have",p:"yǒu",e:"🤲"}, {w:"做",t:"To do/make",p:"zuò",e:"🔨"},
+    {w:"说",t:"To say/speak",p:"shuō",e:"🗣"}, {w:"知道",t:"To know",p:"zhīdào",e:"🧠"},
+    {w:"想",t:"To want/think",p:"xiǎng",e:"💭"}, {w:"要",t:"To want/need",p:"yào",e:"🙌"},
+    {w:"能",t:"Can/able",p:"néng",e:"💪"}, {w:"会",t:"Can/will",p:"huì",e:"✅"},
+    {w:"看",t:"To look/watch",p:"kàn",e:"👀"}, {w:"听",t:"To listen",p:"tīng",e:"🎧"},
+    {w:"去",t:"To go",p:"qù",e:"🚶"}, {w:"来",t:"To come",p:"lái",e:"👋"},
+    {w:"回",t:"To return",p:"huí",e:"🔙"}, {w:"吃",t:"To eat",p:"chī",e:"🍽"},
+    {w:"喝",t:"To drink",p:"hē",e:"🥤"}, {w:"睡觉",t:"To sleep",p:"shuìjiào",e:"😴"},
+    {w:"买",t:"To buy",p:"mǎi",e:"🛒"}, {w:"卖",t:"To sell",p:"mài",e:"🏷"},
+    {w:"付钱",t:"To pay",p:"fùqián",e:"💳"}, {w:"读",t:"To read",p:"dú",e:"📖"},
+    {w:"写",t:"To write",p:"xiě",e:"✍️"}, {w:"玩",t:"To play",p:"wán",e:"🎮"},
+    {w:"跑",t:"To run",p:"pǎo",e:"🏃"}, {w:"走",t:"To walk",p:"zǒu",e:"🚶"},
+    {w:"等",t:"To wait",p:"děng",e:"⏳"}, {w:"想要",t:"To desire",p:"xiǎngyào",e:"🙌"},
+    {w:"觉得",t:"To feel/think",p:"juéde",e:"💗"}, {w:"给",t:"To give",p:"gěi",e:"🎁"},
+    {w:"拿",t:"To take/hold",p:"ná",e:"✊"}, {w:"见",t:"To meet/see",p:"jiàn",e:"🤝"},
+    {w:"住",t:"To live/reside",p:"zhù",e:"🏠"}, {w:"帮助",t:"To help",p:"bāngzhù",e:"🆘"},
+    {w:"学习",t:"To study",p:"xuéxí",e:"📚"}, {w:"教",t:"To teach",p:"jiāo",e:"👩‍🏫"},
+    {w:"开始",t:"To begin",p:"kāishǐ",e:"▶️"}, {w:"结束",t:"To end",p:"jiéshù",e:"🏁"},
+    {w:"找",t:"To search/find",p:"zhǎo",e:"🔎"}, {w:"用",t:"To use",p:"yòng",e:"🛠"},
+    {w:"问",t:"To ask",p:"wèn",e:"❓"}, {w:"回答",t:"To answer",p:"huídá",e:"💬"},
+    {w:"进",t:"To enter",p:"jìn",e:"➡️"}, {w:"出",t:"To exit",p:"chū",e:"🚪"},
+    {w:"开",t:"To open",p:"kāi",e:"🔓"}, {w:"关",t:"To close",p:"guān",e:"🔒"},
+    {w:"坐",t:"To sit",p:"zuò",e:"🪑"}, {w:"站",t:"To stand",p:"zhàn",e:"🧍"},
+    {w:"喜欢",t:"To like",p:"xǐhuān",e:"😊"}, {w:"全部",t:"Everything",p:"quánbù",e:"🌐"},
+    {w:"没有",t:"Nothing/none",p:"méiyǒu",e:"🚫"}, {w:"东西",t:"Thing",p:"dōngxi",e:"📦"},
+    {w:"很多",t:"A lot",p:"hěnduō",e:"📈"}, {w:"一点",t:"A little",p:"yìdiǎn",e:"🤏"},
+    {w:"很",t:"Very",p:"hěn",e:"📈"}, {w:"更",t:"More",p:"gèng",e:"➕"},
+    {w:"也",t:"Also",p:"yě",e:"➕"}, {w:"总是",t:"Always",p:"zǒngshì",e:"♾️"},
+    {w:"从不",t:"Never",p:"cóngbù",e:"🚫"}, {w:"现在",t:"Now",p:"xiànzài",e:"⏱"},
+    {w:"以后",t:"Later",p:"yǐhòu",e:"⏭"}, {w:"以前",t:"Before",p:"yǐqián",e:"⏮"},
+    {w:"一",t:"One",p:"yī",e:"1️⃣"}, {w:"二",t:"Two",p:"èr",e:"2️⃣"},
+    {w:"三",t:"Three",p:"sān",e:"3️⃣"}, {w:"四",t:"Four",p:"sì",e:"4️⃣"},
+    {w:"五",t:"Five",p:"wǔ",e:"5️⃣"}, {w:"六",t:"Six",p:"liù",e:"6️⃣"},
+    {w:"七",t:"Seven",p:"qī",e:"7️⃣"}, {w:"八",t:"Eight",p:"bā",e:"8️⃣"},
+    {w:"九",t:"Nine",p:"jiǔ",e:"9️⃣"}, {w:"十",t:"Ten",p:"shí",e:"🔟"},
+    {w:"百",t:"Hundred",p:"bǎi",e:"💯"}, {w:"千",t:"Thousand",p:"qiān",e:"🔢"},
+    {w:"第一",t:"First",p:"dìyī",e:"🥇"}, {w:"最后",t:"Last",p:"zuìhòu",e:"🔚"},
+    {w:"星期一",t:"Monday",p:"xīngqīyī",e:"📅"}, {w:"星期二",t:"Tuesday",p:"xīngqī'èr",e:"📅"},
+    {w:"星期三",t:"Wednesday",p:"xīngqīsān",e:"📅"}, {w:"星期四",t:"Thursday",p:"xīngqīsì",e:"📅"},
+    {w:"星期五",t:"Friday",p:"xīngqīwǔ",e:"📅"}, {w:"星期六",t:"Saturday",p:"xīngqīliù",e:"📅"},
+    {w:"星期天",t:"Sunday",p:"xīngqītiān",e:"📅"}, {w:"今天",t:"Today",p:"jīntiān",e:"📆"},
+    {w:"明天",t:"Tomorrow",p:"míngtiān",e:"🌅"}, {w:"昨天",t:"Yesterday",p:"zuótiān",e:"🌇"},
+    {w:"星期",t:"Week",p:"xīngqī",e:"🗓"}, {w:"月",t:"Month",p:"yuè",e:"🗓"},
+    {w:"年",t:"Year",p:"nián",e:"🎆"}, {w:"天",t:"Day",p:"tiān",e:"☀️"},
+    {w:"晚上",t:"Night/evening",p:"wǎnshàng",e:"🌙"}, {w:"早上",t:"Morning",p:"zǎoshàng",e:"🌄"},
+    {w:"下午",t:"Afternoon",p:"xiàwǔ",e:"🌆"}, {w:"小时",t:"Hour",p:"xiǎoshí",e:"🕐"},
+    {w:"分钟",t:"Minute",p:"fēnzhōng",e:"⏱"}, {w:"红色",t:"Red",p:"hóngsè",e:"🔴"},
+    {w:"蓝色",t:"Blue",p:"lánsè",e:"🔵"}, {w:"绿色",t:"Green",p:"lǜsè",e:"🟢"},
+    {w:"黄色",t:"Yellow",p:"huángsè",e:"🟡"}, {w:"黑色",t:"Black",p:"hēisè",e:"⚫"},
+    {w:"白色",t:"White",p:"báisè",e:"⚪"}, {w:"灰色",t:"Grey",p:"huīsè",e:"🩶"},
+    {w:"棕色",t:"Brown",p:"zōngsè",e:"🟤"}, {w:"粉色",t:"Pink",p:"fěnsè",e:"🌸"},
+    {w:"橙色",t:"Orange",p:"chéngsè",e:"🟠"}, {w:"紫色",t:"Purple",p:"zǐsè",e:"🟣"},
+    {w:"儿子",t:"Son",p:"érzi",e:"👦"}, {w:"女儿",t:"Daughter",p:"nǚ'ér",e:"👧"},
+    {w:"哥哥",t:"Older brother",p:"gēge",e:"👬"}, {w:"姐姐",t:"Older sister",p:"jiějie",e:"👭"},
+    {w:"弟弟",t:"Younger brother",p:"dìdi",e:"👦"}, {w:"妹妹",t:"Younger sister",p:"mèimei",e:"👧"},
+    {w:"爷爷",t:"Grandfather",p:"yéye",e:"👴"}, {w:"奶奶",t:"Grandmother",p:"nǎinai",e:"👵"},
+    {w:"丈夫",t:"Husband",p:"zhàngfu",e:"🤵"}, {w:"妻子",t:"Wife",p:"qīzi",e:"👰"},
+    {w:"孩子",t:"Child",p:"háizi",e:"👶"}, {w:"男人",t:"Man",p:"nánrén",e:"👨"},
+    {w:"女人",t:"Woman",p:"nǚrén",e:"👩"}, {w:"人",t:"Person",p:"rén",e:"👤"},
+    {w:"头",t:"Head",p:"tóu",e:"🗣"}, {w:"眼睛",t:"Eye",p:"yǎnjīng",e:"👁"},
+    {w:"手",t:"Hand",p:"shǒu",e:"✋"}, {w:"脚",t:"Foot",p:"jiǎo",e:"🦶"},
+    {w:"心",t:"Heart",p:"xīn",e:"❤️"}, {w:"嘴",t:"Mouth",p:"zuǐ",e:"👄"},
+    {w:"鼻子",t:"Nose",p:"bízi",e:"👃"}, {w:"耳朵",t:"Ear",p:"ěrduo",e:"👂"},
+    {w:"头发",t:"Hair",p:"tóufà",e:"💇"}, {w:"脸",t:"Face",p:"liǎn",e:"🙂"},
+    {w:"面包",t:"Bread",p:"miànbāo",e:"🍞"}, {w:"牛奶",t:"Milk",p:"niúnǎi",e:"🥛"},
+    {w:"茶",t:"Tea",p:"chá",e:"🍵"}, {w:"咖啡",t:"Coffee",p:"kāfēi",e:"☕"},
+    {w:"肉",t:"Meat",p:"ròu",e:"🥩"}, {w:"鱼",t:"Fish",p:"yú",e:"🐟"},
+    {w:"鸡肉",t:"Chicken",p:"jīròu",e:"🍗"}, {w:"米饭",t:"Rice",p:"mǐfàn",e:"🍚"},
+    {w:"面条",t:"Noodles",p:"miàntiáo",e:"🍜"}, {w:"奶酪",t:"Cheese",p:"nǎilào",e:"🧀"},
+    {w:"鸡蛋",t:"Egg",p:"jīdàn",e:"🥚"}, {w:"水果",t:"Fruit",p:"shuǐguǒ",e:"🍎"},
+    {w:"苹果",t:"Apple",p:"píngguǒ",e:"🍏"}, {w:"香蕉",t:"Banana",p:"xiāngjiāo",e:"🍌"},
+    {w:"蔬菜",t:"Vegetables",p:"shūcài",e:"🥦"}, {w:"西红柿",t:"Tomato",p:"xīhóngshì",e:"🍅"},
+    {w:"土豆",t:"Potato",p:"tǔdòu",e:"🥔"}, {w:"沙拉",t:"Salad",p:"shālā",e:"🥗"},
+    {w:"糖",t:"Sugar",p:"táng",e:"🍬"}, {w:"盐",t:"Salt",p:"yán",e:"🧂"},
+    {w:"油",t:"Oil",p:"yóu",e:"🫒"}, {w:"蛋糕",t:"Cake",p:"dàngāo",e:"🍰"},
+    {w:"冰淇淋",t:"Ice cream",p:"bīngqílín",e:"🍨"}, {w:"汤",t:"Soup",p:"tāng",e:"🍲"},
+    {w:"早饭",t:"Breakfast",p:"zǎofàn",e:"🥐"}, {w:"午饭",t:"Lunch",p:"wǔfàn",e:"🍽"},
+    {w:"晚饭",t:"Dinner",p:"wǎnfàn",e:"🌙"}, {w:"饭店",t:"Restaurant",p:"fàndiàn",e:"🍴"},
+    {w:"桌子",t:"Table",p:"zhuōzi",e:"🪑"}, {w:"门",t:"Door",p:"mén",e:"🚪"},
+    {w:"窗户",t:"Window",p:"chuānghu",e:"🪟"}, {w:"房间",t:"Room",p:"fángjiān",e:"🛏"},
+    {w:"厨房",t:"Kitchen",p:"chúfáng",e:"🍳"}, {w:"浴室",t:"Bathroom",p:"yùshì",e:"🛁"},
+    {w:"床",t:"Bed",p:"chuáng",e:"🛌"}, {w:"椅子",t:"Chair",p:"yǐzi",e:"🪑"},
+    {w:"钥匙",t:"Key",p:"yàoshi",e:"🔑"}, {w:"灯",t:"Light/lamp",p:"dēng",e:"💡"},
+    {w:"路",t:"Road",p:"lù",e:"🛣"}, {w:"商店",t:"Shop",p:"shāngdiàn",e:"🏪"},
+    {w:"市场",t:"Market",p:"shìchǎng",e:"🛍"}, {w:"学校",t:"School",p:"xuéxiào",e:"🏫"},
+    {w:"医院",t:"Hospital",p:"yīyuàn",e:"🏥"}, {w:"银行",t:"Bank",p:"yínháng",e:"🏦"},
+    {w:"公司",t:"Company",p:"gōngsī",e:"🏢"}, {w:"车站",t:"Station",p:"chēzhàn",e:"🚉"},
+    {w:"机场",t:"Airport",p:"jīchǎng",e:"✈️"}, {w:"酒店",t:"Hotel",p:"jiǔdiàn",e:"🏨"},
+    {w:"汽车",t:"Car",p:"qìchē",e:"🚗"}, {w:"火车",t:"Train",p:"huǒchē",e:"🚆"},
+    {w:"公交车",t:"Bus",p:"gōngjiāochē",e:"🚌"}, {w:"飞机",t:"Airplane",p:"fēijī",e:"🛩"},
+    {w:"自行车",t:"Bicycle",p:"zìxíngchē",e:"🚲"}, {w:"票",t:"Ticket",p:"piào",e:"🎫"},
+    {w:"新",t:"New",p:"xīn",e:"✨"}, {w:"旧",t:"Old (things)",p:"jiù",e:"🏚"},
+    {w:"年轻",t:"Young",p:"niánqīng",e:"🧒"}, {w:"漂亮",t:"Beautiful",p:"piàoliang",e:"😍"},
+    {w:"热",t:"Hot",p:"rè",e:"🔥"}, {w:"冷",t:"Cold",p:"lěng",e:"🧊"},
+    {w:"高",t:"Tall/high",p:"gāo",e:"📏"}, {w:"矮",t:"Short (height)",p:"ǎi",e:"📉"},
+    {w:"长",t:"Long",p:"cháng",e:"📏"}, {w:"短",t:"Short (length)",p:"duǎn",e:"✂️"},
+    {w:"强",t:"Strong",p:"qiáng",e:"💪"}, {w:"弱",t:"Weak",p:"ruò",e:"🪶"},
+    {w:"容易",t:"Easy",p:"róngyì",e:"🟢"}, {w:"难",t:"Difficult",p:"nán",e:"🔴"},
+    {w:"重要",t:"Important",p:"zhòngyào",e:"⭐"}, {w:"对",t:"Correct",p:"duì",e:"✅"},
+    {w:"错",t:"Wrong",p:"cuò",e:"❌"}, {w:"真",t:"True/real",p:"zhēn",e:"✔️"},
+    {w:"满",t:"Full",p:"mǎn",e:"🈵"}, {w:"空",t:"Empty",p:"kōng",e:"🈳"},
+    {w:"干净",t:"Clean",p:"gānjìng",e:"🧼"}, {w:"脏",t:"Dirty",p:"zāng",e:"🧹"},
+    {w:"贵",t:"Expensive",p:"guì",e:"💸"}, {w:"便宜",t:"Cheap",p:"piányi",e:"🏷"},
+    {w:"健康",t:"Healthy",p:"jiànkāng",e:"🥦"}, {w:"忙",t:"Busy",p:"máng",e:"📵"},
+    {w:"一样",t:"Same",p:"yíyàng",e:"🟰"}, {w:"不同",t:"Different",p:"bùtóng",e:"🔀"},
+    {w:"有趣",t:"Interesting",p:"yǒuqù",e:"😄"}, {w:"太阳",t:"Sun",p:"tàiyáng",e:"☀️"},
+    {w:"月亮",t:"Moon",p:"yuèliàng",e:"🌙"}, {w:"星星",t:"Star",p:"xīngxing",e:"⭐"},
+    {w:"天空",t:"Sky",p:"tiānkōng",e:"🌤"}, {w:"大海",t:"Sea",p:"dàhǎi",e:"🌊"},
+    {w:"山",t:"Mountain",p:"shān",e:"⛰"}, {w:"河",t:"River",p:"hé",e:"🏞"},
+    {w:"树",t:"Tree",p:"shù",e:"🌳"}, {w:"花",t:"Flower",p:"huā",e:"🌸"},
+    {w:"雨",t:"Rain",p:"yǔ",e:"🌧"}, {w:"雪",t:"Snow",p:"xuě",e:"❄️"},
+    {w:"风",t:"Wind",p:"fēng",e:"💨"}, {w:"火",t:"Fire",p:"huǒ",e:"🔥"},
+    {w:"天气",t:"Weather",p:"tiānqì",e:"🌦"}, {w:"生活",t:"Life",p:"shēnghuó",e:"🌱"},
+    {w:"世界",t:"World",p:"shìjiè",e:"🌎"}, {w:"国家",t:"Country",p:"guójiā",e:"🗺"},
+    {w:"地方",t:"Place",p:"dìfāng",e:"📍"}, {w:"名字",t:"Name",p:"míngzi",e:"🏷"},
+    {w:"词",t:"Word",p:"cí",e:"🔤"}, {w:"问题",t:"Question/problem",p:"wèntí",e:"❓"},
+    {w:"答案",t:"Answer",p:"dá'àn",e:"💬"}, {w:"主意",t:"Idea",p:"zhǔyi",e:"💡"},
+    {w:"故事",t:"Story",p:"gùshi",e:"📜"}, {w:"音乐",t:"Music",p:"yīnyuè",e:"🎵"},
+    {w:"电影",t:"Movie",p:"diànyǐng",e:"🎬"}, {w:"照片",t:"Photo",p:"zhàopiàn",e:"📷"},
+    {w:"电话",t:"Telephone",p:"diànhuà",e:"📱"}, {w:"游戏",t:"Game",p:"yóuxì",e:"🎲"},
+    {w:"运动",t:"Sport",p:"yùndòng",e:"⚽"}, {w:"足球",t:"Football",p:"zúqiú",e:"⚽"},
+    {w:"早上好",t:"Good morning",p:"zǎoshàng hǎo",e:"🌅"}, {w:"晚上好",t:"Good evening",p:"wǎnshàng hǎo",e:"🌆"},
+    {w:"晚安",t:"Good night",p:"wǎn'ān",e:"🌙"}, {w:"再见",t:"Goodbye",p:"zàijiàn",e:"👋"},
+    {w:"对不起",t:"Sorry",p:"duìbuqǐ",e:"🙇"}, {w:"没关系",t:"It's okay",p:"méiguānxi",e:"🤲"},
+    {w:"不客气",t:"You're welcome",p:"búkèqi",e:"🤲"}, {w:"我不知道",t:"I don't know",p:"wǒ bù zhīdào",e:"🤷"},
+    {w:"我不懂",t:"I don't understand",p:"wǒ bù dǒng",e:"😕"}, {w:"多少钱",t:"How much money?",p:"duōshǎo qián",e:"💶"},
+    {w:"几点了",t:"What time is it?",p:"jǐ diǎn le",e:"🕐"}, {w:"我叫",t:"My name is",p:"wǒ jiào",e:"🪪"},
+    {w:"很高兴认识你",t:"Nice to meet you",p:"hěn gāoxìng rènshi nǐ",e:"🤝"}, {w:"救命",t:"Help!",p:"jiùmìng",e:"🆘"},
+    {w:"干杯",t:"Cheers",p:"gānbēi",e:"🥂"}, {w:"恭喜",t:"Congratulations",p:"gōngxǐ",e:"🎉"},
+    {w:"欢迎",t:"Welcome",p:"huānyíng",e:"🎊"}, {w:"走吧",t:"Let's go",p:"zǒu ba",e:"🚀"},
+    {w:"请问",t:"Excuse me (asking)",p:"qǐngwèn",e:"🙋"}
   ],
   hi: [
     {w:"नमस्ते",     t:"Hello",       p:"na-MAS-teh",     e:"🙋"}, {w:"धन्यवाद",    t:"Thank you",   p:"dhan-ya-VAAD",   e:"🙏"},
@@ -1735,9 +2538,172 @@ const WORDS = {
     {w:"धीमा",       t:"Slow",        p:"DHEE-ma",        e:"🐢"}, {w:"खुश",        t:"Happy",       p:"khush",          e:"😊"},
     {w:"उदास",       t:"Sad",         p:"u-DAAS",         e:"😢"}, {w:"थका",        t:"Tired",       p:"tha-KAA",        e:"😴"},
     {w:"भूखा",       t:"Hungry",      p:"BHOO-kha",       e:"🤤"}, {w:"प्यासा",     t:"Thirsty",     p:"PYAA-sa",        e:"😮"},
-    {w:"परिवार",     t:"Family",      p:"pa-ri-VAAR",     e:"👨‍👩‍👧"},{w:"माँ",        t:"Mother",      p:"maa",            e:"👩"},
+    {w:"परिवार",     t:"Family",      p:"pa-ri-VAAR",     e:"👨‍👩‍👧"}, {w:"माँ",        t:"Mother",      p:"maa",            e:"👩"},
     {w:"पिता",       t:"Father",      p:"pi-TAA",         e:"👨"}, {w:"किताब",      t:"Book",        p:"ki-TAAB",        e:"📚"},
     {w:"शहर",        t:"City",        p:"sha-HAR",        e:"🏙"}, {w:"समुद्र तट",  t:"Beach",       p:"sa-MUD-ra tat",  e:"🏖"},
+    {w:"होना",t:"To be",p:"ho-naa",e:"🧍"}, {w:"करना",t:"To do",p:"kar-naa",e:"🔨"},
+    {w:"कहना",t:"To say",p:"keh-naa",e:"🗣"}, {w:"बोलना",t:"To speak",p:"bol-naa",e:"💬"},
+    {w:"जानना",t:"To know",p:"jaan-naa",e:"🧠"}, {w:"चाहना",t:"To want",p:"chaah-naa",e:"🙌"},
+    {w:"सकना",t:"To be able",p:"sak-naa",e:"💪"}, {w:"देखना",t:"To see",p:"dekh-naa",e:"👀"},
+    {w:"जाना",t:"To go",p:"jaa-naa",e:"🚶"}, {w:"आना",t:"To come",p:"aa-naa",e:"👋"},
+    {w:"देना",t:"To give",p:"de-naa",e:"🎁"}, {w:"सोचना",t:"To think",p:"soch-naa",e:"💭"},
+    {w:"रहना",t:"To live/stay",p:"reh-naa",e:"🌱"}, {w:"समझना",t:"To understand",p:"samajh-naa",e:"💡"},
+    {w:"पाना",t:"To find/get",p:"paa-naa",e:"🔍"}, {w:"लेना",t:"To take",p:"le-naa",e:"✊"},
+    {w:"रखना",t:"To put/keep",p:"rakh-naa",e:"📥"}, {w:"मानना",t:"To believe",p:"maan-naa",e:"🙏"},
+    {w:"लाना",t:"To bring",p:"laa-naa",e:"🎒"}, {w:"लौटना",t:"To return",p:"laut-naa",e:"🔙"},
+    {w:"याद करना",t:"To remember",p:"yaad kar-naa",e:"🧾"}, {w:"बुलाना",t:"To call",p:"bu-laa-naa",e:"📞"},
+    {w:"इंतज़ार करना",t:"To wait",p:"in-te-zaar kar-naa",e:"⏳"}, {w:"ख़त्म करना",t:"To finish",p:"khatm kar-naa",e:"🏁"},
+    {w:"पीना",t:"To drink",p:"pee-naa",e:"🥤"}, {w:"सोना",t:"To sleep",p:"so-naa",e:"😴"},
+    {w:"खोलना",t:"To open",p:"khol-naa",e:"🔓"}, {w:"बंद करना",t:"To close",p:"band kar-naa",e:"🔒"},
+    {w:"ख़रीदना",t:"To buy",p:"kha-reed-naa",e:"🛒"}, {w:"भुगतान करना",t:"To pay",p:"bhug-taan kar-naa",e:"💳"},
+    {w:"पढ़ना",t:"To read/study",p:"parh-naa",e:"📖"}, {w:"लिखना",t:"To write",p:"likh-naa",e:"✍️"},
+    {w:"सुनना",t:"To listen",p:"sun-naa",e:"🎧"}, {w:"खेलना",t:"To play",p:"khel-naa",e:"🎮"},
+    {w:"दौड़ना",t:"To run",p:"daur-naa",e:"🏃"}, {w:"चलना",t:"To walk",p:"chal-naa",e:"🚶"},
+    {w:"मदद करना",t:"To help",p:"ma-dad kar-naa",e:"🆘"}, {w:"सीखना",t:"To learn",p:"seekh-naa",e:"🎓"},
+    {w:"सिखाना",t:"To teach",p:"si-khaa-naa",e:"👩‍🏫"}, {w:"शुरू करना",t:"To begin",p:"shu-ruu kar-naa",e:"▶️"},
+    {w:"ढूंढना",t:"To search",p:"dhuundh-naa",e:"🔎"}, {w:"इस्तेमाल करना",t:"To use",p:"is-te-maal kar-naa",e:"🛠"},
+    {w:"पूछना",t:"To ask",p:"puuchh-naa",e:"❓"}, {w:"जवाब देना",t:"To answer",p:"ja-vaab de-naa",e:"💬"},
+    {w:"निकलना",t:"To go out",p:"ni-kal-naa",e:"🚪"}, {w:"अंदर आना",t:"To enter",p:"an-dar aa-naa",e:"➡️"},
+    {w:"खोना",t:"To lose",p:"kho-naa",e:"🫥"}, {w:"जीतना",t:"To win",p:"jeet-naa",e:"🏆"},
+    {w:"कोशिश करना",t:"To try",p:"ko-shish kar-naa",e:"🎯"}, {w:"बदलना",t:"To change",p:"ba-dal-naa",e:"🔄"},
+    {w:"महसूस करना",t:"To feel",p:"meh-suus kar-naa",e:"💗"}, {w:"बैठना",t:"To sit",p:"baith-naa",e:"🪑"},
+    {w:"खड़ा होना",t:"To stand",p:"kha-raa ho-naa",e:"🧍"}, {w:"मिलना",t:"To meet",p:"mil-naa",e:"🤝"},
+    {w:"मैं",t:"I",p:"main",e:"🙋"}, {w:"तुम",t:"You (informal)",p:"tum",e:"👉"},
+    {w:"आप",t:"You (formal)",p:"aap",e:"🙏"}, {w:"वह",t:"He/she/that",p:"vah",e:"👤"},
+    {w:"हम",t:"We",p:"ham",e:"👥"}, {w:"वे",t:"They",p:"ve",e:"👪"},
+    {w:"यह",t:"This",p:"yah",e:"👇"}, {w:"सब",t:"All/everything",p:"sab",e:"🌐"},
+    {w:"कुछ नहीं",t:"Nothing",p:"kuchh na-heen",e:"🚫"}, {w:"कुछ",t:"Something",p:"kuchh",e:"❔"},
+    {w:"कोई",t:"Someone",p:"ko-ii",e:"👤"}, {w:"कोई नहीं",t:"Nobody",p:"ko-ii na-heen",e:"🙅"},
+    {w:"बहुत",t:"A lot/very",p:"ba-hut",e:"📈"}, {w:"थोड़ा",t:"Little/few",p:"tho-raa",e:"🤏"},
+    {w:"ज़्यादा",t:"More/too much",p:"zyaa-daa",e:"➕"}, {w:"कम",t:"Less",p:"kam",e:"➖"},
+    {w:"भी",t:"Also",p:"bhee",e:"➕"}, {w:"हमेशा",t:"Always",p:"ha-me-shaa",e:"♾️"},
+    {w:"कभी नहीं",t:"Never",p:"ka-bhee na-heen",e:"🚫"}, {w:"अभी",t:"Now",p:"a-bhee",e:"⏱"},
+    {w:"बाद में",t:"Later",p:"baad mein",e:"⏭"}, {w:"पहले",t:"Before/first",p:"peh-le",e:"⏮"},
+    {w:"फिर",t:"Again/then",p:"phir",e:"🔁"}, {w:"यहाँ",t:"Here",p:"ya-haan",e:"📍"},
+    {w:"वहाँ",t:"There",p:"va-haan",e:"🗺"}, {w:"अंदर",t:"Inside",p:"an-dar",e:"📦"},
+    {w:"बाहर",t:"Outside",p:"baa-har",e:"🌤"}, {w:"कहाँ",t:"Where",p:"ka-haan",e:"🧭"},
+    {w:"कब",t:"When",p:"kab",e:"📅"}, {w:"क्यों",t:"Why",p:"kyon",e:"❓"},
+    {w:"कैसे",t:"How",p:"kai-se",e:"🤔"}, {w:"कौन",t:"Who",p:"kaun",e:"👤"},
+    {w:"क्या",t:"What",p:"kyaa",e:"❔"}, {w:"कौन सा",t:"Which",p:"kaun saa",e:"🔀"},
+    {w:"कितना",t:"How much",p:"kit-naa",e:"⚖️"}, {w:"एक",t:"One",p:"ek",e:"1️⃣"},
+    {w:"दो",t:"Two",p:"do",e:"2️⃣"}, {w:"तीन",t:"Three",p:"teen",e:"3️⃣"},
+    {w:"चार",t:"Four",p:"chaar",e:"4️⃣"}, {w:"पाँच",t:"Five",p:"paanch",e:"5️⃣"},
+    {w:"छह",t:"Six",p:"chhah",e:"6️⃣"}, {w:"सात",t:"Seven",p:"saat",e:"7️⃣"},
+    {w:"आठ",t:"Eight",p:"aath",e:"8️⃣"}, {w:"नौ",t:"Nine",p:"nau",e:"9️⃣"},
+    {w:"दस",t:"Ten",p:"das",e:"🔟"}, {w:"ग्यारह",t:"Eleven",p:"gyaa-rah",e:"🔢"},
+    {w:"बारह",t:"Twelve",p:"baa-rah",e:"🔢"}, {w:"बीस",t:"Twenty",p:"bees",e:"🔢"},
+    {w:"तीस",t:"Thirty",p:"tees",e:"🔢"}, {w:"चालीस",t:"Forty",p:"chaa-lees",e:"🔢"},
+    {w:"पचास",t:"Fifty",p:"pa-chaas",e:"🔢"}, {w:"सौ",t:"Hundred",p:"sau",e:"💯"},
+    {w:"हज़ार",t:"Thousand",p:"ha-zaar",e:"🔢"}, {w:"पहला",t:"First",p:"peh-laa",e:"🥇"},
+    {w:"दूसरा",t:"Second",p:"duus-raa",e:"🥈"}, {w:"आख़िरी",t:"Last",p:"aa-khi-ree",e:"🔚"},
+    {w:"सोमवार",t:"Monday",p:"som-vaar",e:"📅"}, {w:"मंगलवार",t:"Tuesday",p:"man-gal-vaar",e:"📅"},
+    {w:"बुधवार",t:"Wednesday",p:"budh-vaar",e:"📅"}, {w:"गुरुवार",t:"Thursday",p:"gu-ru-vaar",e:"📅"},
+    {w:"शुक्रवार",t:"Friday",p:"shuk-ra-vaar",e:"📅"}, {w:"शनिवार",t:"Saturday",p:"sha-ni-vaar",e:"📅"},
+    {w:"रविवार",t:"Sunday",p:"ra-vi-vaar",e:"📅"}, {w:"आज",t:"Today",p:"aaj",e:"📆"},
+    {w:"कल",t:"Tomorrow/yesterday",p:"kal",e:"🌅"}, {w:"सप्ताह",t:"Week",p:"sap-taah",e:"🗓"},
+    {w:"महीना",t:"Month",p:"ma-hee-naa",e:"🗓"}, {w:"साल",t:"Year",p:"saal",e:"🎆"},
+    {w:"दिन",t:"Day",p:"din",e:"☀️"}, {w:"रात",t:"Night",p:"raat",e:"🌙"},
+    {w:"सुबह",t:"Morning",p:"su-bah",e:"🌄"}, {w:"शाम",t:"Evening",p:"shaam",e:"🌆"},
+    {w:"घंटा",t:"Hour",p:"ghan-taa",e:"🕐"}, {w:"मिनट",t:"Minute",p:"mi-nat",e:"⏱"},
+    {w:"जनवरी",t:"January",p:"jan-va-ree",e:"❄️"}, {w:"फ़रवरी",t:"February",p:"far-va-ree",e:"💘"},
+    {w:"मार्च",t:"March",p:"maarch",e:"🌸"}, {w:"अप्रैल",t:"April",p:"a-prail",e:"🌷"},
+    {w:"मई",t:"May",p:"ma-ee",e:"🌼"}, {w:"जून",t:"June",p:"juun",e:"☀️"},
+    {w:"जुलाई",t:"July",p:"ju-laa-ee",e:"🏖"}, {w:"अगस्त",t:"August",p:"a-gast",e:"🌞"},
+    {w:"सितंबर",t:"September",p:"si-tam-bar",e:"🍂"}, {w:"अक्टूबर",t:"October",p:"ak-tuu-bar",e:"🎃"},
+    {w:"नवंबर",t:"November",p:"na-vam-bar",e:"🌧"}, {w:"दिसंबर",t:"December",p:"di-sam-bar",e:"🎄"},
+    {w:"लाल",t:"Red",p:"laal",e:"🔴"}, {w:"नीला",t:"Blue",p:"nee-laa",e:"🔵"},
+    {w:"हरा",t:"Green",p:"ha-raa",e:"🟢"}, {w:"पीला",t:"Yellow",p:"pee-laa",e:"🟡"},
+    {w:"काला",t:"Black",p:"kaa-laa",e:"⚫"}, {w:"सफ़ेद",t:"White",p:"sa-fed",e:"⚪"},
+    {w:"स्लेटी",t:"Grey",p:"sle-tee",e:"🩶"}, {w:"भूरा",t:"Brown",p:"bhuu-raa",e:"🟤"},
+    {w:"गुलाबी",t:"Pink",p:"gu-laa-bee",e:"🌸"}, {w:"नारंगी",t:"Orange",p:"naa-ran-gee",e:"🟠"},
+    {w:"बैंगनी",t:"Purple",p:"bain-ga-nee",e:"🟣"}, {w:"बेटा",t:"Son",p:"be-taa",e:"👦"},
+    {w:"बेटी",t:"Daughter",p:"be-tee",e:"👧"}, {w:"भाई",t:"Brother",p:"bhaa-ee",e:"👬"},
+    {w:"बहन",t:"Sister",p:"ba-han",e:"👭"}, {w:"दादा",t:"Grandfather",p:"daa-daa",e:"👴"},
+    {w:"दादी",t:"Grandmother",p:"daa-dee",e:"👵"}, {w:"चाचा",t:"Uncle",p:"chaa-chaa",e:"👨"},
+    {w:"चाची",t:"Aunt",p:"chaa-chee",e:"👩"}, {w:"पति",t:"Husband",p:"pa-ti",e:"🤵"},
+    {w:"पत्नी",t:"Wife",p:"pat-nee",e:"👰"}, {w:"बच्चा",t:"Child",p:"bach-chaa",e:"👶"},
+    {w:"लड़का",t:"Boy",p:"lar-kaa",e:"🧑"}, {w:"लड़की",t:"Girl",p:"lar-kee",e:"👧"},
+    {w:"आदमी",t:"Man",p:"aad-mee",e:"👨"}, {w:"औरत",t:"Woman",p:"au-rat",e:"👩"},
+    {w:"लोग",t:"People",p:"log",e:"👥"}, {w:"इंसान",t:"Person/human",p:"in-saan",e:"👤"},
+    {w:"सिर",t:"Head",p:"sir",e:"🗣"}, {w:"आँख",t:"Eye",p:"aankh",e:"👁"},
+    {w:"हाथ",t:"Hand",p:"haath",e:"✋"}, {w:"पैर",t:"Foot/leg",p:"pair",e:"🦶"},
+    {w:"दिल",t:"Heart",p:"dil",e:"❤️"}, {w:"मुँह",t:"Mouth",p:"munh",e:"👄"},
+    {w:"नाक",t:"Nose",p:"naak",e:"👃"}, {w:"कान",t:"Ear",p:"kaan",e:"👂"},
+    {w:"बाल",t:"Hair",p:"baal",e:"💇"}, {w:"चेहरा",t:"Face",p:"cheh-raa",e:"🙂"},
+    {w:"उंगली",t:"Finger",p:"ung-lee",e:"👆"}, {w:"पीठ",t:"Back",p:"peeth",e:"🧍"},
+    {w:"रोटी",t:"Bread/roti",p:"ro-tee",e:"🍞"}, {w:"दूध",t:"Milk",p:"duudh",e:"🥛"},
+    {w:"चाय",t:"Tea",p:"chaay",e:"🍵"}, {w:"कॉफ़ी",t:"Coffee",p:"ko-fee",e:"☕"},
+    {w:"जूस",t:"Juice",p:"juus",e:"🧃"}, {w:"मांस",t:"Meat",p:"maans",e:"🥩"},
+    {w:"मछली",t:"Fish",p:"machh-lee",e:"🐟"}, {w:"मुर्गी",t:"Chicken",p:"mur-gee",e:"🍗"},
+    {w:"चावल",t:"Rice",p:"chaa-val",e:"🍚"}, {w:"दाल",t:"Lentils (dal)",p:"daal",e:"🍲"},
+    {w:"पनीर",t:"Paneer/cheese",p:"pa-neer",e:"🧀"}, {w:"अंडा",t:"Egg",p:"an-daa",e:"🥚"},
+    {w:"फल",t:"Fruit",p:"phal",e:"🍎"}, {w:"सेब",t:"Apple",p:"seb",e:"🍏"},
+    {w:"केला",t:"Banana",p:"ke-laa",e:"🍌"}, {w:"सब्ज़ी",t:"Vegetable",p:"sab-zee",e:"🥦"},
+    {w:"टमाटर",t:"Tomato",p:"ta-maa-tar",e:"🍅"}, {w:"आलू",t:"Potato",p:"aa-luu",e:"🥔"},
+    {w:"सलाद",t:"Salad",p:"sa-laad",e:"🥗"}, {w:"चीनी",t:"Sugar",p:"chee-nee",e:"🍬"},
+    {w:"नमक",t:"Salt",p:"na-mak",e:"🧂"}, {w:"तेल",t:"Oil",p:"tel",e:"🫒"},
+    {w:"मक्खन",t:"Butter",p:"mak-khan",e:"🧈"}, {w:"मिठाई",t:"Sweets",p:"mi-thaa-ee",e:"🍰"},
+    {w:"आइसक्रीम",t:"Ice cream",p:"aais-kreem",e:"🍨"}, {w:"नाश्ता",t:"Breakfast",p:"naash-taa",e:"🥐"},
+    {w:"दोपहर का खाना",t:"Lunch",p:"do-pa-har kaa khaa-naa",e:"🍽"}, {w:"रात का खाना",t:"Dinner",p:"raat kaa khaa-naa",e:"🌙"},
+    {w:"रेस्टोरेंट",t:"Restaurant",p:"res-to-rent",e:"🍴"}, {w:"मेज़",t:"Table",p:"mez",e:"🪑"},
+    {w:"दरवाज़ा",t:"Door",p:"dar-vaa-zaa",e:"🚪"}, {w:"खिड़की",t:"Window",p:"khir-kee",e:"🪟"},
+    {w:"कमरा",t:"Room",p:"kam-raa",e:"🛏"}, {w:"रसोई",t:"Kitchen",p:"ra-so-ee",e:"🍳"},
+    {w:"बाथरूम",t:"Bathroom",p:"baath-room",e:"🛁"}, {w:"बिस्तर",t:"Bed",p:"bis-tar",e:"🛌"},
+    {w:"कुर्सी",t:"Chair",p:"kur-see",e:"🪑"}, {w:"चाबी",t:"Key",p:"chaa-bee",e:"🔑"},
+    {w:"रोशनी",t:"Light",p:"rosh-nee",e:"💡"}, {w:"सड़क",t:"Street/road",p:"sa-rak",e:"🛣"},
+    {w:"दुकान",t:"Shop",p:"du-kaan",e:"🏪"}, {w:"बाज़ार",t:"Market",p:"baa-zaar",e:"🛍"},
+    {w:"स्कूल",t:"School",p:"skuul",e:"🏫"}, {w:"अस्पताल",t:"Hospital",p:"as-pa-taal",e:"🏥"},
+    {w:"मंदिर",t:"Temple",p:"man-dir",e:"🛕"}, {w:"बैंक",t:"Bank",p:"baink",e:"🏦"},
+    {w:"दफ़्तर",t:"Office",p:"daf-tar",e:"🏢"}, {w:"स्टेशन",t:"Station",p:"ste-shan",e:"🚉"},
+    {w:"हवाई अड्डा",t:"Airport",p:"ha-vaa-ee ad-daa",e:"✈️"}, {w:"होटल",t:"Hotel",p:"ho-tal",e:"🏨"},
+    {w:"गाड़ी",t:"Car/vehicle",p:"gaa-ree",e:"🚗"}, {w:"ट्रेन",t:"Train",p:"tren",e:"🚆"},
+    {w:"बस",t:"Bus",p:"bas",e:"🚌"}, {w:"हवाई जहाज़",t:"Airplane",p:"ha-vaa-ee ja-haaz",e:"🛩"},
+    {w:"साइकिल",t:"Bicycle",p:"saai-kil",e:"🚲"}, {w:"टिकट",t:"Ticket",p:"ti-kat",e:"🎫"},
+    {w:"नया",t:"New",p:"na-yaa",e:"✨"}, {w:"पुराना",t:"Old",p:"pu-raa-naa",e:"🏚"},
+    {w:"जवान",t:"Young",p:"ja-vaan",e:"🧒"}, {w:"सुंदर",t:"Beautiful",p:"sun-dar",e:"😍"},
+    {w:"बदसूरत",t:"Ugly",p:"bad-suu-rat",e:"🫣"}, {w:"गरम",t:"Hot",p:"ga-ram",e:"🔥"},
+    {w:"ठंडा",t:"Cold",p:"than-daa",e:"🧊"}, {w:"लंबा",t:"Tall/long",p:"lam-baa",e:"📏"},
+    {w:"ऊँचा",t:"High",p:"uun-chaa",e:"📏"}, {w:"नीचा",t:"Low",p:"nee-chaa",e:"📉"},
+    {w:"मज़बूत",t:"Strong",p:"maz-buut",e:"💪"}, {w:"कमज़ोर",t:"Weak",p:"kam-zor",e:"🪶"},
+    {w:"आसान",t:"Easy",p:"aa-saan",e:"🟢"}, {w:"मुश्किल",t:"Difficult",p:"mush-kil",e:"🔴"},
+    {w:"ज़रूरी",t:"Important/necessary",p:"za-ruu-ree",e:"⭐"}, {w:"सही",t:"Correct",p:"sa-hee",e:"✅"},
+    {w:"ग़लत",t:"Wrong",p:"ga-lat",e:"❌"}, {w:"सच",t:"True",p:"sach",e:"✔️"},
+    {w:"भरा",t:"Full",p:"bha-raa",e:"🈵"}, {w:"ख़ाली",t:"Empty",p:"khaa-lee",e:"🈳"},
+    {w:"खुला",t:"Open",p:"khu-laa",e:"🔓"}, {w:"बंद",t:"Closed",p:"band",e:"🔒"},
+    {w:"साफ़",t:"Clean",p:"saaf",e:"🧼"}, {w:"गंदा",t:"Dirty",p:"gan-daa",e:"🧹"},
+    {w:"अमीर",t:"Rich",p:"a-meer",e:"💎"}, {w:"ग़रीब",t:"Poor",p:"ga-reeb",e:"🪙"},
+    {w:"आज़ाद",t:"Free",p:"aa-zaad",e:"🕊"}, {w:"व्यस्त",t:"Busy",p:"vyast",e:"📵"},
+    {w:"तैयार",t:"Ready",p:"tai-yaar",e:"🚦"}, {w:"सुरक्षित",t:"Safe",p:"su-rak-shit",e:"🛡"},
+    {w:"एक जैसा",t:"Same",p:"ek jai-saa",e:"🟰"}, {w:"अलग",t:"Different",p:"a-lag",e:"🔀"},
+    {w:"महंगा",t:"Expensive",p:"ma-han-gaa",e:"💸"}, {w:"सस्ता",t:"Cheap",p:"sas-taa",e:"🏷"},
+    {w:"स्वस्थ",t:"Healthy",p:"svasth",e:"🥦"}, {w:"बीमार",t:"Sick",p:"bee-maar",e:"🤒"},
+    {w:"सूरज",t:"Sun",p:"suu-raj",e:"☀️"}, {w:"चाँद",t:"Moon",p:"chaand",e:"🌙"},
+    {w:"तारा",t:"Star",p:"taa-raa",e:"⭐"}, {w:"आसमान",t:"Sky",p:"aas-maan",e:"🌤"},
+    {w:"समुद्र",t:"Sea",p:"sa-mu-dra",e:"🌊"}, {w:"पहाड़",t:"Mountain",p:"pa-haar",e:"⛰"},
+    {w:"नदी",t:"River",p:"na-dee",e:"🏞"}, {w:"पेड़",t:"Tree",p:"per",e:"🌳"},
+    {w:"फूल",t:"Flower",p:"phuul",e:"🌸"}, {w:"बारिश",t:"Rain",p:"baa-rish",e:"🌧"},
+    {w:"बर्फ़",t:"Snow/ice",p:"barf",e:"❄️"}, {w:"हवा",t:"Wind/air",p:"ha-vaa",e:"💨"},
+    {w:"आग",t:"Fire",p:"aag",e:"🔥"}, {w:"धरती",t:"Earth",p:"dhar-tee",e:"🌍"},
+    {w:"मौसम",t:"Weather",p:"mau-sam",e:"🌦"}, {w:"चीज़",t:"Thing",p:"cheez",e:"📦"},
+    {w:"ज़िंदगी",t:"Life",p:"zin-da-gee",e:"🌱"}, {w:"दुनिया",t:"World",p:"du-ni-yaa",e:"🌎"},
+    {w:"देश",t:"Country",p:"desh",e:"🗺"}, {w:"जगह",t:"Place",p:"ja-gah",e:"📍"},
+    {w:"हिस्सा",t:"Part",p:"his-saa",e:"🧩"}, {w:"बार",t:"Time (occasion)",p:"baar",e:"🔁"},
+    {w:"नाम",t:"Name",p:"naam",e:"🏷"}, {w:"शब्द",t:"Word",p:"shabd",e:"🔤"},
+    {w:"सवाल",t:"Question",p:"sa-vaal",e:"❓"}, {w:"जवाब",t:"Answer",p:"ja-vaab",e:"💬"},
+    {w:"समस्या",t:"Problem",p:"sa-mas-yaa",e:"⚠️"}, {w:"विचार",t:"Idea/thought",p:"vi-chaar",e:"💡"},
+    {w:"कहानी",t:"Story",p:"ka-haa-nee",e:"📜"}, {w:"संगीत",t:"Music",p:"san-geet",e:"🎵"},
+    {w:"फ़िल्म",t:"Movie",p:"film",e:"🎬"}, {w:"फ़ोटो",t:"Photo",p:"fo-to",e:"📷"},
+    {w:"फ़ोन",t:"Phone",p:"fon",e:"📱"}, {w:"खेल",t:"Game/sport",p:"khel",e:"🎲"},
+    {w:"क्रिकेट",t:"Cricket",p:"kri-ket",e:"🏏"}, {w:"फुटबॉल",t:"Football",p:"fut-bol",e:"⚽"},
+    {w:"सुप्रभात",t:"Good morning",p:"su-pra-bhaat",e:"🌅"}, {w:"शुभ रात्रि",t:"Good night",p:"shubh raa-tri",e:"🌙"},
+    {w:"अलविदा",t:"Goodbye",p:"al-vi-daa",e:"👋"}, {w:"फिर मिलेंगे",t:"See you again",p:"phir mi-len-ge",e:"👋"},
+    {w:"माफ़ कीजिए",t:"Sorry/excuse me",p:"maaf kee-ji-e",e:"🙇"}, {w:"कोई बात नहीं",t:"No problem",p:"ko-ii baat na-heen",e:"🤲"},
+    {w:"ठीक है",t:"Okay",p:"theek hai",e:"👌"}, {w:"मुझे नहीं पता",t:"I don't know",p:"mu-jhe na-heen pa-taa",e:"🤷"},
+    {w:"मैं नहीं समझा",t:"I don't understand",p:"main na-heen sam-jhaa",e:"😕"}, {w:"यह कितने का है?",t:"How much is this?",p:"yah kit-ne kaa hai",e:"💶"},
+    {w:"कहाँ है?",t:"Where is it?",p:"ka-haan hai",e:"🧭"}, {w:"कितने बजे हैं?",t:"What time is it?",p:"kit-ne ba-je hain",e:"🕐"},
+    {w:"मेरा नाम",t:"My name is",p:"me-raa naam",e:"🪪"}, {w:"आपसे मिलकर ख़ुशी हुई",t:"Nice to meet you",p:"aap-se mil-kar khu-shee hu-ee",e:"🤝"},
+    {w:"बचाओ!",t:"Help!",p:"ba-chaa-o",e:"🆘"}, {w:"बधाई हो",t:"Congratulations",p:"ba-dhaa-ee ho",e:"🎉"},
+    {w:"स्वागत है",t:"Welcome",p:"svaa-gat hai",e:"🎊"}, {w:"चलो",t:"Let's go",p:"cha-lo",e:"🚀"}
   ],
   ru: [
     {w:"Привет",     t:"Hello",       p:"pree-VYET",      e:"🙋"}, {w:"Спасибо",    t:"Thank you",   p:"spa-SEE-ba",     e:"🙏"},
@@ -1752,23 +2718,178 @@ const WORDS = {
     {w:"Медленно",   t:"Slow",        p:"MED-len-na",     e:"🐢"}, {w:"Счастливый", t:"Happy",       p:"shast-LEE-viy",  e:"😊"},
     {w:"Грустный",   t:"Sad",         p:"GRUS-tniy",      e:"😢"}, {w:"Устал",      t:"Tired",       p:"us-TAL",         e:"😴"},
     {w:"Голодный",   t:"Hungry",      p:"ga-LOD-niy",     e:"🤤"}, {w:"Жаждущий",   t:"Thirsty",     p:"ZHAZH-du-shiy",  e:"😮"},
-    {w:"Семья",      t:"Family",      p:"sem-YA",         e:"👨‍👩‍👧"},{w:"Мама",       t:"Mother",      p:"MA-ma",          e:"👩"},
+    {w:"Семья",      t:"Family",      p:"sem-YA",         e:"👨‍👩‍👧"}, {w:"Мама",       t:"Mother",      p:"MA-ma",          e:"👩"},
     {w:"Папа",       t:"Father",      p:"PA-pa",          e:"👨"}, {w:"Книга",      t:"Book",        p:"KNEE-ga",        e:"📚"},
     {w:"Город",      t:"City",        p:"GO-rod",         e:"🏙"}, {w:"Пляж",       t:"Beach",       p:"plyazh",         e:"🏖"},
+    {w:"Быть",t:"To be",p:"byt",e:"🧍"}, {w:"Мочь",t:"To be able",p:"moch",e:"💪"},
+    {w:"Сказать",t:"To say",p:"skah-ZAT",e:"🗣"}, {w:"Говорить",t:"To speak",p:"gah-vah-REET",e:"💬"},
+    {w:"Знать",t:"To know",p:"znat",e:"🧠"}, {w:"Хотеть",t:"To want",p:"khah-TYET",e:"🙌"},
+    {w:"Делать",t:"To do/make",p:"DYEH-lat",e:"🔨"}, {w:"Видеть",t:"To see",p:"VEE-dyet",e:"👀"},
+    {w:"Идти",t:"To go (on foot)",p:"eet-TEE",e:"🚶"}, {w:"Ехать",t:"To go (by transport)",p:"YEH-khat",e:"🚗"},
+    {w:"Прийти",t:"To come",p:"preey-TEE",e:"👋"}, {w:"Дать",t:"To give",p:"dat",e:"🎁"},
+    {w:"Думать",t:"To think",p:"DOO-mat",e:"💭"}, {w:"Работать",t:"To work",p:"rah-BOH-tat",e:"💼"},
+    {w:"Жить",t:"To live",p:"zhyt",e:"🌱"}, {w:"Любить",t:"To love",p:"lyoo-BEET",e:"❤️"},
+    {w:"Понимать",t:"To understand",p:"pah-nee-MAT",e:"💡"}, {w:"Найти",t:"To find",p:"nigh-TEE",e:"🔍"},
+    {w:"Взять",t:"To take",p:"vzyat",e:"✊"}, {w:"Смотреть",t:"To look/watch",p:"smah-TRYET",e:"👁"},
+    {w:"Положить",t:"To put",p:"pah-lah-ZHYT",e:"📥"}, {w:"Верить",t:"To believe",p:"VYEH-reet",e:"🙏"},
+    {w:"Принести",t:"To bring",p:"pree-nyes-TEE",e:"🎒"}, {w:"Вернуться",t:"To return",p:"vyer-NOO-tsa",e:"🔙"},
+    {w:"Помнить",t:"To remember",p:"POM-neet",e:"🧾"}, {w:"Звонить",t:"To call (phone)",p:"zvah-NEET",e:"📞"},
+    {w:"Ждать",t:"To wait",p:"zhdat",e:"⏳"}, {w:"Закончить",t:"To finish",p:"zah-KON-cheet",e:"🏁"},
+    {w:"Есть",t:"To eat",p:"yest",e:"🍽"}, {w:"Пить",t:"To drink",p:"peet",e:"🥤"},
+    {w:"Спать",t:"To sleep",p:"spat",e:"😴"}, {w:"Открыть",t:"To open",p:"aht-KRYT",e:"🔓"},
+    {w:"Закрыть",t:"To close",p:"zah-KRYT",e:"🔒"}, {w:"Купить",t:"To buy",p:"koo-PEET",e:"🛒"},
+    {w:"Платить",t:"To pay",p:"plah-TEET",e:"💳"}, {w:"Читать",t:"To read",p:"chee-TAT",e:"📖"},
+    {w:"Писать",t:"To write",p:"pee-SAT",e:"✍️"}, {w:"Слушать",t:"To listen",p:"SLOO-shat",e:"🎧"},
+    {w:"Играть",t:"To play",p:"ee-GRAT",e:"🎮"}, {w:"Бежать",t:"To run",p:"bye-ZHAT",e:"🏃"},
+    {w:"Ходить",t:"To walk",p:"khah-DEET",e:"🚶"}, {w:"Помогать",t:"To help",p:"pah-mah-GAT",e:"🆘"},
+    {w:"Учиться",t:"To study/learn",p:"oo-CHEE-tsa",e:"📚"}, {w:"Учить",t:"To teach/learn",p:"oo-CHEET",e:"🎓"},
+    {w:"Начать",t:"To begin",p:"nah-CHAT",e:"▶️"}, {w:"Искать",t:"To search",p:"ees-KAT",e:"🔎"},
+    {w:"Использовать",t:"To use",p:"ees-POL-zah-vat",e:"🛠"}, {w:"Спросить",t:"To ask",p:"sprah-SEET",e:"❓"},
+    {w:"Ответить",t:"To answer",p:"aht-VYEH-teet",e:"💬"}, {w:"Выйти",t:"To go out",p:"VY-tee",e:"🚪"},
+    {w:"Войти",t:"To enter",p:"vigh-TEE",e:"➡️"}, {w:"Потерять",t:"To lose",p:"pah-tye-RYAT",e:"🫥"},
+    {w:"Выиграть",t:"To win",p:"VY-ee-grat",e:"🏆"}, {w:"Попробовать",t:"To try",p:"pah-PROH-bah-vat",e:"🎯"},
+    {w:"Изменить",t:"To change",p:"eez-mye-NEET",e:"🔄"}, {w:"Стоять",t:"To stand",p:"stah-YAT",e:"🧍"},
+    {w:"Сидеть",t:"To sit",p:"see-DYET",e:"🪑"}, {w:"Чувствовать",t:"To feel",p:"CHOOST-vah-vat",e:"💗"},
+    {w:"Я",t:"I",p:"ya",e:"🙋"}, {w:"Ты",t:"You",p:"ty",e:"👉"},
+    {w:"Он",t:"He",p:"on",e:"👨"}, {w:"Она",t:"She",p:"ah-NAH",e:"👩"},
+    {w:"Мы",t:"We",p:"my",e:"👥"}, {w:"Вы",t:"You (formal/plural)",p:"vy",e:"👫"},
+    {w:"Они",t:"They",p:"ah-NEE",e:"👪"}, {w:"Это",t:"This/it",p:"EH-tah",e:"👇"},
+    {w:"Всё",t:"Everything",p:"vsyo",e:"🌐"}, {w:"Ничего",t:"Nothing",p:"nee-chee-VOH",e:"🚫"},
+    {w:"Что-то",t:"Something",p:"SHTOH-tah",e:"❔"}, {w:"Кто-то",t:"Someone",p:"KTOH-tah",e:"👤"},
+    {w:"Никто",t:"Nobody",p:"neek-TOH",e:"🙅"}, {w:"Много",t:"A lot",p:"MNOH-gah",e:"📈"},
+    {w:"Мало",t:"Little/few",p:"MAH-lah",e:"🤏"}, {w:"Слишком",t:"Too much",p:"SLEESH-kahm",e:"🛑"},
+    {w:"Больше",t:"More",p:"BOL-sheh",e:"➕"}, {w:"Меньше",t:"Less",p:"MYEN-sheh",e:"➖"},
+    {w:"Тоже",t:"Also",p:"TOH-zheh",e:"➕"}, {w:"Всегда",t:"Always",p:"vseeg-DAH",e:"♾️"},
+    {w:"Никогда",t:"Never",p:"nee-kahg-DAH",e:"🚫"}, {w:"Уже",t:"Already",p:"oo-ZHEH",e:"✔️"},
+    {w:"Ещё",t:"Still/more",p:"ye-SHYO",e:"🔁"}, {w:"Сейчас",t:"Now",p:"see-CHAS",e:"⏱"},
+    {w:"Потом",t:"Later",p:"pah-TOM",e:"⏭"}, {w:"Раньше",t:"Before/earlier",p:"RAN-sheh",e:"⏮"},
+    {w:"Здесь",t:"Here",p:"zdyes",e:"📍"}, {w:"Там",t:"There",p:"tam",e:"🗺"},
+    {w:"Где",t:"Where",p:"gdyeh",e:"🧭"}, {w:"Когда",t:"When",p:"kahg-DAH",e:"📅"},
+    {w:"Почему",t:"Why",p:"pah-chee-MOO",e:"❓"}, {w:"Как",t:"How",p:"kak",e:"🤔"},
+    {w:"Кто",t:"Who",p:"ktoh",e:"👤"}, {w:"Что",t:"What",p:"shtoh",e:"❔"},
+    {w:"Какой",t:"Which/what kind",p:"kah-KOY",e:"🔀"}, {w:"Сколько",t:"How much",p:"SKOL-kah",e:"⚖️"},
+    {w:"Один",t:"One",p:"ah-DEEN",e:"1️⃣"}, {w:"Два",t:"Two",p:"dvah",e:"2️⃣"},
+    {w:"Три",t:"Three",p:"tree",e:"3️⃣"}, {w:"Четыре",t:"Four",p:"chee-TY-ree",e:"4️⃣"},
+    {w:"Пять",t:"Five",p:"pyat",e:"5️⃣"}, {w:"Шесть",t:"Six",p:"shest",e:"6️⃣"},
+    {w:"Семь",t:"Seven",p:"syem",e:"7️⃣"}, {w:"Восемь",t:"Eight",p:"VOH-syem",e:"8️⃣"},
+    {w:"Девять",t:"Nine",p:"DYEH-vyat",e:"9️⃣"}, {w:"Десять",t:"Ten",p:"DYEH-syat",e:"🔟"},
+    {w:"Одиннадцать",t:"Eleven",p:"ah-DEEN-nah-tsat",e:"🔢"}, {w:"Двенадцать",t:"Twelve",p:"dvee-NAH-tsat",e:"🔢"},
+    {w:"Двадцать",t:"Twenty",p:"DVAH-tsat",e:"🔢"}, {w:"Тридцать",t:"Thirty",p:"TREE-tsat",e:"🔢"},
+    {w:"Сорок",t:"Forty",p:"SOH-rahk",e:"🔢"}, {w:"Пятьдесят",t:"Fifty",p:"pee-dee-SYAT",e:"🔢"},
+    {w:"Сто",t:"Hundred",p:"stoh",e:"💯"}, {w:"Тысяча",t:"Thousand",p:"TY-see-chah",e:"🔢"},
+    {w:"Первый",t:"First",p:"PYER-vy",e:"🥇"}, {w:"Второй",t:"Second",p:"ftah-ROY",e:"🥈"},
+    {w:"Последний",t:"Last",p:"pahs-LYED-nee",e:"🔚"}, {w:"Понедельник",t:"Monday",p:"pah-nee-DYEL-neek",e:"📅"},
+    {w:"Вторник",t:"Tuesday",p:"FTOR-neek",e:"📅"}, {w:"Среда",t:"Wednesday",p:"sree-DAH",e:"📅"},
+    {w:"Четверг",t:"Thursday",p:"cheet-VYERK",e:"📅"}, {w:"Пятница",t:"Friday",p:"PYAT-nee-tsah",e:"📅"},
+    {w:"Суббота",t:"Saturday",p:"soo-BOH-tah",e:"📅"}, {w:"Воскресенье",t:"Sunday",p:"vahs-kree-SYEN-yeh",e:"📅"},
+    {w:"Сегодня",t:"Today",p:"see-VOD-nya",e:"📆"}, {w:"Завтра",t:"Tomorrow",p:"ZAF-trah",e:"🌅"},
+    {w:"Вчера",t:"Yesterday",p:"fchee-RAH",e:"🌇"}, {w:"Неделя",t:"Week",p:"nee-DYEH-lya",e:"🗓"},
+    {w:"Месяц",t:"Month",p:"MYEH-syats",e:"🗓"}, {w:"Год",t:"Year",p:"got",e:"🎆"},
+    {w:"День",t:"Day",p:"dyen",e:"☀️"}, {w:"Ночь",t:"Night",p:"noch",e:"🌙"},
+    {w:"Утро",t:"Morning",p:"OO-trah",e:"🌄"}, {w:"Вечер",t:"Evening",p:"VYEH-cher",e:"🌆"},
+    {w:"Час",t:"Hour",p:"chas",e:"🕐"}, {w:"Минута",t:"Minute",p:"mee-NOO-tah",e:"⏱"},
+    {w:"Январь",t:"January",p:"yan-VAR",e:"❄️"}, {w:"Февраль",t:"February",p:"feev-RAL",e:"💘"},
+    {w:"Март",t:"March",p:"mart",e:"🌸"}, {w:"Апрель",t:"April",p:"ah-PRYEL",e:"🌷"},
+    {w:"Май",t:"May",p:"my",e:"🌼"}, {w:"Июнь",t:"June",p:"ee-YOON",e:"☀️"},
+    {w:"Июль",t:"July",p:"ee-YOOL",e:"🏖"}, {w:"Август",t:"August",p:"AV-goost",e:"🌞"},
+    {w:"Сентябрь",t:"September",p:"seen-TYABR",e:"🍂"}, {w:"Октябрь",t:"October",p:"ahk-TYABR",e:"🎃"},
+    {w:"Ноябрь",t:"November",p:"nah-YABR",e:"🌧"}, {w:"Декабрь",t:"December",p:"dee-KABR",e:"🎄"},
+    {w:"Красный",t:"Red",p:"KRAS-ny",e:"🔴"}, {w:"Синий",t:"Blue",p:"SEE-nee",e:"🔵"},
+    {w:"Зелёный",t:"Green",p:"zee-LYO-ny",e:"🟢"}, {w:"Жёлтый",t:"Yellow",p:"ZHOL-ty",e:"🟡"},
+    {w:"Чёрный",t:"Black",p:"CHOR-ny",e:"⚫"}, {w:"Белый",t:"White",p:"BYEH-ly",e:"⚪"},
+    {w:"Серый",t:"Grey",p:"SYEH-ry",e:"🩶"}, {w:"Коричневый",t:"Brown",p:"kah-REECH-nee-vy",e:"🟤"},
+    {w:"Розовый",t:"Pink",p:"ROH-zah-vy",e:"🌸"}, {w:"Оранжевый",t:"Orange",p:"ah-RAN-zheh-vy",e:"🟠"},
+    {w:"Фиолетовый",t:"Purple",p:"fee-ah-LYEH-tah-vy",e:"🟣"}, {w:"Сын",t:"Son",p:"syn",e:"👦"},
+    {w:"Дочь",t:"Daughter",p:"doch",e:"👧"}, {w:"Брат",t:"Brother",p:"brat",e:"👬"},
+    {w:"Сестра",t:"Sister",p:"sees-TRAH",e:"👭"}, {w:"Дедушка",t:"Grandfather",p:"DYEH-doosh-kah",e:"👴"},
+    {w:"Бабушка",t:"Grandmother",p:"BAH-boosh-kah",e:"👵"}, {w:"Дядя",t:"Uncle",p:"DYA-dya",e:"👨"},
+    {w:"Тётя",t:"Aunt",p:"TYO-tya",e:"👩"}, {w:"Муж",t:"Husband",p:"moosh",e:"🤵"},
+    {w:"Жена",t:"Wife",p:"zheh-NAH",e:"👰"}, {w:"Ребёнок",t:"Child",p:"ree-BYO-nahk",e:"👶"},
+    {w:"Мальчик",t:"Boy",p:"MAL-cheek",e:"🧑"}, {w:"Девочка",t:"Girl",p:"DYEH-vahch-kah",e:"👧"},
+    {w:"Мужчина",t:"Man",p:"moo-SHCHEE-nah",e:"👨"}, {w:"Женщина",t:"Woman",p:"ZHEN-shchee-nah",e:"👩"},
+    {w:"Люди",t:"People",p:"LYOO-dee",e:"👥"}, {w:"Человек",t:"Person",p:"chee-lah-VYEK",e:"👤"},
+    {w:"Голова",t:"Head",p:"gah-lah-VAH",e:"🗣"}, {w:"Глаз",t:"Eye",p:"glas",e:"👁"},
+    {w:"Рука",t:"Hand/arm",p:"roo-KAH",e:"✋"}, {w:"Нога",t:"Leg/foot",p:"nah-GAH",e:"🦵"},
+    {w:"Сердце",t:"Heart",p:"SYER-tseh",e:"❤️"}, {w:"Рот",t:"Mouth",p:"rot",e:"👄"},
+    {w:"Нос",t:"Nose",p:"nos",e:"👃"}, {w:"Ухо",t:"Ear",p:"OO-khah",e:"👂"},
+    {w:"Волосы",t:"Hair",p:"VOH-lah-sy",e:"💇"}, {w:"Лицо",t:"Face",p:"lee-TSOH",e:"🙂"},
+    {w:"Палец",t:"Finger",p:"PAH-lyets",e:"👆"}, {w:"Спина",t:"Back",p:"spee-NAH",e:"🧍"},
+    {w:"Хлеб",t:"Bread",p:"khlyep",e:"🍞"}, {w:"Молоко",t:"Milk",p:"mah-lah-KOH",e:"🥛"},
+    {w:"Вино",t:"Wine",p:"vee-NOH",e:"🍷"}, {w:"Пиво",t:"Beer",p:"PEE-vah",e:"🍺"},
+    {w:"Кофе",t:"Coffee",p:"KOH-fye",e:"☕"}, {w:"Чай",t:"Tea",p:"chigh",e:"🍵"},
+    {w:"Мясо",t:"Meat",p:"MYA-sah",e:"🥩"}, {w:"Рыба",t:"Fish",p:"RY-bah",e:"🐟"},
+    {w:"Курица",t:"Chicken",p:"KOO-ree-tsah",e:"🍗"}, {w:"Рис",t:"Rice",p:"rees",e:"🍚"},
+    {w:"Макароны",t:"Pasta",p:"mah-kah-ROH-ny",e:"🍝"}, {w:"Сыр",t:"Cheese",p:"syr",e:"🧀"},
+    {w:"Яйцо",t:"Egg",p:"yigh-TSOH",e:"🥚"}, {w:"Фрукты",t:"Fruit",p:"FROOK-ty",e:"🍎"},
+    {w:"Яблоко",t:"Apple",p:"YAB-lah-kah",e:"🍏"}, {w:"Банан",t:"Banana",p:"bah-NAN",e:"🍌"},
+    {w:"Овощи",t:"Vegetables",p:"OH-vah-shchee",e:"🥦"}, {w:"Помидор",t:"Tomato",p:"pah-mee-DOR",e:"🍅"},
+    {w:"Картошка",t:"Potato",p:"kar-TOSH-kah",e:"🥔"}, {w:"Салат",t:"Salad",p:"sah-LAT",e:"🥗"},
+    {w:"Сахар",t:"Sugar",p:"SAH-khar",e:"🍬"}, {w:"Соль",t:"Salt",p:"sol",e:"🧂"},
+    {w:"Масло",t:"Butter/oil",p:"MAS-lah",e:"🧈"}, {w:"Торт",t:"Cake",p:"tort",e:"🍰"},
+    {w:"Мороженое",t:"Ice cream",p:"mah-ROH-zheh-nah-yeh",e:"🍨"}, {w:"Суп",t:"Soup",p:"soop",e:"🍲"},
+    {w:"Завтрак",t:"Breakfast",p:"ZAF-trahk",e:"🥐"}, {w:"Обед",t:"Lunch",p:"ah-BYET",e:"🍽"},
+    {w:"Ужин",t:"Dinner",p:"OO-zhyn",e:"🌙"}, {w:"Ресторан",t:"Restaurant",p:"rees-tah-RAN",e:"🍴"},
+    {w:"Стол",t:"Table",p:"stol",e:"🪑"}, {w:"Дверь",t:"Door",p:"dvyer",e:"🚪"},
+    {w:"Окно",t:"Window",p:"ahk-NOH",e:"🪟"}, {w:"Комната",t:"Room",p:"KOM-nah-tah",e:"🛏"},
+    {w:"Кухня",t:"Kitchen",p:"KOOKH-nya",e:"🍳"}, {w:"Ванная",t:"Bathroom",p:"VAN-nah-yah",e:"🛁"},
+    {w:"Кровать",t:"Bed",p:"krah-VAT",e:"🛌"}, {w:"Стул",t:"Chair",p:"stool",e:"🪑"},
+    {w:"Ключ",t:"Key",p:"klyooch",e:"🔑"}, {w:"Свет",t:"Light",p:"svyet",e:"💡"},
+    {w:"Улица",t:"Street",p:"OO-lee-tsah",e:"🛣"}, {w:"Магазин",t:"Shop",p:"mah-gah-ZEEN",e:"🏪"},
+    {w:"Рынок",t:"Market",p:"RY-nahk",e:"🛍"}, {w:"Школа",t:"School",p:"SHKOH-lah",e:"🏫"},
+    {w:"Больница",t:"Hospital",p:"bahl-NEE-tsah",e:"🏥"}, {w:"Церковь",t:"Church",p:"TSER-kahf",e:"⛪"},
+    {w:"Банк",t:"Bank",p:"bank",e:"🏦"}, {w:"Офис",t:"Office",p:"OH-fees",e:"🏢"},
+    {w:"Вокзал",t:"Station",p:"vahk-ZAL",e:"🚉"}, {w:"Аэропорт",t:"Airport",p:"ah-eh-rah-PORT",e:"✈️"},
+    {w:"Гостиница",t:"Hotel",p:"gahs-TEE-nee-tsah",e:"🏨"}, {w:"Машина",t:"Car",p:"mah-SHY-nah",e:"🚗"},
+    {w:"Поезд",t:"Train",p:"POH-yest",e:"🚆"}, {w:"Автобус",t:"Bus",p:"af-TOH-boos",e:"🚌"},
+    {w:"Самолёт",t:"Airplane",p:"sah-mah-LYOT",e:"🛩"}, {w:"Велосипед",t:"Bicycle",p:"vee-lah-see-PYET",e:"🚲"},
+    {w:"Билет",t:"Ticket",p:"bee-LYET",e:"🎫"}, {w:"Новый",t:"New",p:"NOH-vy",e:"✨"},
+    {w:"Старый",t:"Old",p:"STAH-ry",e:"🏚"}, {w:"Молодой",t:"Young",p:"mah-lah-DOY",e:"🧒"},
+    {w:"Красивый",t:"Beautiful",p:"krah-SEE-vy",e:"😍"}, {w:"Горячий",t:"Hot",p:"gah-RYA-chee",e:"🔥"},
+    {w:"Холодный",t:"Cold",p:"khah-LOD-ny",e:"🧊"}, {w:"Высокий",t:"Tall/high",p:"vy-SOH-kee",e:"📏"},
+    {w:"Низкий",t:"Short/low",p:"NEES-kee",e:"📉"}, {w:"Длинный",t:"Long",p:"DLEEN-ny",e:"📏"},
+    {w:"Короткий",t:"Short (length)",p:"kah-ROT-kee",e:"✂️"}, {w:"Сильный",t:"Strong",p:"SEEL-ny",e:"💪"},
+    {w:"Слабый",t:"Weak",p:"SLAH-by",e:"🪶"}, {w:"Лёгкий",t:"Easy/light",p:"LYOKH-kee",e:"🟢"},
+    {w:"Трудный",t:"Difficult",p:"TROOD-ny",e:"🔴"}, {w:"Важный",t:"Important",p:"VAZH-ny",e:"⭐"},
+    {w:"Правильный",t:"Correct",p:"PRAH-veel-ny",e:"✅"}, {w:"Неправильный",t:"Wrong",p:"nee-PRAH-veel-ny",e:"❌"},
+    {w:"Настоящий",t:"Real/true",p:"nahs-tah-YA-shchee",e:"✔️"}, {w:"Полный",t:"Full",p:"POL-ny",e:"🈵"},
+    {w:"Пустой",t:"Empty",p:"poos-TOY",e:"🈳"}, {w:"Открытый",t:"Open",p:"aht-KRY-ty",e:"🔓"},
+    {w:"Закрытый",t:"Closed",p:"zah-KRY-ty",e:"🔒"}, {w:"Чистый",t:"Clean",p:"CHEES-ty",e:"🧼"},
+    {w:"Грязный",t:"Dirty",p:"GRYAZ-ny",e:"🧹"}, {w:"Богатый",t:"Rich",p:"bah-GAH-ty",e:"💎"},
+    {w:"Бедный",t:"Poor",p:"BYED-ny",e:"🪙"}, {w:"Свободный",t:"Free",p:"svah-BOD-ny",e:"🕊"},
+    {w:"Занятый",t:"Busy",p:"ZAH-nya-ty",e:"📵"}, {w:"Готовый",t:"Ready",p:"gah-TOH-vy",e:"🚦"},
+    {w:"Безопасный",t:"Safe",p:"bee-zah-PAS-ny",e:"🛡"}, {w:"Одинаковый",t:"Same",p:"ah-dee-NAH-kah-vy",e:"🟰"},
+    {w:"Разный",t:"Different",p:"RAZ-ny",e:"🔀"}, {w:"Дорогой",t:"Expensive/dear",p:"dah-rah-GOY",e:"💸"},
+    {w:"Дешёвый",t:"Cheap",p:"dee-SHO-vy",e:"🏷"}, {w:"Здоровый",t:"Healthy",p:"zdah-ROH-vy",e:"🥦"},
+    {w:"Больной",t:"Sick",p:"bahl-NOY",e:"🤒"}, {w:"Солнце",t:"Sun",p:"SON-tseh",e:"☀️"},
+    {w:"Луна",t:"Moon",p:"loo-NAH",e:"🌙"}, {w:"Звезда",t:"Star",p:"zvyez-DAH",e:"⭐"},
+    {w:"Небо",t:"Sky",p:"NYEH-bah",e:"🌤"}, {w:"Море",t:"Sea",p:"MOH-ryeh",e:"🌊"},
+    {w:"Гора",t:"Mountain",p:"gah-RAH",e:"⛰"}, {w:"Река",t:"River",p:"ree-KAH",e:"🏞"},
+    {w:"Дерево",t:"Tree",p:"DYEH-ree-vah",e:"🌳"}, {w:"Цветок",t:"Flower",p:"tsvee-TOK",e:"🌸"},
+    {w:"Дождь",t:"Rain",p:"dozhd",e:"🌧"}, {w:"Снег",t:"Snow",p:"snyek",e:"❄️"},
+    {w:"Ветер",t:"Wind",p:"VYEH-tyer",e:"💨"}, {w:"Огонь",t:"Fire",p:"ah-GON",e:"🔥"},
+    {w:"Земля",t:"Earth",p:"zeem-LYA",e:"🌍"}, {w:"Воздух",t:"Air",p:"VOZ-dookh",e:"🌬"},
+    {w:"Вещь",t:"Thing",p:"vyeshch",e:"📦"}, {w:"Жизнь",t:"Life",p:"zhyzn",e:"🌱"},
+    {w:"Мир",t:"World/peace",p:"meer",e:"🌎"}, {w:"Страна",t:"Country",p:"strah-NAH",e:"🗺"},
+    {w:"Место",t:"Place",p:"MYES-tah",e:"📍"}, {w:"Часть",t:"Part",p:"chast",e:"🧩"},
+    {w:"Раз",t:"Time (occasion)",p:"ras",e:"🔁"}, {w:"Имя",t:"Name",p:"EE-mya",e:"🏷"},
+    {w:"Слово",t:"Word",p:"SLOH-vah",e:"🔤"}, {w:"Вопрос",t:"Question",p:"vah-PROS",e:"❓"},
+    {w:"Ответ",t:"Answer",p:"aht-VYET",e:"💬"}, {w:"Проблема",t:"Problem",p:"prah-BLYEH-mah",e:"⚠️"},
+    {w:"Идея",t:"Idea",p:"ee-DYEH-yah",e:"💡"}, {w:"История",t:"Story/history",p:"ees-TOH-ree-yah",e:"📜"},
+    {w:"Музыка",t:"Music",p:"MOO-zy-kah",e:"🎵"}, {w:"Фильм",t:"Movie",p:"feelm",e:"🎬"},
+    {w:"Фото",t:"Photo",p:"FOH-tah",e:"📷"}, {w:"Телефон",t:"Telephone",p:"tee-lee-FON",e:"📱"},
+    {w:"Игра",t:"Game",p:"ee-GRAH",e:"🎲"}, {w:"Спорт",t:"Sport",p:"sport",e:"⚽"},
+    {w:"Футбол",t:"Football",p:"foot-BOL",e:"⚽"}, {w:"Доброе утро",t:"Good morning",p:"DOB-rah-yeh OO-trah",e:"🌅"},
+    {w:"Добрый день",t:"Good afternoon",p:"DOB-ry dyen",e:"🌤"}, {w:"Добрый вечер",t:"Good evening",p:"DOB-ry VYEH-cher",e:"🌆"},
+    {w:"Спокойной ночи",t:"Good night",p:"spah-KOY-nigh NOH-chee",e:"🌙"}, {w:"До свидания",t:"Goodbye",p:"dah svee-DAH-nee-yah",e:"👋"},
+    {w:"Пока",t:"Bye (informal)",p:"pah-KAH",e:"👋"}, {w:"Извините",t:"Sorry/excuse me",p:"eez-vee-NEE-tyeh",e:"🙇"},
+    {w:"Не за что",t:"You're welcome",p:"NYEH-zah-shtah",e:"🤲"}, {w:"Ладно",t:"Okay/alright",p:"LAD-nah",e:"👌"},
+    {w:"Я не знаю",t:"I don't know",p:"ya nyeh ZNAH-yoo",e:"🤷"}, {w:"Я не понимаю",t:"I don't understand",p:"ya nyeh pah-nee-MAH-yoo",e:"😕"},
+    {w:"Сколько стоит?",t:"How much is it?",p:"SKOL-kah STOH-eet",e:"💶"}, {w:"Где находится?",t:"Where is it?",p:"gdyeh nah-KHOH-dee-tsa",e:"🧭"},
+    {w:"Который час?",t:"What time is it?",p:"kah-TOH-ry chas",e:"🕐"}, {w:"Меня зовут",t:"My name is",p:"mee-NYA zah-VOOT",e:"🪪"},
+    {w:"Очень приятно",t:"Nice to meet you",p:"OH-cheen pree-YAT-nah",e:"🤝"}, {w:"Помогите!",t:"Help!",p:"pah-mah-GHEE-tyeh",e:"🆘"},
+    {w:"За здоровье!",t:"Cheers!",p:"zah zdah-ROH-vyeh",e:"🥂"}, {w:"Поздравляю",t:"Congratulations",p:"pahz-drahv-LYA-yoo",e:"🎉"},
+    {w:"Добро пожаловать",t:"Welcome",p:"dah-BROH pah-ZHAH-lah-vat",e:"🎊"}, {w:"Поехали!",t:"Let's go!",p:"pah-YEH-khah-lee",e:"🚀"}
   ],
-};
-
-const CONVERSATIONS = {
-  es: (words) => `— ${words[0]?.w || "Hola"}! ¿Cómo estás?\n— Muy bien, ${words[1]?.w || "gracias"}. ¿Y tú?\n— Bien también. ¿Tienes ${words[2]?.w || "agua"}?\n— Sí, aquí está. ¿Vas a ${words[3]?.w || "casa"}?\n— Sí, con mi ${words[4]?.w || "familia"}.`,
-  fr: (words) => `— ${words[0]?.w || "Bonjour"}! Comment ça va?\n— Très bien, ${words[1]?.w || "merci"}. Et toi?\n— Bien aussi. Tu as de l'${words[2]?.w || "eau"}?\n— Oui, voilà. Tu rentres à la ${words[3]?.w || "maison"}?\n— Oui, avec ma ${words[4]?.w || "famille"}.`,
-  it: (words) => `— ${words[0]?.w || "Ciao"}! Come stai?\n— Molto bene, ${words[1]?.w || "grazie"}. E tu?\n— Bene anche io. Hai dell'${words[2]?.w || "acqua"}?\n— Sì, eccola. Torni a ${words[3]?.w || "casa"}?\n— Sì, con la mia ${words[4]?.w || "famiglia"}.`,
-  de: (words) => `— ${words[0]?.w || "Hallo"}! Wie geht es dir?\n— Sehr gut, ${words[1]?.w || "danke"}. Und dir?\n— Auch gut. Hast du ${words[2]?.w || "Wasser"}?\n— Ja, hier. Gehst du nach ${words[3]?.w || "Haus"}e?\n— Ja, mit meiner ${words[4]?.w || "Familie"}.`,
-  pt: (words) => `— ${words[0]?.w || "Olá"}! Como vai você?\n— Muito bem, ${words[1]?.w || "obrigado"}. E você?\n— Bem também. Tem ${words[2]?.w || "água"}?\n— Sim, aqui está. Vai para ${words[3]?.w || "casa"}?\n— Sim, com minha ${words[4]?.w || "família"}.`,
-  ar: (words) => `— ${words[0]?.w || "مرحبا"}! كيف حالك؟\n— بخير، ${words[1]?.w || "شكراً"}. وأنت؟\n— بخير أيضاً. هل معك ${words[2]?.w || "ماء"}؟\n— نعم، تفضل. هل ستذهب إلى ${words[3]?.w || "بيت"}؟\n— نعم، مع ${words[4]?.w || "عائلة"}تي.`,
-  ja: (words) => `— ${words[0]?.w || "こんにちは"}！元気ですか？\n— はい、${words[1]?.w || "ありがとう"}。あなたは？\n— 私も元気です。${words[2]?.w || "みず"}がありますか？\n— はい、どうぞ。${words[3]?.w || "いえ"}に帰りますか？\n— はい、${words[4]?.w || "かぞく"}と一緒に。`,
-  zh: (words) => `— ${words[0]?.w || "你好"}！你好吗？\n— 很好，${words[1]?.w || "谢谢"}。你呢？\n— 我也很好。你有${words[2]?.w || "水"}吗？\n— 有，给你。你要回${words[3]?.w || "家"}吗？\n— 是的，和我的${words[4]?.w || "家人"}一起。`,
-  hi: (words) => `— ${words[0]?.w || "नमस्ते"}! आप कैसे हैं?\n— बहुत अच्छा, ${words[1]?.w || "धन्यवाद"}। आप?\n— मैं भी अच्छा हूँ। क्या आपके पास ${words[2]?.w || "पानी"} है?\n— हाँ, लीजिए। क्या आप ${words[3]?.w || "घर"} जा रहे हैं?\n— हाँ, मेरे ${words[4]?.w || "परिवार"} के साथ।`,
-  ru: (words) => `— ${words[0]?.w || "Привет"}! Как дела?\n— Хорошо, ${words[1]?.w || "спасибо"}. А у тебя?\n— Тоже хорошо. У тебя есть ${words[2]?.w || "вода"}?\n— Да, вот. Идёшь домой?\n— Да, с моей ${words[4]?.w || "семьёй"}.`,
 };
 
 function shuffle(arr) { return [...arr].sort(()=>Math.random()-0.5); }
@@ -1861,7 +2982,7 @@ function LearningPage({ darkMode=true }) {
     setTimeout(()=>{
       setAnswer(null);
       if (quizIdx < sessionWords.length-1) { setQuizIdx(i=>{ makeQuizChoices(i+1); return i+1; }); }
-      else setScreen("convo");
+      else setScreen("review");
     }, isCorrect ? 600 : 1200);
   };
   const finishSession = () => {
@@ -1871,7 +2992,7 @@ function LearningPage({ darkMode=true }) {
     const last = load("rslv_learn_last_date","");
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
     const yStr = yesterday.toISOString().slice(0,10);
-    const newStreak = last===yStr||last===today ? streak+1 : 1;
+    const newStreak = last===today ? streak : (last===yStr ? streak+1 : 1);
     setStreak(newStreak);
     save("rslv_learn_streak", newStreak);
     save("rslv_learn_last_date", today);
@@ -2039,38 +3160,24 @@ function LearningPage({ darkMode=true }) {
     );
   }
 
-  if (screen==="convo") {
-    const convoFn = CONVERSATIONS[lang];
-    const lines = convoFn ? convoFn(sessionWords).split("\n") : [];
-    const hlColor = tt.gr.fg;
+  if (screen==="review") {
     return (
       <div style={{ padding:"0 18px 32px", animation:"tabIn 0.25s ease both", fontFamily:FONT }}>
         <div style={{ textAlign:"center", marginBottom:18 }}>
-          <div style={{ fontSize:12, fontWeight:700, color:tt.gr.fg, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:3 }}>Mini conversation</div>
-          <div style={{ fontSize:13, color:T.ink2, fontWeight:500 }}>Your words used in real life</div>
+          <div style={{ fontSize:12, fontWeight:700, color:tt.gr.fg, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:3 }}>Session review</div>
+          <div style={{ fontSize:13, color:T.ink2, fontWeight:500 }}>Tap each word — hear it, then say it out loud</div>
         </div>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:18, justifyContent:"center" }}>
-          {sessionWords.map(w=>(
-            <div key={w.w} onClick={()=>speak(w.w,lang)} style={{ padding:"6px 13px", borderRadius:999, background:tints(T).gr.bg, cursor:"pointer" }}>
-              <span style={{ fontSize:12, fontWeight:700, color:tt.gr.fg }}>{w.w}</span>
+        <div style={{ display:"flex", flexDirection:"column", gap:9, marginBottom:22 }}>
+          {sessionWords.map((w,i)=>(
+            <div key={w.w} onClick={()=>speak(w.w,lang)} style={{ display:"flex", alignItems:"center", gap:12, background:T.card, border:"1px solid "+T.line, borderRadius:18, padding:"13px 15px", cursor:"pointer", boxShadow:T.shadow, animation:"fadeUp .35s ease "+(i*0.06)+"s both" }}>
+              <div style={{ fontSize:26, lineHeight:1, flexShrink:0 }}>{w.e}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:16, fontWeight:800, color:T.ink }}>{w.w}</div>
+                <div style={{ fontSize:11.5, color:T.ink2, fontWeight:500, marginTop:1 }}>{w.t} · /{w.p}/</div>
+              </div>
+              <div style={{ width:36, height:36, borderRadius:"50%", background:tints(T).bl.bg, color:tt.bl.fg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><Ic n="sound" s={15}/></div>
             </div>
           ))}
-        </div>
-        <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:22 }}>
-          {lines.filter(l=>l.trim()).map((line,i)=>{
-            const isLeft = i%2===0;
-            const text = line.replace("— ","");
-            const highlighted = sessionWords.reduce((acc,w)=>acc.replace(new RegExp("\\b"+w.w+"\\b","g"),'<strong style="color:'+hlColor+'">'+w.w+"</strong>"),text);
-            return (
-              <div key={i} style={{ display:"flex", justifyContent:isLeft?"flex-start":"flex-end", alignItems:"flex-end", gap:8, animation:"fadeUp 0.4s ease "+(i*0.08)+"s both" }}>
-                {isLeft && <div style={{ fontSize:20 }}>{selectedLang && selectedLang.flag}</div>}
-                <div style={{ maxWidth:"78%", background:isLeft?T.card:tints(T).bl.bg, border:isLeft?("1px solid "+T.line):"none", borderRadius:isLeft?"20px 20px 20px 5px":"20px 20px 5px 20px", padding:"12px 15px", boxShadow:isLeft?T.shadow:"none" }}>
-                  <div style={{ fontSize:13.5, color:T.ink, fontWeight:500, lineHeight:1.55 }} dangerouslySetInnerHTML={{__html:highlighted}}/>
-                </div>
-                {!isLeft && <Chip n="user" c="bl" T={T} size={26} is={13} style={{ borderRadius:"50%" }}/>}
-              </div>
-            );
-          })}
         </div>
         <CTA T={T} onClick={finishSession}>Complete Session</CTA>
       </div>
@@ -2102,7 +3209,7 @@ function LearningPage({ darkMode=true }) {
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16, animation:"fadeUp 0.4s ease both" }}>
         <div>
           <div style={{ fontSize:26, fontWeight:800, color:T.ink, letterSpacing:"-0.02em" }}>Learning</div>
-          <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, marginTop:2 }}>{allWords.length>0 ? allWords.length+" words in "+(selectedLang?selectedLang.name:"") : "1,000+ words per language"}</div>
+          <div style={{ fontSize:12.5, color:T.ink2, fontWeight:500, marginTop:2 }}>{allWords.length>0 ? allWords.length+" words in "+(selectedLang?selectedLang.name:"") : "350+ words per language"}</div>
         </div>
         <div onClick={()=>setScreen("pick")} style={{ display:"flex", alignItems:"center", gap:7, background:T.card, border:"1px solid "+T.line, borderRadius:999, padding:"8px 12px 8px 10px", cursor:"pointer", boxShadow:T.shadow }}>
           <span style={{ fontSize:17, lineHeight:1 }}>{selectedLang?selectedLang.flag:""}</span>
@@ -3322,7 +4429,7 @@ function FitnessPage({ onModalChange=()=>{}, darkMode=true }) {
 
       <div style={{ background:T.card, border:"1px solid "+T.line, borderRadius:26, padding:"16px 18px", marginBottom:12, display:"flex", alignItems:"center", gap:16, boxShadow:T.shadow, animation:"fadeUp .4s ease .05s both" }}>
         <Ring pct={calPct} size={106} T={T} over={calOver}>
-          <div style={{ fontSize:21, fontWeight:800, letterSpacing:"-0.02em", lineHeight:1, color:calOver?PAL.red:T.ink, fontFamily:FONT }}>{Math.round(totals.cal).toLocaleString()}</div>
+          <div style={{ fontSize:21, fontWeight:800, letterSpacing:"-0.02em", lineHeight:1, color:calOver?PAL.red:T.ink, fontFamily:FONT }}><CountUp value={Math.round(totals.cal)}/></div>
           <div style={{ fontSize:9.5, fontWeight:600, color:T.ink3, marginTop:2, fontFamily:FONT }}>kcal</div>
         </Ring>
         <div>
@@ -3414,6 +4521,80 @@ function FitnessPage({ onModalChange=()=>{}, darkMode=true }) {
 /* ─────────────────────────────────────────────
    PROFILE / APP SETTINGS PAGE
 ───────────────────────────────────────────── */
+const PLANS=[
+  {id:"monthly",label:"Monthly",price:"€6.99",per:"per month",note:"Cancel anytime"},
+  {id:"yearly",label:"Yearly",price:"€34.99",per:"per year",note:"Save 58%",best:true},
+];
+function PremiumSheet({ T, current, onChoose, onClose }) {
+  const [sel,setSel]=useState(current&&current!=="free"?current:"yearly");
+  const tt=tints(T);
+  const feats=[["book","gr","All 10 languages · 3,500+ words"],["chart","bl","Full growth history & stats"],["flame","or","Streak protection"],["bell","am","Smart daily reminders"],["heart","ro","Support an independent app"]];
+  const p=PLANS.find(x=>x.id===sel);
+  return (
+    <Sheet T={T} onClose={onClose}>
+      <div style={{ background:GRAD.or, borderRadius:24, padding:"20px 18px", textAlign:"center", marginBottom:16 }}>
+        <div style={{ width:54, height:54, borderRadius:"50%", background:"rgba(255,255,255,.22)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 10px" }}><Ic n="star" s={26}/></div>
+        <div style={{ fontSize:21, fontWeight:800, color:"#fff", fontFamily:FONT }}>Risolvero Premium</div>
+        <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,.85)", fontFamily:FONT, marginTop:3 }}>Everything, unlocked.</div>
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:9, marginBottom:16 }}>
+        {feats.map(f=>(
+          <div key={f[2]} style={{ display:"flex", alignItems:"center", gap:11 }}>
+            <Chip n={f[0]} c={f[1]} T={T} size={32} is={15}/>
+            <span style={{ fontSize:13, fontWeight:600, color:T.ink, fontFamily:FONT }}>{f[2]}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
+        {PLANS.map(pl=>{ const on=sel===pl.id; return (
+          <div key={pl.id} onClick={()=>setSel(pl.id)} style={{ position:"relative", background:T.card, border:on?("2px solid "+PAL.or):("1px solid "+T.line), borderRadius:20, padding:"15px 13px", cursor:"pointer", boxShadow:T.shadow }}>
+            {pl.best&&<div style={{ position:"absolute", top:-9, left:"50%", transform:"translateX(-50%)", background:GRAD.or, color:"#fff", fontSize:8.5, fontWeight:800, fontFamily:FONT, padding:"3px 9px", borderRadius:999, letterSpacing:"0.06em", whiteSpace:"nowrap" }}>BEST VALUE</div>}
+            <div style={{ fontSize:12.5, fontWeight:700, color:T.ink2, fontFamily:FONT }}>{pl.label}</div>
+            <div style={{ fontSize:20, fontWeight:800, color:T.ink, fontFamily:FONT, margin:"3px 0 1px" }}>{pl.price}</div>
+            <div style={{ fontSize:10, fontWeight:600, color:T.ink3, fontFamily:FONT }}>{pl.per}</div>
+            <div style={{ fontSize:10, fontWeight:700, color:on?PAL.or:tt.gr.fg, fontFamily:FONT, marginTop:6 }}>{pl.note}</div>
+          </div>
+        );})}
+      </div>
+      <div style={{ fontSize:10.5, color:T.ink3, fontFamily:FONT, fontWeight:500, textAlign:"center", lineHeight:1.6, marginBottom:12 }}>Test mode — real billing arrives with the Play Store release. Nothing is charged today.</div>
+      <CTA T={T} onClick={()=>{ onChoose(sel); onClose(); }}>Start Premium · {p.price} {p.id==="monthly"?"/ month":"/ year"}</CTA>
+    </Sheet>
+  );
+}
+function ManageSheet({ T, plan, onSwitch, onCancel, onClose }) {
+  const [confirm,setConfirm]=useState(false);
+  const cur=PLANS.find(p=>p.id===plan)||PLANS[0];
+  const other=PLANS.find(p=>p.id!==plan);
+  return (
+    <Sheet T={T} onClose={onClose}>
+      <div style={{ fontSize:21, fontWeight:800, color:T.ink, fontFamily:FONT, marginBottom:14 }}>Manage subscription</div>
+      <div style={{ background:GRAD.or, borderRadius:22, padding:"16px 18px", display:"flex", alignItems:"center", gap:13, marginBottom:14 }}>
+        <div style={{ width:42, height:42, borderRadius:15, background:"rgba(255,255,255,.22)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n="star" s={20}/></div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:15, fontWeight:800, color:"#fff", fontFamily:FONT }}>Premium · {cur.label}</div>
+          <div style={{ fontSize:11.5, fontWeight:600, color:"rgba(255,255,255,.85)", fontFamily:FONT }}>{cur.price} {cur.per} · active</div>
+        </div>
+      </div>
+      {other&&(
+        <button onClick={()=>{ onSwitch(other.id); onClose(); }} style={{ width:"100%", padding:"14px", background:T.chip, border:"none", borderRadius:16, fontSize:13.5, fontWeight:700, fontFamily:FONT, color:T.ink, cursor:"pointer", marginBottom:10 }}>Switch to {other.label} · {other.price} {other.per}</button>
+      )}
+      {!confirm ? (
+        <button onClick={()=>setConfirm(true)} style={{ width:"100%", padding:"14px", background:tints(T).red.bg, border:"none", borderRadius:16, fontSize:13.5, fontWeight:700, fontFamily:FONT, color:PAL.red, cursor:"pointer" }}>Cancel subscription</button>
+      ):(
+        <div style={{ background:tints(T).red.bg, borderRadius:18, padding:"15px" }}>
+          <div style={{ fontSize:13, fontWeight:700, color:PAL.red, fontFamily:FONT, marginBottom:4 }}>Cancel Premium?</div>
+          <div style={{ fontSize:11.5, color:T.ink2, fontFamily:FONT, fontWeight:500, lineHeight:1.55, marginBottom:12 }}>You keep Premium until the end of the period, then return to the free plan.</div>
+          <div style={{ display:"flex", gap:9 }}>
+            <button onClick={()=>setConfirm(false)} style={{ flex:1, padding:"12px", background:T.card, border:"1px solid "+T.line, borderRadius:13, fontSize:12.5, fontWeight:700, fontFamily:FONT, color:T.ink, cursor:"pointer" }}>Keep it</button>
+            <button onClick={()=>{ onCancel(); onClose(); }} style={{ flex:1, padding:"12px", background:PAL.red, border:"none", borderRadius:13, fontSize:12.5, fontWeight:700, fontFamily:FONT, color:"#fff", cursor:"pointer" }}>Cancel plan</button>
+          </div>
+        </div>
+      )}
+      <div style={{ fontSize:10.5, color:T.ink3, fontFamily:FONT, fontWeight:500, textAlign:"center", lineHeight:1.6, marginTop:12 }}>Test mode — billing activates with the Play Store release.</div>
+    </Sheet>
+  );
+}
+
 function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }) {
   const T=THEME(darkMode);
   const tt=tints(T);
@@ -3437,6 +4618,11 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
   const [showFeedback, setShowFeedback] = useState(false);
   const [fbText, setFbText]       = useState("");
   const [notifTick, setNotifTick] = useState(0);
+  const [premium, setPremium]     = useState(()=>load("rslv_premium",{plan:"free"}));
+  const [showPremium, setShowPremium] = useState(false);
+  const [showManage, setShowManage]   = useState(false);
+  const setPlan   = (p)=>{ const v={plan:p, since:TODAY()}; setPremium(v); save("rslv_premium",v); };
+  const cancelPlan= ()=>{ const v={plan:"free"}; setPremium(v); save("rslv_premium",v); };
 
   const streak   = load("rslv_streak",0);
   const habits   = load("rslv_habits",[]);
@@ -3484,7 +4670,7 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
     alert("Today's data cleared.");
   };
   const clearAll = () => {
-    const keys = ["rslv_habits","rslv_done","rslv_streak","rslv_salary","rslv_deposits","rslv_expenses","rslv_loans","rslv_subs","rslv_fit_goals","rslv_fit_log","rslv_fit_water","rslv_learn_history","rslv_lang","rslv_learn_streak","rslv_learn_goal","rslv_profile","rslv_display_name","rslv_avatar","rslv_bio","rslv_currency","rslv_quick_actions"];
+    const keys = ["rslv_habits","rslv_done","rslv_streak","rslv_salary","rslv_deposits","rslv_expenses","rslv_loans","rslv_subs","rslv_fit_goals","rslv_fit_log","rslv_fit_water","rslv_learn_history","rslv_lang","rslv_learn_streak","rslv_learn_goal","rslv_profile","rslv_display_name","rslv_avatar","rslv_bio","rslv_currency","rslv_quick_actions","rslv_premium","rslv_learn_last_date"];
     keys.forEach(k=>localStorage.removeItem(k));
     setShowClear(false);
     window.location.reload();
@@ -3650,6 +4836,19 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
         <div onClick={()=>{ setDraftName(name); setDraftAvatar(avatar); setDraftBio(bio); onModalChange(true); setEditName(true); }} style={{ background:darkMode?"#fff":PAL.ink, color:darkMode?PAL.ink:"#fff", borderRadius:999, padding:"8px 15px", cursor:"pointer", fontSize:12, fontWeight:700 }}>Edit</div>
       </div>
 
+      {premium.plan==="free" ? (
+        <div onClick={()=>{ onModalChange(true); setShowPremium(true); }} style={{ background:GRAD.or, borderRadius:24, padding:"16px 18px", display:"flex", alignItems:"center", gap:13, marginBottom:18, cursor:"pointer", boxShadow:"0 12px 26px rgba(255,94,31,.28)", animation:"fadeUp 0.4s ease 0.08s both" }}>
+          <div style={{ width:44, height:44, borderRadius:16, background:"rgba(255,255,255,.22)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><Ic n="star" s={21}/></div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:"#fff" }}>Risolvero Premium</div>
+            <div style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,.85)", marginTop:1 }}>All languages, stats & more</div>
+          </div>
+          <div style={{ background:"#fff", color:PAL.or3, borderRadius:999, padding:"9px 15px", fontSize:12, fontWeight:800 }}>Upgrade</div>
+        </div>
+      ):(
+        <Row icon="star" c="am" label="Subscription" value={"Premium · "+(premium.plan==="yearly"?"Yearly":"Monthly")} onPress={()=>{ onModalChange(true); setShowManage(true); }}/>
+      )}
+
       <SecHead T={T} mt={0}>Preferences</SecHead>
       <Toggle icon="moon" c="ink" label={darkMode?"Dark mode":"Light mode"} value={darkMode} onToggle={()=>setDarkMode(d=>!d)}/>
       <Row icon="coins" c="gr" label="Currency" value={currency} onPress={()=>setSection("currency")}/>
@@ -3695,6 +4894,9 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
       <Row icon="trash" danger label="Clear all app data" onPress={()=>setShowClear(true)}/>
 
       <div style={{ textAlign:"center", fontSize:11, color:T.ink3, fontWeight:600, marginTop:18 }}>Risolvero · v1.0</div>
+
+      {showPremium && <PremiumSheet T={T} current={premium.plan} onChoose={setPlan} onClose={()=>{ setShowPremium(false); onModalChange(false); }}/>}
+      {showManage && <ManageSheet T={T} plan={premium.plan} onSwitch={setPlan} onCancel={cancelPlan} onClose={()=>{ setShowManage(false); onModalChange(false); }}/>}
 
       {editName && (
         <Sheet T={T} onClose={()=>{ setEditName(false); onModalChange(false); }}>
@@ -4023,25 +5225,23 @@ export default function Risolvero() {
         #rslv-root.light .legacy [style*="rgba(255,255,255,0.2)"] { color:rgba(27,27,31,0.65) !important; }
 
         /* progress-bar / circle tracks: white-on-dark -> visible warm grey */
-        #rslv-root.light circle[stroke="rgba(255,255,255,0.12)"] { stroke:rgba(27,27,31,0.1) !important; }
-        #rslv-root.light circle[stroke="rgba(255, 255, 255, 0.12)"] { stroke:rgba(27,27,31,0.1) !important; }
+        #rslv-root.light .legacy circle[stroke="rgba(255,255,255,0.12)"] { stroke:rgba(27,27,31,0.1) !important; }
+        #rslv-root.light .legacy circle[stroke="rgba(255, 255, 255, 0.12)"] { stroke:rgba(27,27,31,0.1) !important; }
 
         /* sticky header fade */
         #rslv-root.light .legacy [style*="linear-gradient(180deg,#12141E"],
         #rslv-root.light .legacy [style*="linear-gradient(180deg, #12141E"] { background:linear-gradient(180deg,#F4F4F6 70%,transparent 100%) !important; }
 
         /* inputs */
-        #rslv-root.light input, #rslv-root.light textarea, #rslv-root.light select {
+        #rslv-root.light .legacy input, #rslv-root.light .legacy textarea, #rslv-root.light .legacy select {
           background:#FFFFFF !important;
           border-color:rgba(27,27,31,0.12) !important;
           color:#1B1B1F !important;
         }
-        #rslv-root.light input::placeholder, #rslv-root.light textarea::placeholder { color:rgba(27,27,31,0.35) !important; }
+        #rslv-root.light .legacy input::placeholder, #rslv-root.light .legacy textarea::placeholder { color:rgba(27,27,31,0.35) !important; }
 
         /* bottom nav */
-        #rslv-root.light .bottom-nav > div { background:rgba(255,255,255,0.98) !important; box-shadow:0 -1px 24px rgba(27,27,31,0.1) !important; border-color:rgba(27,27,31,0.06) !important; }
         /* inactive nav buttons -> readable dark grey (active stays terracotta via inline) */
-        #rslv-root.light .bottom-nav button[style*="rgba(17, 17, 16, 0.35)"] svg { stroke:rgba(27,27,31,0.5) !important; }
 
         /* toggles keep their own styling in light mode (don't convert to white card) */
         #rslv-root.light .legacy .rslv-toggle.off { background:rgba(120,120,130,0.22) !important; border-color:rgba(120,120,130,0.5) !important; box-shadow:none !important; }
@@ -4124,12 +5324,12 @@ export default function Risolvero() {
 
         {!navHidden && (
         <div className="bottom-nav" style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, padding:"0 16px", zIndex:20, paddingBottom:"max(14px, env(safe-area-inset-bottom))" }}>
-          <div style={{ background:darkMode?"#1E1F25":"#17181C", border:darkMode?"1px solid #2A2B33":"none", borderRadius:24, height:64, display:"flex", justifyContent:"space-around", alignItems:"center", boxShadow:darkMode?"0 14px 34px rgba(0,0,0,.5)":"0 14px 30px rgba(23,24,28,.3)" }}>
+          <div style={{ background:"linear-gradient(180deg,#2C2D33 0%,#141519 60%,#0D0E11 100%)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:24, height:64, display:"flex", justifyContent:"space-around", alignItems:"center", boxShadow:"0 16px 34px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.10)" }}>
             {TABS.map(({id,label})=>{
               const active=tab===id;
               const NI={home:"home",fitness:"fit",learning:"book",finance:"wallet",profile:"user"};
               return (
-                <button key={id} onClick={()=>setTab(id)} style={{ flex:1, height:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:3, background:"none", border:"none", cursor:"pointer", color:active?PAL.or2:"rgba(255,255,255,.5)", transition:"color .2s" }}>
+                <button key={id} onClick={()=>setTab(id)} style={{ flex:1, height:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:3, background:"none", border:"none", cursor:"pointer", color:active?PAL.or2:"#FFFFFF", opacity:active?1:0.55, transition:"color .2s, opacity .2s" }}>
                   <Ic n={NI[id]||"target"} s={23}/>
                   <span style={{ fontSize:9.5, fontWeight:active?700:500, fontFamily:FONT }}>{label}</span>
                 </button>
