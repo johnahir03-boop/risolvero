@@ -333,15 +333,27 @@ const CountUp = ({ value, dur=600 }) => {
   const v=useCountUp(value,dur);
   return <>{Math.round(v)}</>;
 };
-const Sheet = ({ T, onClose, children }) => (
-  <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-    <div onClick={onClose} style={{ position:"absolute", inset:0, background:T.overlay, backdropFilter:"blur(3px)" }}/>
-    <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:T.sheet, borderRadius:"30px 30px 0 0", padding:"18px 20px 40px", animation:"sheetUp 0.3s ease both", maxHeight:"88dvh", display:"flex", flexDirection:"column", boxShadow:T.dark?"none":"0 -8px 40px rgba(23,24,28,.12)" }}>
-      <div style={{ width:38, height:4, borderRadius:3, background:T.line2, margin:"0 auto 16px", flexShrink:0 }}/>
-      <div style={{ flex:1, overflowY:"auto", WebkitOverflowScrolling:"touch", minHeight:0, overscrollBehavior:"contain" }}>{children}</div>
+const Sheet = ({ T, onClose, children }) => {
+  useEffect(()=>{
+    const y = window.scrollY;
+    const b = document.body;
+    const prev = { position:b.style.position, top:b.style.top, width:b.style.width, overflow:b.style.overflow };
+    b.style.position="fixed"; b.style.top=`-${y}px`; b.style.width="100%"; b.style.overflow="hidden";
+    return ()=>{
+      b.style.position=prev.position; b.style.top=prev.top; b.style.width=prev.width; b.style.overflow=prev.overflow;
+      window.scrollTo(0, y);
+    };
+  }, []);
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
+      <div onClick={onClose} style={{ position:"absolute", inset:0, background:T.overlay, backdropFilter:"blur(3px)" }}/>
+      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:T.sheet, borderRadius:"30px 30px 0 0", padding:"18px 20px 40px", animation:"sheetUp 0.3s ease both", maxHeight:"88dvh", display:"flex", flexDirection:"column", boxShadow:T.dark?"none":"0 -8px 40px rgba(23,24,28,.12)" }}>
+        <div style={{ width:38, height:4, borderRadius:3, background:T.line2, margin:"0 auto 16px", flexShrink:0 }}/>
+        <div style={{ flex:1, overflowY:"auto", WebkitOverflowScrolling:"touch", minHeight:0, overscrollBehavior:"contain" }}>{children}</div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 const SecHead = ({ T, children, right, mt=18 }) => (
   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", margin:mt+"px 2px 10px" }}>
     <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.13em", textTransform:"uppercase", color:T.ink3, fontFamily:FONT }}>{children}</div>
@@ -4227,6 +4239,16 @@ function FoodSearchModal({ meal, onSelect, onClose, startWithScan=false, T }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const rafRef = useRef(null);
+  useEffect(()=>{
+    const y = window.scrollY;
+    const b = document.body;
+    const prev = { position:b.style.position, top:b.style.top, width:b.style.width, overflow:b.style.overflow };
+    b.style.position="fixed"; b.style.top=`-${y}px`; b.style.width="100%"; b.style.overflow="hidden";
+    return ()=>{
+      b.style.position=prev.position; b.style.top=prev.top; b.style.width=prev.width; b.style.overflow=prev.overflow;
+      window.scrollTo(0, y);
+    };
+  }, []);
 
   const search = async (q) => {
     if (!q.trim()) return;
