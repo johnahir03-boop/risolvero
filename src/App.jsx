@@ -4878,6 +4878,7 @@ function ProfilePage({ onModalChange=()=>{}, darkMode=true, setDarkMode=()=>{} }
       <Row icon="chart" c="vi" label="Growth history" onPress={()=>setSection("history")}/>
 
       <SecHead T={T}>Notifications</SecHead>
+      <div style={{ fontSize:11.5, color:T.ink3, fontWeight:500, lineHeight:1.6, marginBottom:11, marginTop:-4 }}>These work while Risolvero is open. Reminders that reach you when the app is closed arrive with the App Store version.</div>
       <Toggle icon="bell" c="am" label="Daily habit reminder" value={notifs.habits} onToggle={()=>toggleNotif("habits")}/>
       <Toggle icon="flame" c="or" label="Streak alert" value={notifs.streak} onToggle={()=>toggleNotif("streak")}/>
       <Toggle icon="wallet" c="gr" label="Finance reminders" value={notifs.finance} onToggle={()=>toggleNotif("finance")}/>
@@ -5330,12 +5331,12 @@ export default function Risolvero() {
             <div onClick={()=>setShowNotifPrompt(false)} style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.5)" }}/>
             <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:430, background:darkMode?"#1A1A17":"#FFFFFF", borderRadius:28, padding:"28px 24px", margin:"0 16px", border:`1px solid ${darkMode?"rgba(245,243,239,0.1)":"rgba(17,17,16,0.1)"}`, animation:"sheetUp 0.3s ease both" }}>
               <div style={{ color:navAccent, display:"flex", justifyContent:"center", marginBottom:14 }}><Icons.Bell/></div>
-              <div style={{ fontSize:20, fontWeight:700, color:darkMode?"#F5F3EF":"#111110", fontFamily:FONT, textAlign:"center", marginBottom:8, letterSpacing:"-0.02em" }}>Stay on track</div>
+              <div style={{ fontSize:20, fontWeight:700, color:darkMode?"#F5F3EF":"#111110", fontFamily:FONT, textAlign:"center", marginBottom:8, letterSpacing:"-0.02em" }}>Reminders while you use the app</div>
               <div style={{ fontSize:14, color:darkMode?"#A8A49B":"#6E6B63", fontFamily:FONT, textAlign:"center", lineHeight:1.6, marginBottom:24 }}>
-                Get reminders for your habits, streak alerts and subscription renewals.
+                Get gentle nudges about your habits while Risolvero is open. Full background reminders arrive with the App Store version.
               </div>
               <button onClick={async()=>{ await requestNotifPermission(); scheduleNotifications(); setShowNotifPrompt(false); }} style={{ width:"100%", padding:"16px", background:darkMode?"#F5F3EF":"#111110", border:"none", borderRadius:16, fontSize:15, fontWeight:600, fontFamily:FONT, color:darkMode?"#121110":"#F2F1ED", cursor:"pointer", marginBottom:10, letterSpacing:"-0.01em" }}>
-                Enable Notifications
+                Turn on reminders
               </button>
               <button onClick={()=>setShowNotifPrompt(false)} style={{ width:"100%", padding:"12px", background:"none", border:"none", fontSize:13, fontFamily:FONT, color:darkMode?"#6E6A62":"#9A988F", cursor:"pointer" }}>
                 Not now
